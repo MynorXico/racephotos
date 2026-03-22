@@ -1,4 +1,5 @@
 import * as cdk from "aws-cdk-lib";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import {
@@ -32,6 +33,20 @@ export class PipelineStack extends cdk.Stack {
             pipelineName: "racephotos-pipeline",
             crossAccountKeys: true,
             selfMutation: true,
+
+            // Grant the synth CodeBuild project permission to read SSM parameters
+            // used by valueFromLookup during cdk synth.
+            synthCodeBuildDefaults: {
+                rolePolicy: [
+                    new iam.PolicyStatement({
+                        effect: iam.Effect.ALLOW,
+                        actions: ["ssm:GetParameter"],
+                        resources: [
+                            `arn:aws:ssm:${this.region}:${this.account}:parameter/racephotos/*`,
+                        ],
+                    }),
+                ],
+            },
 
             synth: new ShellStep("Synth", {
                 input: CodePipelineSource.connection(
