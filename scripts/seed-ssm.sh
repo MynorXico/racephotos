@@ -1,0 +1,75 @@
+#!/usr/bin/env bash
+# =============================================================================
+# seed-ssm.sh
+#
+# One-time setup: creates all SSM parameters in the TOOLS account.
+# Run this with credentials for the TOOLS account before the first cdk deploy.
+#
+# Usage:
+#   AWS_PROFILE=tools ./scripts/seed-ssm.sh
+#
+# You will be prompted for each value. Nothing is hardcoded here.
+# Re-run at any time to update a value — put-parameter with --overwrite
+# updates existing parameters safely.
+# =============================================================================
+
+set -euo pipefail
+
+REGION=${AWS_REGION:-us-east-1}
+
+put() {
+  local name=$1
+  local value=$2
+  aws ssm put-parameter \
+    --name "$name" \
+    --value "$value" \
+    --type "String" \
+    --overwrite \
+    --region "$REGION" \
+    --query "Version" \
+    --output text
+  echo "  set $name"
+}
+
+echo ""
+echo "RaceShots — SSM parameter setup"
+echo "Region: $REGION"
+echo "Profile: ${AWS_PROFILE:-default}"
+echo ""
+
+# ── TOOLS account ─────────────────────────────────────────────────────────────
+read -rp "TOOLS account ID:  " TOOLS_ACCOUNT
+read -rp "TOOLS region:      " TOOLS_REGION
+
+put "/racephotos/tools/account-id" "$TOOLS_ACCOUNT"
+put "/racephotos/tools/region"     "$TOOLS_REGION"
+
+# ── GitHub ────────────────────────────────────────────────────────────────────
+read -rp "GitHub owner (org or username): " GH_OWNER
+read -rp "GitHub repo name:               " GH_REPO
+read -rp "GitHub branch [main]:           " GH_BRANCH
+GH_BRANCH=${GH_BRANCH:-main}
+read -rp "CodeStar connection ARN:        " CS_ARN
+
+put "/racephotos/github/owner"                  "$GH_OWNER"
+put "/racephotos/github/repo"                   "$GH_REPO"
+put "/racephotos/github/branch"                 "$GH_BRANCH"
+put "/racephotos/github/codestar-connection-arn" "$CS_ARN"
+
+# ── Target accounts ───────────────────────────────────────────────────────────
+for ENV_NAME in dev qa staging prod; do
+  echo ""
+  echo "── $ENV_NAME ──"
+  read -rp "  Account ID (leave blank to skip): " ACC
+  if [[ -z "$ACC" ]]; then
+    echo "  Skipping $ENV_NAME"
+    continue
+  fi
+  read -rp "  Region [$TOOLS_REGION]: " REG
+  REG=${REG:-$TOOLS_REGION}
+  put "/racephotos/env/$ENV_NAME/account-id" "$ACC"
+  put "/racephotos/env/$ENV_NAME/region"     "$REG"
+done
+
+echo ""
+echo "Done. Run 'cdk synth' to verify all parameters resolve correctly."
