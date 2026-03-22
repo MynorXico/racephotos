@@ -1,6 +1,6 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
-import { EnvConfig } from "../config/environments";
+import { EnvConfig } from "../config/types";
 
 interface RacePhotosStageProps extends cdk.StageProps {
     config: EnvConfig;
