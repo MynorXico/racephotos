@@ -19,8 +19,9 @@ infra/cdk/config/environments.ts
 # =============================================================================
 # Go
 # =============================================================================
-# Binaries
-**/bin/
+# Binaries (Lambda/shared build output only — does not apply to infra/cdk/bin/)
+lambdas/**/bin/
+shared/**/bin/
 **/*.exe
 **/*.exe~
 **/*.dll
