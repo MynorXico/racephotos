@@ -1,6 +1,7 @@
 import * as cdk from "aws-cdk-lib";
 import { Construct } from "constructs";
 import { EnvConfig } from "../config/types";
+import { PlaceholderStack } from "../stacks/placeholder-stack";
 
 interface RacePhotosStageProps extends cdk.StageProps {
     config: EnvConfig;
@@ -31,10 +32,8 @@ export class RacePhotosStage extends cdk.Stage {
         // new PhotoStorageStack(this, "PhotoStorage", { config });
         // new ProcessingStack(this, "Processing", { config });
         //
-        // For now this stage is intentionally empty — the pipeline will still
-        // deploy and self-mutate successfully with no stacks inside it.
-
-        // Suppress unused variable warning during skeleton phase
-        void config;
+        // PlaceholderStack satisfies the CDK Pipelines requirement of at least
+        // one Stack per Stage. Remove it once a real application stack exists.
+        new PlaceholderStack(this, "Placeholder", { env: props.env, config });
     }
 }
