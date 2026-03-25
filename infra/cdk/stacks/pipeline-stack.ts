@@ -8,6 +8,7 @@ import {
     ShellStep,
 } from "aws-cdk-lib/pipelines";
 import { PipelineConfig } from "../config/types";
+import {RacePhotosStage} from "../stages/racephotos-stage";
 
 /**
  * PipelineStack — lives in the TOOLS account.
