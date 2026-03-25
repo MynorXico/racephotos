@@ -69,16 +69,16 @@ export class PipelineStack extends cdk.Stack {
 
         // -------------------------------------------------------------------------
         // Application stages — uncomment as environments are ready.
-        //
-        // const devEnv = config.environments.dev;
-        // if (devEnv) {
-        //   pipeline.addStage(
-        //     new RacePhotosStage(this, "Dev", {
-        //       env: { account: devEnv.account, region: devEnv.region },
-        //       config: devEnv,
-        //     })
-        //   );
-        // }
+
+        const devEnv = config.environments.dev;
+        if (devEnv) {
+          pipeline.addStage(
+            new RacePhotosStage(this, "Dev", {
+              env: { account: devEnv.account, region: devEnv.region },
+              config: devEnv,
+            })
+          );
+        }
         //
         // const stagingEnv = config.environments.staging;
         // if (stagingEnv) {

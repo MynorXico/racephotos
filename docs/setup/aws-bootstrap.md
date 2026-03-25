@@ -156,6 +156,13 @@ AWS_PROFILE=tools npx cdk deploy RacePhotosPipeline
 > to `main` triggers it automatically. Do not run `cdk deploy` again manually
 > for the pipeline or any application stack — let the pipeline handle it.
 
+> **If the first pipeline run fails with `ssm:GetParameter` access denied:**
+> This is a known chicken-and-egg issue — the CodeBuild role's SSM policy is
+> applied by CloudFormation only after a successful synth, but the synth needs
+> the policy to succeed. Fix it by running `cdk deploy` locally a second time
+> (same commands above) to patch the role directly. Then re-trigger the
+> pipeline. See [troubleshooting.md](troubleshooting.md) for full details.
+
 ---
 
 ## Step 5 — Verify the pipeline

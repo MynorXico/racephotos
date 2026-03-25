@@ -167,6 +167,54 @@ repo root automatically selects the correct version.
 
 ---
 
+## CodePipeline / CodeBuild issues
+
+### Pipeline synth step fails: "not authorized to perform: ssm:GetParameter"
+
+**Symptom**
+```
+[Error at /RacePhotosPipeline] User: arn:aws:sts::ACCOUNT:assumed-role/
+RacePhotosPipeline-PipelineBuildSynthCdkBuildProjec-.../AWSCodeBuild-...
+is not authorized to perform: ssm:GetParameter on resource:
+arn:aws:ssm:us-east-1:ACCOUNT:parameter/racephotos/github/owner
+because no identity-based policy allows the ssm:GetParameter action
+```
+
+**Cause**
+CDK Pipelines chicken-and-egg problem. The IAM policy that grants the synth
+CodeBuild role `ssm:GetParameter` on `racephotos/*` is defined in CDK
+(`synthCodeBuildDefaults.rolePolicy` in `pipeline-stack.ts`). That policy is
+only applied when CloudFormation updates the stack — but CloudFormation can
+only update the stack after a successful `cdk synth` — which requires the
+permission it doesn't yet have.
+
+This happens on the first pipeline run after the stack is created, or after
+any change to `synthCodeBuildDefaults` is pushed without a prior local deploy.
+
+**Fix**
+Run `cdk deploy` locally once to patch the CodeBuild role directly via
+CloudFormation, bypassing the pipeline:
+
+```bash
+cd infra/cdk
+export CDK_DEFAULT_ACCOUNT=$(AWS_PROFILE=tools aws sts get-caller-identity \
+  --query Account --output text)
+export CDK_DEFAULT_REGION=us-east-1
+
+AWS_PROFILE=tools npx cdk deploy RacePhotosPipeline
+```
+
+After the deploy completes, re-trigger the pipeline (push a commit or click
+**Release change** in the CodePipeline console). The synth step will now
+succeed, and the pipeline will self-mutate to stay in sync going forward.
+
+> **Why this works:** The local deploy updates the CloudFormation stack
+> directly, attaching the SSM policy to the CodeBuild role without going
+> through the pipeline's synth step. Once the role has the permission, the
+> pipeline can run and self-mutate normally.
+
+---
+
 ## AWS / credential issues
 
 ### "Unable to resolve AWS account to use"
