@@ -69,7 +69,26 @@ for ENV_NAME in dev qa staging prod; do
   REG=${REG:-$TOOLS_REGION}
   put "/racephotos/env/$ENV_NAME/account-id" "$ACC"
   put "/racephotos/env/$ENV_NAME/region"     "$REG"
+
+  # Custom domain — leave blank for CloudFront default (*.cloudfront.net)
+  read -rp "  Custom domain (e.g. app.dev.example.com, blank = none): " DOMAIN
+  DOMAIN=${DOMAIN:-none}
+  put "/racephotos/env/$ENV_NAME/domain-name" "$DOMAIN"
+
+  # ACM certificate ARN — must be in us-east-1 (CloudFront requirement)
+  if [[ "$DOMAIN" == "none" ]]; then
+    put "/racephotos/env/$ENV_NAME/certificate-arn" "none"
+  else
+    echo "  Certificate must be in us-east-1 in the $ENV_NAME account."
+    echo "  See docs/setup/aws-bootstrap.md for ACM setup instructions."
+    read -rp "  ACM certificate ARN (us-east-1): " CERT_ARN
+    put "/racephotos/env/$ENV_NAME/certificate-arn" "$CERT_ARN"
+  fi
 done
 
 echo ""
 echo "Done. Run 'cdk synth' to verify all parameters resolve correctly."
+echo ""
+echo "Tip: verify with:"
+echo "  AWS_PROFILE=tools aws ssm get-parameters-by-path \\"
+echo "    --path '/racephotos' --recursive --output table"
