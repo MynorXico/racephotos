@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration lint lint-check build seed-local synth ng-build ng-test e2e validate
+.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-test storybook-build e2e validate
 
 LAMBDAS := photo-upload photo-processor watermark search payment
 
@@ -57,9 +57,14 @@ seed-local:
 	@echo "Starting LocalStack seed..."
 	bash scripts/seed-local.sh
 
-# CDK synth check — --no-lookups skips SSM/context resolution (safe in CI)
+# CDK synth — requires real AWS credentials and resolved SSM context.
+# Run locally before deploying. Not used in CI (see cdk-check).
 synth:
-	cd infra/cdk && npx cdk synth --no-lookups
+	cd infra/cdk && npx cdk synth
+
+# CDK type-check + unit tests — no AWS credentials required, safe in CI
+cdk-check:
+	cd infra/cdk && npx tsc --noEmit && npm test
 
 # Angular build check
 ng-build:
@@ -77,5 +82,5 @@ storybook-build:
 e2e:
 	cd frontend/angular && npx playwright test
 
-# Full validation — runs everything
-validate: test lint synth ng-build ng-test storybook-build
+# Full validation — runs everything (cdk-check, not synth — synth needs credentials)
+validate: test lint cdk-check ng-build ng-test storybook-build

@@ -39,7 +39,14 @@ jobs:
         run: make lint
 
   # ──────────────────────────────────────────────
-  # Infrastructure: CDK synth
+  # Infrastructure: CDK type-check + unit tests
+  #
+  # We do NOT run `cdk synth` in CI. The pipeline stack resolves all config
+  # via SSM valueFromLookup, which requires real AWS credentials and cached
+  # context — neither available in CI without secrets. Instead we:
+  #   1. tsc --noEmit: validates all TypeScript types across constructs/stacks
+  #   2. jest: validates construct logic via CDK assertions (no AWS calls)
+  # Run `make synth` locally with real credentials to verify deploy readiness.
   # ──────────────────────────────────────────────
   infrastructure:
     name: Infrastructure (CDK)
@@ -56,13 +63,11 @@ jobs:
       - name: Install CDK dependencies
         run: cd infra/cdk && npm ci
 
-      - name: CDK synth
-        # --no-lookups prevents CDK from making AWS API calls (SSM/context lookups).
-        # This validates construct logic and type correctness without needing credentials.
-        run: make synth
-        env:
-          CDK_DEFAULT_ACCOUNT: '000000000000'
-          CDK_DEFAULT_REGION: 'us-east-1'
+      - name: TypeScript type-check
+        run: cd infra/cdk && npx tsc --noEmit
+
+      - name: CDK unit tests
+        run: cd infra/cdk && npm test
 
   # ──────────────────────────────────────────────
   # Frontend: build + unit tests + E2E
