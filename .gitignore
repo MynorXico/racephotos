@@ -57,6 +57,14 @@ frontend/angular/node_modules/
 frontend/angular/dist/
 frontend/angular/.angular/
 frontend/angular/*.js.map
+frontend/angular/storybook-static/
+frontend/angular/storybook.log
+
+# =============================================================================
+# Playwright
+# =============================================================================
+test-results/
+playwright-report/
 
 # =============================================================================
 # Lambda build artifacts
