@@ -1,0 +1,76 @@
+# golangci-lint configuration for RaceShots
+# Shared by all Lambda modules — each module picks this up automatically
+# because golangci-lint traverses up from the working directory.
+#
+# Run: golangci-lint run ./...
+# Docs: https://golangci-lint.run/usage/configuration/
+
+run:
+  timeout: 5m
+  # Only show new issues relative to the base branch in CI
+  new-from-rev: ""
+
+linters:
+  disable-all: true
+  enable:
+    # Correctness
+    - errcheck        # unchecked errors
+    - govet           # go vet checks
+    - staticcheck     # advanced static analysis
+    - unused          # unused code
+    - ineffassign     # assignments that are never used
+
+    # Context propagation (critical for Lambda handlers)
+    - contextcheck    # ensures context is passed through call chains
+
+    # Error wrapping (matches CLAUDE.md: fmt.Errorf("op: %w", err))
+    - wrapcheck       # errors from external packages must be wrapped
+
+    # Code quality
+    - gosimple        # simplification suggestions
+    - gofmt           # formatting (redundant with goimports but explicit)
+    - goimports       # import ordering
+    - misspell        # typos in comments and strings
+    - whitespace      # unnecessary blank lines
+
+    # Security
+    - gosec           # common security issues (SQL injection, weak crypto, etc.)
+
+linters-settings:
+  errcheck:
+    # Require all type assertions to be checked
+    check-type-assertions: true
+    # Require all blank identifier assignments from function calls to be checked
+    check-blank: true
+
+  wrapcheck:
+    # Internal packages do not need wrapping — only external/SDK errors
+    ignorePackageGlobs:
+      - github.com/racephotos/*
+
+  gosec:
+    excludes:
+      # G115: integer overflow — acceptable in Lambda context
+      - G115
+
+  goimports:
+    # Keep AWS SDK imports in a separate group
+    local-prefixes: github.com/racephotos
+
+  govet:
+    enable:
+      - shadow   # catch variable shadowing
+
+issues:
+  # Show all issues — don't truncate
+  max-issues-per-linter: 0
+  max-same-issues: 0
+
+  # Exclude generated mock files from linting
+  exclude-rules:
+    - path: "mock_.*\\.go"
+      linters: [all]
+    - path: "_test\\.go"
+      linters:
+        - wrapcheck   # test files can use unwrapped errors
+        - gosec        # test files don't need security checks

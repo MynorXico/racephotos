@@ -69,9 +69,13 @@ ng-build:
 ng-test:
 	cd frontend/angular && ng test --watch=false --code-coverage
 
+# Storybook build (component isolation check)
+storybook-build:
+	cd frontend/angular && npm run storybook:build
+
 # Playwright E2E tests (requires dev server running)
 e2e:
 	cd frontend/angular && npx playwright test
 
 # Full validation — runs everything
-validate: test lint synth ng-build ng-test
+validate: test lint synth ng-build ng-test storybook-build

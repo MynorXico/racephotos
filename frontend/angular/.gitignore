@@ -46,3 +46,6 @@ Thumbs.db
 /test-results
 /blob-report
 # Snapshots ARE committed (visual baselines) — do not ignore e2e/**/*.png
+
+# Storybook
+/storybook-static
