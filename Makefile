@@ -57,17 +57,17 @@ seed-local:
 	@echo "Starting LocalStack seed..."
 	bash scripts/seed-local.sh
 
-# CDK synth check
+# CDK synth check — --no-lookups skips SSM/context resolution (safe in CI)
 synth:
-	cd infra/cdk && npx cdk synth
+	cd infra/cdk && npx cdk synth --no-lookups
 
 # Angular build check
 ng-build:
-	cd frontend/angular && ng build --configuration=production
+	cd frontend/angular && npx ng build --configuration=production
 
 # Angular unit tests
 ng-test:
-	cd frontend/angular && ng test --watch=false --code-coverage
+	cd frontend/angular && npx ng test --watch=false --code-coverage
 
 # Storybook build (component isolation check)
 storybook-build:

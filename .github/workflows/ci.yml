@@ -57,11 +57,10 @@ jobs:
         run: cd infra/cdk && npm ci
 
       - name: CDK synth
+        # --no-lookups prevents CDK from making AWS API calls (SSM/context lookups).
+        # This validates construct logic and type correctness without needing credentials.
         run: make synth
         env:
-          # CDK synth reads these from SSM at synth time via valueFromLookup.
-          # In CI the pipeline account is not available, so we use a dummy
-          # account/region — synth validates construct logic, not deploy targets.
           CDK_DEFAULT_ACCOUNT: '000000000000'
           CDK_DEFAULT_REGION: 'us-east-1'
 
@@ -87,7 +86,7 @@ jobs:
         run: make ng-build
 
       - name: Unit tests
-        run: cd frontend/angular && npx ng test --watch=false --code-coverage --browsers=ChromeHeadless
+        run: cd frontend/angular && npx ng test --watch=false --code-coverage --browsers=ChromeHeadlessNoSandbox
 
       - name: Install Playwright browsers
         run: cd frontend/angular && npx playwright install chromium --with-deps
@@ -122,4 +121,5 @@ jobs:
         run: cd frontend/angular && npm ci
 
       - name: Build Storybook
-        run: cd frontend/angular && npx storybook build
+        # Must use the Angular builder — `npx storybook build` is the legacy path
+        run: cd frontend/angular && npm run storybook:build
