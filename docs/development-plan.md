@@ -107,14 +107,16 @@ See `docs/setup/runtime-config.md`.
 
 ---
 
-### PR 6 — Local development baseline: docker-compose, seed script, .env.example
+### PR 6 — Local development baseline: docker-compose, seed script, .env.example ✅ Ready to merge
 
 **Deliverables:**
 
-- `docker-compose.yml` (LocalStack, with health check and port 4566)
-- `.env.example` (all `RACEPHOTOS_*` vars with placeholder values)
-- `scripts/seed-local.sh` (creates S3 buckets, DynamoDB table, SQS queue matching CDK definitions)
-- `docs/setup/local-dev.md` updated with the actual working commands
+- `docker-compose.yml` (LocalStack 3, health check, PERSISTENCE=1, port 4566) ✅
+- `.env.example` (all `RACEPHOTOS_*` vars + AWS LocalStack vars with placeholder values) ✅
+- `scripts/seed-local.sh` (creates S3 buckets, DynamoDB, SQS + DLQ, Cognito pool + client, SES identity; idempotent; prints frontend config values) ✅
+- `docs/setup/local-dev.md` — full working guide: first-time setup → daily workflow → re-seeding → Rekognition mock ✅
+- `frontend/angular/proxy.conf.json` — dev-server proxy `/api/*` → `http://localhost:3000` ✅
+- `frontend/angular/angular.json` — proxy wired to serve config; `src/assets` added to build and test asset paths ✅
 
 **Why before code:** no Lambda can be tested locally without this. The first
 `make test-integration` call will fail without a running LocalStack and seeded resources.

@@ -79,6 +79,8 @@ lambdas/**/*.zip
 .localstack/
 volume/
 
+# .env.local already listed above — no duplicate needed here
+
 # =============================================================================
 # Terraform (if ever added)
 # =============================================================================
