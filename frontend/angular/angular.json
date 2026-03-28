@@ -78,6 +78,7 @@
         "test": {
           "builder": "@angular-devkit/build-angular:karma",
           "options": {
+            "karmaConfig": "karma.conf.js",
             "polyfills": [
               "zone.js",
               "zone.js/testing"
@@ -94,6 +95,26 @@
               "src/styles.scss"
             ],
             "scripts": []
+          }
+        },
+        "storybook": {
+          "builder": "@storybook/angular:start-storybook",
+          "options": {
+            "configDir": ".storybook",
+            "browserTarget": "racephotos:build",
+            "compodoc": false,
+            "port": 6006,
+            "tsConfig": "tsconfig.storybook.json"
+          }
+        },
+        "build-storybook": {
+          "builder": "@storybook/angular:build-storybook",
+          "options": {
+            "configDir": ".storybook",
+            "browserTarget": "racephotos:build",
+            "compodoc": false,
+            "outputDir": "storybook-static",
+            "tsConfig": "tsconfig.storybook.json"
           }
         }
       }
