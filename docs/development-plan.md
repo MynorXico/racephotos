@@ -84,18 +84,26 @@ pass these checks. Retrofitting formatting and lint rules to 10+ files is painfu
 
 ---
 
-### PR 5 — Frontend infrastructure: NgRx + Angular environments + Cognito auth ADR
+### PR 5 — Frontend infrastructure: NgRx + runtime config + Amplify ✅ Ready to merge
+
+**Design decision: environment-agnostic build**
+One compiled Angular artifact is deployed to every environment (dev, qa, staging, prod).
+No `environment.ts` file-replacement at build time. Instead, the deploy pipeline writes
+`config.json` to S3 per environment; Angular loads it at startup via `APP_INITIALIZER`.
+See `docs/setup/runtime-config.md`.
 
 **Deliverables:**
 
-- NgRx installed: `@ngrx/store`, `@ngrx/effects`, `@ngrx/entity`, `@ngrx/router-store`, `@ngrx/store-devtools`
-- Root store wired in `app.config.ts`
-- Feature store folder structure created: `src/app/store/{auth,events,photos,purchases}/`
-- `src/environments/environment.ts` + `environment.prod.ts` (API base URL, Cognito pool ID, region)
-- `docs/adr/0007-cognito-auth-sdk.md` (AWS Amplify vs. thin wrapper)
-- Angular build configurations updated to swap environments per target
-
-**Blocked on:** answer to Cognito auth SDK question — see section below.
+- NgRx installed: `@ngrx/store`, `@ngrx/effects`, `@ngrx/entity`, `@ngrx/router-store`, `@ngrx/store-devtools` ✅
+- `aws-amplify` installed ✅
+- `src/app/core/config/app-config.model.ts` — `AppConfig` interface ✅
+- `src/app/core/config/app-config.service.ts` — fetches `/assets/config.json` at startup ✅
+- `src/assets/config.json` — committed placeholder (overwritten per env at deploy time) ✅
+- `app.config.ts` — `APP_INITIALIZER` loads config + configures Amplify; NgRx root store wired ✅
+- Feature store folder structure: `src/app/store/{auth,events,photos,purchases}/` ✅
+  - Auth: full actions / state / reducer / selectors / effects (Amplify `getCurrentUser`, `signOut`)
+  - Events / Photos / Purchases: typed action stubs (filled in by feature stories)
+- `docs/setup/runtime-config.md` — documents the pattern and deploy injection steps ✅
 
 ---
 
