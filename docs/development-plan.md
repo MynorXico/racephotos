@@ -24,6 +24,10 @@ Update this file as PRs are merged and decisions are made.
 | ADR-0001: Photographer approval via SES email + in-app dashboard | #2 |
 | ADR-0003: Multi-bib photos → independent purchases per runner | #2 |
 | ADR-0005: NgRx for Angular state management | #2 |
+| ADR-0002: Runner self-serve re-download via email verification | #3 |
+| ADR-0004: Events publicly listed on homepage (visibility field for v2) | #3 |
+| ADR-0006: Angular Material (M3) as design system | #3 |
+| ADR-0007: AWS Amplify v6 auth-only for Cognito integration | #3 |
 
 ### Not started
 See the PR sequence below.
@@ -37,14 +41,13 @@ product story. Do not start development until all 8 are merged.
 
 ---
 
-### PR 3 — Product decisions: ADRs 0002, 0004, and design system
+### PR 3 — Product decisions: ADRs 0002, 0004, 0006, 0007 ✅ Ready to merge
 
 **Deliverables:**
-- `docs/adr/0002-runner-redownload-ux.md`
-- `docs/adr/0004-event-visibility.md`
-- `docs/adr/0006-design-system.md`
-
-**Blocked on:** answers to open questions — see section below.
+- `docs/adr/0002-runner-self-serve-redownload.md` ✅
+- `docs/adr/0004-public-event-listing.md` ✅
+- `docs/adr/0006-angular-material-design-system.md` ✅
+- `docs/adr/0007-aws-amplify-cognito-auth.md` ✅
 
 ---
 
@@ -164,10 +167,10 @@ surfaces cross-story dependencies and inconsistencies before they become bugs.
 
 | # | Question | Blocks | Status |
 |---|---|---|---|
-| A | **Runner re-download**: expired signed URL → self-serve email verification, or contact photographer? | PR 9 (RS-006, RS-009) | ❌ Pending |
-| B | **Event visibility**: direct link only, or publicly listed on a homepage? | PR 9 (RS-007, RS-008) | ❌ Pending |
-| C | **Design system**: Angular Material, PrimeNG, or TailwindCSS only? | PR 3, PR 5, PR 9 (all frontend stories) | ❌ Pending |
-| D | **Cognito auth SDK**: AWS Amplify (`aws-amplify`) or thin custom wrapper? | PR 5, PR 9 (RS-007) | ❌ Pending |
+| A | **Runner re-download**: self-serve email verification against purchase record | PR 9 (RS-006, RS-009) | ✅ ADR-0002 written |
+| B | **Event visibility**: publicly listed on homepage (add `visibility` field for v2 unlisted support) | PR 9 (RS-007, RS-008) | ✅ ADR-0004 written |
+| C | **Design system**: Angular Material (M3 theming, CDK, tree-shaken imports) | PR 3, PR 5, PR 9 | ✅ ADR-0006 written |
+| D | **Cognito auth SDK**: AWS Amplify v6 (`aws-amplify/auth` only, wrapped in NgRx effects) | PR 5, PR 9 (RS-007) | ✅ ADR-0007 written |
 
 ---
 
