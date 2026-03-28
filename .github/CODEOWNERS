@@ -1,0 +1,18 @@
+# CODEOWNERS — automatic review requests
+#
+# For an open-source project with a single maintainer, all paths route to the
+# repo owner. Update this file as the team grows.
+#
+# Format: <pattern> <@github-username or @org/team>
+
+# Default owner for everything not matched below
+* @MynorXico
+
+# Architecture decisions — require maintainer review
+/docs/adr/ @MynorXico
+
+# CDK infrastructure — require maintainer review
+/infra/ @MynorXico
+
+# CI/CD pipeline — require maintainer review
+/.github/ @MynorXico

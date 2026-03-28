@@ -1,0 +1,23 @@
+# Build outputs
+dist/
+cdk.out/
+storybook-static/
+coverage/
+
+# Dependencies
+node_modules/
+**/node_modules/
+
+# Generated files
+*.lock
+yarn.lock
+package-lock.json
+*.d.ts
+
+# Go binaries
+lambdas/**/bootstrap
+lambdas/**/handler
+
+# CDK compiled output (gitignored JS/d.ts, but also ignore for formatting)
+infra/cdk/**/*.js
+infra/cdk/**/*.d.ts

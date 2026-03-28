@@ -1,0 +1,35 @@
+{
+  "name": "racephotos",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.0.0",
+    "@commitlint/config-conventional": "^19.0.0",
+    "@eslint/js": "^10.0.1",
+    "angular-eslint": "^21.3.1",
+    "husky": "^9.0.0",
+    "lint-staged": "^15.0.0",
+    "prettier": "^3.0.0"
+  },
+  "lint-staged": {
+    "frontend/angular/src/**/*.{ts,html}": [
+      "prettier --write",
+      "eslint --fix --max-warnings=0 --config frontend/angular/eslint.config.js"
+    ],
+    "infra/cdk/**/*.ts": [
+      "prettier --write"
+    ],
+    "lambdas/**/*.go": [
+      "gofmt -w"
+    ],
+    "shared/**/*.go": [
+      "gofmt -w"
+    ],
+    "*.{json,yml,yaml,md}": [
+      "prettier --write"
+    ]
+  }
+}
