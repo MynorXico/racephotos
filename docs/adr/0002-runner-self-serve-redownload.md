@@ -1,122 +1,143 @@
-# ADR-0002: Runner self-serve re-download via email + payment reference
+# ADR-0002: Runner re-download via long-lived download token delivered by email
 **Date**: 2026-03-28
 **Status**: accepted
 
 ## Context
 
-Signed S3 download URLs have a 24-hour TTL (domain rule 6). After expiry, a runner
+Signed S3 download URLs have a 24-hour TTL (domain rule 6). After expiry a runner
 who has already paid cannot access their photo until a new signed URL is generated.
 
-Two questions needed resolving:
-1. Should runners re-download themselves, or contact the photographer?
-2. What verification is strong enough to prevent a third party from accessing
-   a runner's photos by knowing only their email address?
+Two earlier approaches were considered and rejected:
 
-This matters because:
-- Runners may not download immediately after approval — they may return days later
-- Email addresses are not secrets — they are often publicly known or easily guessed
-- The photographer has already approved the purchase — there is no new trust decision
-  at re-download time, but the platform must still verify identity
+**Email-only verification** — rejected because email is not a secret; anyone who
+knows a runner's email address could regenerate their download links.
+
+**Email + paymentRef** — rejected because the paymentRef is the string the runner
+types into their bank transfer description field, and many bank apps (particularly
+in Latin American markets where this platform is likely deployed) do not show the
+sender's own transfer description after the fact. The runner has no reliable way
+to retrieve it later.
+
+The core constraint: whatever the runner uses to prove ownership at re-download
+time must be **reliably retrievable without depending on bank app behavior**. The
+only channel we control that the runner can always access is their **email inbox**.
 
 ## Decision
 
-Runners **self-serve regenerate** a signed URL by providing **two factors**:
+Use a **long-lived download token** delivered to the runner by email when their
+purchase is approved.
 
-1. **Email address** — the one used when submitting the purchase claim
-2. **Payment reference** (`paymentRef`) — the system-generated UUID the runner
-   received during the purchase flow and used as the bank transfer description
+### How it works
 
-The `paymentRef` is a UUID already scoped to the `(photo_id, runner_email)` pair
-and stored in the Purchase record. The runner always has it because they used it
-as their bank transfer reference — it appears in their banking app transaction
-history as the payment description.
+**At purchase claim time:**
+1. Runner selects a photo, enters their email, receives the `paymentRef` to use
+   as their bank transfer description
+2. System emails the runner a claim confirmation:
+   *"We received your payment claim. The photographer will verify and approve it.
+   Your reference: RS-XXXX (keep for your records)."*
+   — informational only; runner does not need this to re-download
 
-**Re-download flow:**
-1. Runner visits `/redownload` (linked from their purchase confirmation, or via
-   a "re-download" CTA on any event page)
-2. System prompts: "Enter the email and payment reference you used for your transfer"
-3. System queries Purchase table: `runnerEmail = email AND paymentRef = ref AND status = approved`
-4. If matched: generate a fresh 24h signed URL and return it
-5. If not matched: return a generic error — do not reveal whether the email exists
+**At approval time:**
+1. Photographer approves the claim in the dashboard
+2. System generates a `downloadToken` (UUID v4) and stores it on the Purchase record
+3. System emails the runner an approval notification:
+   *"Your photo is ready to download.*
+   *[Download photo] → racephotos.example.com/download/{downloadToken}*
+   *This link works indefinitely. Bookmark it or keep this email."*
+4. Runner clicks the link — Lambda generates a fresh 24h S3 presigned URL and
+   redirects. From the runner's perspective the link always works.
 
-No photographer involvement. No SES email to the runner.
+**The 24h TTL remains on the S3 presigned URL** — a backend implementation detail
+the runner never sees. The `downloadToken` itself does not expire.
 
-## Security properties
+**If the runner loses the approval email:**
+1. Runner visits `/redownload` and enters their email address
+2. System looks up all approved purchases for that email and sends a fresh email
+   containing all their active download links
+3. Runner clicks from the new email — no form to fill, no reference to remember
+4. Rate-limited: 3 resend requests per email address per hour
 
-- **Email alone is not sufficient** — a third party who knows the runner's email
-  gets nothing without the UUID reference
-- **Reference alone is not sufficient** — the query requires both fields to match
-  the same Purchase record
-- **Reference is unguessable** — UUID v4, 122 bits of entropy; brute force is
-  not feasible even with rate limiting disabled
-- **No enumeration** — the endpoint returns the same generic error whether the
-  email doesn't exist, the reference doesn't match, or the purchase is not approved
+### Security properties
+
+- The download link is a UUID in the URL — 122 bits of entropy, not guessable
+- A third party who knows the runner's email can trigger a resend but **cannot
+  read the email** — the link goes to the runner's inbox, not the attacker's
+- The S3 presigned URL generated on click is scoped to the exact S3 key with a
+  24h TTL — even if a token URL leaks, the presigned URL it generates is short-lived
+- Resend is rate-limited to prevent abuse
 
 ## Options considered
 
-### Option A — Email only
-Pros: simplest UX; one field to fill.
-Cons: **rejected** — anyone who knows a runner's email can access their photos.
-Email is not a secret.
+### Option A — Email only (no second factor)
+Rejected: anyone with the runner's email can regenerate download links.
 
-### Option B — Email + system-generated paymentRef (chosen)
-Pros: paymentRef is already in the data model and already shared with the runner
-during the purchase flow; UUID is unguessable; no new infrastructure; natural UX
-("enter the reference you used for your bank transfer").
-Cons: runner must have saved or be able to locate their payment reference. It will
-be in their banking app history as the transfer description, but runners should be
-reminded to save it at purchase time.
+### Option B — Email + paymentRef
+Rejected: paymentRef is the bank transfer description; many bank apps in the
+target markets do not show the sender's own transfer description after the fact,
+leaving runners with no way to retrieve it.
 
 ### Option C — Email + bank's own transaction ID
-Pros: runner might find this more natural ("the number my bank gave me").
-Cons: the bank's transaction ID is never seen by our system — the photographer
-would need to capture it manually during approval, adding friction and inconsistency
-(bank ID formats vary by country and institution). Our system-generated reference
-already plays this role more reliably.
+Rejected: the bank's transaction ID is never seen or stored by our system. The
+photographer would need to manually capture it during approval and enter it into
+the platform — friction with no automatic verification benefit.
 
-### Option D — Approval email to runner with signed re-download link
-Pros: zero friction — runner clicks the email.
-Cons: requires SES for runner emails (currently only used for photographer
-notifications); the link in the email can expire, be forwarded, or land in spam;
-adds an email delivery dependency to the approval flow.
-
-### Option E — Contact photographer
-Pros: photographer retains full control.
-Cons: terrible UX for a runner who has already paid; ongoing support burden for
-photographers; inconsistent with the platform's promise.
+### Option D — Long-lived download token delivered by email (chosen)
+Pros: runner needs to remember nothing — the approval email is their receipt and
+their permanent download link; works regardless of bank app behavior; token is
+unguessable; re-download UX is a single click; lost-email recovery is a simple
+"resend" flow.
+Cons: requires SES to email runners (not just photographers); runner must retain
+or be able to find their approval email; delivery failures (spam folder) must be
+handled gracefully.
 
 ## Consequences
 
 **Positive**:
-- Runners always have access to photos they paid for without photographer help
-- Security is meaningfully stronger than email-only: UUID reference is not guessable
-- No new infrastructure — paymentRef is already in the Purchase record
-- Purchase confirmation UI must prominently display the paymentRef with a
-  "Save this reference — you'll need it to re-download" instruction
+- Runner UX is frictionless: click the link in the approval email, forever
+- No dependency on bank app behavior or runner memory
+- `paymentRef` retains its original purpose (photographer matches it on their
+  bank statement) without doubling as a security factor
+- The "lost email" recovery path is standard and familiar to users
 
 **Negative / tradeoffs**:
-- Runner must retain or be able to locate their paymentRef. Mitigated by:
-  - Prominent display + copy-to-clipboard at purchase time
-  - It appears in their banking app as the transfer description
-  - The re-download page can offer a hint: "Check your banking app transfer history
-    for a reference starting with RS-"
-- Rate limiting still required to prevent reference brute-force across known emails:
-  10 attempts per email per hour
+- SES must now send to arbitrary runner email addresses, not just the
+  photographer's verified address. Requires SES out of sandbox mode in prod
+  (standard AWS support request). See ADR-0001 update.
+- Email delivery is not guaranteed — spam filters, typos in email address.
+  The `/redownload` resend endpoint provides recovery, but a runner with a
+  mistyped email at claim time has no path. Mitigated by showing an email
+  preview ("We'll send to r***@gmail.com — is this correct?") before submitting.
+- `downloadToken` must be stored on the Purchase record — minor schema addition
 
-**New endpoint**: `POST /purchases/redownload`
-- Body: `{ email: string, paymentRef: string }`
-- Auth: none (unauthenticated)
-- Rate limit: 10 requests per email per hour (API Gateway throttling)
-- Response (success): `[{ photoId, eventName, signedUrl, expiresAt }]`
-- Response (failure): `{ error: "No matching purchase found" }` — same message for all failure modes
+**Data model addition** (Purchase):
+```
+downloadToken   string   UUID, generated at approval time, null before approval
+```
 
-**DynamoDB access pattern**: `Query` on Purchase table using a composite condition:
-`runnerEmail = :email AND paymentRef = :ref AND status = approved`.
-The existing `runnerEmail` GSI covers the email lookup; `paymentRef` and `status`
-are filter expressions on the result set.
+**New endpoint**: `GET /download/{downloadToken}`
+- Auth: none
+- Behaviour: look up Purchase by `downloadToken`, verify `status = approved`,
+  generate 24h S3 presigned URL, redirect (302)
+- If token not found or not approved: 404
 
-**UX requirement for purchase confirmation page**: display paymentRef in a
-prominent, copyable format. Show instruction: *"Save this reference — you'll need
-it to re-download your photos after the 24-hour link expires."*
+**New endpoint**: `POST /purchases/redownload-resend`
+- Body: `{ email: string }`
+- Auth: none
+- Rate limit: 3 requests per email per hour
+- Behaviour: find all approved purchases for `email`, generate fresh approval
+  emails with current download links, send via SES
+- Response: always 200 with generic message (no enumeration of whether email exists)
 
-**Stories affected**: RS-006 (payment Lambda — redownload endpoint), RS-009 (frontend purchase flow — confirmation UX + redownload page)
+**New SES template**: runner approval email (HTML + plain text)
+- Subject: "Your RaceShots photo is ready"
+- Body: photo thumbnail, event name, download button → `/download/{downloadToken}`
+- Plain text fallback required
+
+**New SES template**: runner claim confirmation email
+- Subject: "Payment claim received — RaceShots"
+- Body: event name, photo reference, expected next steps
+
+**Stories affected**:
+- RS-006 (payment Lambda — approval flow, downloadToken generation, SES runner email)
+- RS-009 (frontend purchase flow — claim confirmation UX, `/redownload` resend page,
+  `/download/{token}` handler)

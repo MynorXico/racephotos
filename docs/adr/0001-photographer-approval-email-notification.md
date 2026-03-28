@@ -63,6 +63,15 @@ scope for v1 given bank-transfer payment model where fraud risk is low.
 - `environments.example.ts` needs `sesFromAddress` and CDK must grant the
   payment Lambda `ses:SendEmail` on the verified identity ARN
 
+**SES scope extended by ADR-0002**: ADR-0002 (runner re-download) decided that
+runners also receive emails — a claim confirmation when they submit, and an
+approval notification with their download link when the photographer approves.
+This means SES must be able to send to **arbitrary runner email addresses**, not
+only the photographer's known address. In production this requires SES to be
+moved out of sandbox mode (a one-time AWS support request). In dev/local,
+SES sandbox mode can be used with verified test addresses.
+See `docs/adr/0002-runner-self-serve-redownload.md` for full runner email spec.
+
 **New env vars introduced**:
 ```
 RACEPHOTOS_SES_FROM_ADDRESS   required — verified SES sender, e.g. noreply@example.com
@@ -73,5 +82,11 @@ RACEPHOTOS_PHOTOGRAPHER_EMAIL required — destination address for approval noti
 ```typescript
 sesFromAddress: string   // verified SES sender identity ARN or email
 ```
+
+**SES templates required** (both photographer-facing and runner-facing):
+1. Photographer: new purchase claim notification (→ dashboard link)
+2. Runner: claim confirmation (informational)
+3. Runner: purchase approved + permanent download link
+4. Runner: re-download resend (on-demand, contains all active download links)
 
 **Stories affected**: RS-006 (payment Lambda), RS-010 (photographer dashboard)
