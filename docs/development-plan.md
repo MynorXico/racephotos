@@ -123,17 +123,79 @@ See `docs/setup/runtime-config.md`.
 
 ---
 
-### PR 7 — Frontend deployment: FrontendConstruct CDK + deploy CI job
+### PR 7 — Frontend deployment: FrontendConstruct CDK via CodePipeline
+
+**Deployment strategy: CodePipeline owns everything — no separate GitHub Actions deploy job.**
+
+The existing CDK Pipelines setup (`PipelineStack`) is extended to build and deploy
+the Angular frontend as part of each stage deployment. One pipeline run produces
+one Angular artifact and deploys it to the correct environment with an
+environment-specific `config.json` injected at deploy time.
+
+**How it works:**
+
+1. The `Synth` ShellStep is extended to build Angular before `cdk synth`:
+
+   ```
+   nvm install 20 && nvm use 20
+   cd frontend/angular && npm ci && npx ng build --configuration=production
+   cd infra/cdk && npm ci && npm run build && npx cdk synth
+   ```
+
+   The `dist/` output is bundled as a CDK asset alongside the CloudFormation template.
+
+2. `FrontendConstruct` creates an S3 bucket + CloudFront distribution and uses
+   `BucketDeployment` with two sources:
+   - `Source.asset(...)` — the Angular `dist/browser/` directory
+   - `Source.jsonData('assets/config.json', { ... })` — the environment-specific
+     `config.json`, generated at deploy time from construct outputs and SSM values.
+     This overwrites the placeholder `config.json` that ships with the Angular build.
+     CloudFront is invalidated automatically after every deploy.
+
+3. `config.json` values come from:
+   - `EnvConfig.region` — already in `EnvConfig`
+   - `EnvConfig.apiBaseUrl` — new field added to `EnvConfig` (API Gateway URL per env)
+   - Cognito user pool ID + client ID — passed in from `CognitoConstruct` outputs
+     (not built yet; `FrontendConstruct` accepts them as optional, defaults to
+     placeholder strings until RS-007 wires them in)
+   - Custom domain / OAuth domain — derived from the domain SSM parameter
+
+**All infrastructure coordinates in SSM — nothing in `environments.example.ts`:**
+
+Two new SSM parameters per environment (seeded by `seed-ssm.sh`):
+
+```
+/racephotos/env/{envName}/domain-name      → "app.dev.example.com" or "none"
+/racephotos/env/{envName}/certificate-arn  → "arn:aws:acm:us-east-1:..." or "none"
+```
+
+Storing `"none"` when no custom domain is needed (dev/qa can use the CloudFront
+default `*.cloudfront.net` domain). `seed-ssm.sh` prompts for both per environment,
+defaulting to `"none"` if left blank. `FrontendConstruct` reads them via
+`valueFromLookup` and only wires in the custom domain + ACM cert when value ≠ `"none"`.
+
+Note: ACM certificates for CloudFront must be created in `us-east-1` regardless
+of the application region. See `docs/setup/aws-bootstrap.md`.
 
 **Deliverables:**
 
-- `infra/cdk/constructs/frontend-construct.ts` (S3 website bucket + CloudFront distribution)
-- `infra/cdk/stages/racephotos-stage.ts` updated to include `FrontendConstruct`
-- `environments.example.ts` updated with `domainName` and `certificateArn` placeholders
-- `.github/workflows/deploy-frontend.yml` job: runs on merge to `main`, builds Angular, syncs to S3, invalidates CloudFront
+- `infra/cdk/constructs/frontend-construct.ts` — S3 + CloudFront + BucketDeployment
+  with `Source.jsonData` config injection; optional custom domain + ACM cert ✦
+- `infra/cdk/stages/racephotos-stage.ts` — wires in `FrontendConstruct` ✦
+- `infra/cdk/stacks/pipeline-stack.ts` — Synth ShellStep extended to build Angular
+  first; Node 20 installed via nvm ✦
+- `infra/cdk/config/types.ts` — `EnvConfig` gains `apiBaseUrl: string` ✦
+- `infra/cdk/config/environments.example.ts` — updated with `apiBaseUrl` placeholder ✦
+- `scripts/seed-ssm.sh` — prompts for `domain-name` and `certificate-arn` per env ✦
+- `docs/setup/aws-bootstrap.md` — documents ACM `us-east-1` requirement and
+  the chicken-and-egg note (first pipeline run will fail to deploy frontend until
+  the Cognito construct exists; that's expected and tracked in RS-007) ✦
+
+✦ = to be implemented
 
 **Why before code:** frontend features cannot be demoed or user-tested without a
-deployed URL. Wiring this early means every merged frontend story is immediately live.
+deployed URL. Wiring this early means every merged feature story is immediately live
+in the target environment after the pipeline run completes.
 
 ---
 
