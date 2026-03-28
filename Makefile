@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-test storybook-build e2e validate
+.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format
 
 LAMBDAS := photo-upload photo-processor watermark search payment
 
@@ -70,6 +70,10 @@ cdk-check:
 ng-build:
 	cd frontend/angular && npx ng build --configuration=production
 
+# Angular ESLint
+ng-lint:
+	cd frontend/angular && npm run lint
+
 # Angular unit tests
 ng-test:
 	cd frontend/angular && npx ng test --watch=false --code-coverage
@@ -82,5 +86,9 @@ storybook-build:
 e2e:
 	cd frontend/angular && npx playwright test
 
+# Format all files with Prettier (root + Angular)
+format:
+	npx prettier --write "**/*.{ts,html,scss,json,yml,yaml,md}" --ignore-path .prettierignore
+
 # Full validation — runs everything (cdk-check, not synth — synth needs credentials)
-validate: test lint cdk-check ng-build ng-test storybook-build
+validate: test lint cdk-check ng-build ng-lint ng-test storybook-build

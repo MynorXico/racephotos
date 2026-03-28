@@ -1,0 +1,67 @@
+version: 2
+updates:
+  # Root tooling (husky, prettier, commitlint)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, javascript]
+    commit-message:
+      prefix: 'chore(deps)'
+
+  # Angular frontend
+  - package-ecosystem: npm
+    directory: /frontend/angular
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, javascript, frontend]
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      angular:
+        patterns: ['@angular/*', '@angular-eslint/*', '@ngrx/*']
+      storybook:
+        patterns: ['@storybook/*', 'storybook']
+      testing:
+        patterns: ['@playwright/*', 'karma*', 'jasmine*', '@types/jasmine']
+
+  # CDK infrastructure
+  - package-ecosystem: npm
+    directory: /infra/cdk
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, javascript, infrastructure]
+    commit-message:
+      prefix: 'chore(deps)'
+    groups:
+      aws-cdk:
+        patterns: ['aws-cdk*', 'aws-cdk-lib', 'constructs']
+
+  # Go — shared module
+  - package-ecosystem: gomod
+    directory: /shared
+    schedule:
+      interval: monthly
+    labels: [dependencies, go]
+    commit-message:
+      prefix: 'chore(deps)'
+
+  # Go — individual Lambda modules (add as lambdas are created)
+  # - package-ecosystem: gomod
+  #   directory: /lambdas/photo-upload
+  #   schedule:
+  #     interval: monthly
+  #   labels: [dependencies, go]
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: 'chore(deps)'
