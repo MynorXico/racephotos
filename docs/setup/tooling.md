@@ -197,24 +197,26 @@ npm install -g @playwright/mcp
 
 ### Configure Claude Code
 
-`~/.claude/mcp.json`:
+Register the server with the Claude Code CLI at user scope (applies to all projects):
 
-```json
-{
-  "mcpServers": {
-    "playwright": {
-      "command": "playwright-mcp",
-      "args": [],
-      "env": {}
-    }
-  }
-}
+```bash
+claude mcp add playwright -s user -- playwright-mcp
+```
+
+> **Do not** create `~/.claude/mcp.json` — that file is not read by Claude Code.
+> The correct config location is `~/.claude.json`, managed by the `claude mcp` CLI.
+
+Verify registration:
+
+```bash
+claude mcp list
+# playwright: playwright-mcp  - ✓ Connected
 ```
 
 ### Restart Claude Code to pick up MCP config
 
-The MCP server is loaded at startup. After editing `mcp.json`, restart the
-Claude Code session.
+The MCP server connects at session startup. After running `claude mcp add`,
+start a new Claude Code session.
 
 ### Verify
 
@@ -279,4 +281,5 @@ cd frontend/angular
 ng version | grep "Angular CLI" # 19.x
 npx playwright --version        # 1.x
 playwright-mcp --version        # confirms MCP binary is on PATH
+claude mcp list                 # playwright: playwright-mcp - ✓ Connected
 ```
