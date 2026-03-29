@@ -7,7 +7,7 @@
 
 ## Context
 
-All Lambda functions need S3 buckets, DynamoDB tables, and SQS queues before any product code can run. This story provisions the foundational storage and messaging layer via CDK constructs. Nothing is deployed until `RacePhotosStage` wires these constructs in. This is a pure infrastructure enabler with no business logic.
+Journey 1 (photographer uploads event photos) requires S3 buckets for raw and watermarked photos, a DynamoDB table layer for event and photo metadata, and SQS queues for async processing — none of which exist yet. This story provisions the foundational storage and messaging layer via CDK constructs; nothing is deployed until `RacePhotosStage` wires them in. This is a pure infrastructure enabler with no business logic.
 
 ## Acceptance criteria
 
@@ -34,6 +34,9 @@ All Lambda functions need S3 buckets, DynamoDB tables, and SQS queues before any
 
 ## Tech notes
 
+- Lambda module path: N/A — infra-only story
+- Interface(s) to implement: N/A — infra-only story
+- DynamoDB access pattern: N/A — infra-only story; access patterns defined per Lambda story
 - New construct files:
   - `infra/cdk/constructs/photo-storage-construct.ts`
   - `infra/cdk/constructs/database-construct.ts`
@@ -42,12 +45,15 @@ All Lambda functions need S3 buckets, DynamoDB tables, and SQS queues before any
 - S3 ObjectCreated → SQS: use `s3.Bucket.addEventNotification(s3.EventType.OBJECT_CREATED, new s3n.SqsDestination(processingQueue))`
 - DLQ alarms: use `ObservabilityConstruct` (PR8) on the DLQ queues — pass `dlq` prop
 - `seed-local.sh` must be updated to mirror all resources: `aws --endpoint-url=http://localhost:4566 sqs create-queue`, `dynamodb create-table`, `s3 mb`
-- No new env vars (infra-only story; env vars added per Lambda story)
+- New env vars: none (infra-only story; env vars added per Lambda story)
 - `EnvConfig` does not change in this story
+- ADR dependency: ADR-0003 — `racephotos-bib-index` separate table design (composite key `{eventId}#{bibNumber}`) is the fan-out write pattern documented in ADR-0003 "Implementation notes"
 
 ## Definition of Done
 
 ### All stories
+
+> Note: this is a CDK TypeScript story with no Go Lambda code. The first three items apply as CDK unit tests (jest + `@aws-cdk/assertions`), not Go tests. There is no `//go:build integration` test; LocalStack coverage is provided by AC6 via `seed-local.sh`.
 
 - [ ] Interface written before implementation
 - [ ] Table-driven unit tests written before implementation
