@@ -312,7 +312,7 @@ if [[ -z "${EXISTING_POOL_ID}" || "${EXISTING_POOL_ID}" == "None" ]]; then
     --pool-name "${USER_POOL_NAME}" \
     --auto-verified-attributes email \
     --username-attributes email \
-    --policies '{"PasswordPolicy":{"MinimumLength":8,"RequireUppercase":false,"RequireLowercase":false,"RequireNumbers":false,"RequireSymbols":false}}' \
+    --policies '{"PasswordPolicy":{"MinimumLength":8,"RequireUppercase":true,"RequireLowercase":true,"RequireNumbers":true,"RequireSymbols":true}}' \
     --query "UserPool.Id" --output text)
 else
   USER_POOL_ID="${EXISTING_POOL_ID}"

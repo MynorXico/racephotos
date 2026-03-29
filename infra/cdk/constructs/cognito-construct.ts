@@ -51,6 +51,9 @@ export class CognitoConstruct extends Construct {
         requireDigits: true,
         requireSymbols: true,
       },
+      // Explicit email-only recovery prevents Cognito defaulting to phone-based
+      // recovery (which is never configured and would fail for all users).
+      accountRecovery: cognito.AccountRecovery.EMAIL_ONLY,
     });
 
     // Removal policy: RETAIN in prod to prevent accidental data loss.
@@ -63,13 +66,16 @@ export class CognitoConstruct extends Construct {
       userPoolClientName: 'racephotos-photographers-client',
       // No client secret — Angular SPA cannot store secrets securely.
       generateSecret: false,
+      // Suppress distinguishable error codes that would allow attackers to
+      // enumerate valid photographer email addresses.
+      preventUserExistenceErrors: true,
       authFlows: {
         // USER_SRP_AUTH: Amplify default — secure, password never sent in plaintext.
         userSrp: true,
-        // USER_PASSWORD_AUTH: needed for local dev / test automation.
-        userPassword: true,
-        // ALLOW_REFRESH_TOKEN_AUTH is automatically included by CDK when any
-        // auth flow is enabled — no explicit field needed.
+        // USER_PASSWORD_AUTH: enabled for local only (LocalStack test automation).
+        // Disabled in all deployed environments — passwords must never be sent
+        // in plaintext to Cognito outside of local dev.
+        userPassword: props.config.envName === 'local',
       },
     });
 

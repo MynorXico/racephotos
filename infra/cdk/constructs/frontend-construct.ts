@@ -6,6 +6,7 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
 import { EnvConfig } from '../config/types';
 
@@ -168,6 +169,18 @@ export class FrontendConstruct extends Construct {
         distributionPaths: ['/*'],
       });
     }
+
+    // ── SSM: publish distribution domain for ApiConstruct CORS ────────────
+    // ApiConstruct reads this via valueFromLookup (CDK context, not a
+    // CloudFormation cross-stack reference) to avoid a circular dependency
+    // between AuthStack and FrontendStack. On first deploy the value is a
+    // dummy; the pipeline self-mutates and picks up the real domain on the
+    // next synth run.
+    new ssm.StringParameter(this, 'FrontendOriginParam', {
+      parameterName: `/racephotos/env/${config.envName}/frontend-origin`,
+      stringValue: distribution.distributionDomainName,
+      description: `CloudFront domain for ${config.envName} — consumed by ApiConstruct CORS`,
+    });
 
     // ── CloudFormation outputs ─────────────────────────────────────────────
     new cdk.CfnOutput(this, 'FrontendUrl', {

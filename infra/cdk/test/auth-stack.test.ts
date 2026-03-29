@@ -5,6 +5,18 @@ import { EnvConfig } from '../config/types';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
+const localConfig: EnvConfig = {
+  envName: 'local',
+  account: '000000000000',
+  region: 'us-east-1',
+  rekognitionConfidenceThreshold: 0.7,
+  watermarkStyle: 'text_overlay',
+  photoRetentionDays: 90,
+  enableDeletionProtection: false,
+  domainName: 'none',
+  certificateArn: 'none',
+};
+
 const devConfig: EnvConfig = {
   envName: 'dev',
   account: '000000000000',
@@ -27,7 +39,11 @@ const prodConfig: EnvConfig = {
 
 function makeTemplate(config: EnvConfig): Template {
   const app = new cdk.App();
-  const stack = new AuthStack(app, 'TestAuthStack', { config });
+  // env must be specified so valueFromLookup (SSM) returns a dummy rather than throwing.
+  const stack = new AuthStack(app, 'TestAuthStack', {
+    config,
+    env: { account: config.account, region: config.region },
+  });
   return Template.fromStack(stack);
 }
 
@@ -107,10 +123,43 @@ describe('CognitoConstruct', () => {
     });
   });
 
-  test('User Pool Client allows USER_PASSWORD_AUTH and REFRESH_TOKEN_AUTH', () => {
-    const t = makeTemplate(devConfig);
+  test('User Pool Client allows USER_PASSWORD_AUTH and REFRESH_TOKEN_AUTH for local env', () => {
+    const t = makeTemplate(localConfig);
     t.hasResourceProperties('AWS::Cognito::UserPoolClient', {
       ExplicitAuthFlows: Match.arrayWith(['ALLOW_USER_PASSWORD_AUTH', 'ALLOW_REFRESH_TOKEN_AUTH']),
+    });
+  });
+
+  test('USER_PASSWORD_AUTH is enabled only for local environment', () => {
+    const tLocal = makeTemplate(localConfig);
+    tLocal.hasResourceProperties('AWS::Cognito::UserPoolClient', {
+      ExplicitAuthFlows: Match.arrayWith(['ALLOW_USER_PASSWORD_AUTH']),
+    });
+  });
+
+  test('USER_PASSWORD_AUTH is NOT enabled for dev environment', () => {
+    const t = makeTemplate(devConfig);
+    const clients = t.findResources('AWS::Cognito::UserPoolClient');
+    const [resource] = Object.values(clients);
+    const flows = (resource as Record<string, Record<string, string[]>>)['Properties'][
+      'ExplicitAuthFlows'
+    ];
+    expect(flows).not.toContain('ALLOW_USER_PASSWORD_AUTH');
+  });
+
+  test('User Pool has EMAIL_ONLY account recovery', () => {
+    const t = makeTemplate(devConfig);
+    t.hasResourceProperties('AWS::Cognito::UserPool', {
+      AccountRecoverySetting: {
+        RecoveryMechanisms: [Match.objectLike({ Name: 'verified_email', Priority: 1 })],
+      },
+    });
+  });
+
+  test('User Pool Client prevents user existence errors', () => {
+    const t = makeTemplate(devConfig);
+    t.hasResourceProperties('AWS::Cognito::UserPoolClient', {
+      PreventUserExistenceErrors: 'ENABLED',
     });
   });
 });
