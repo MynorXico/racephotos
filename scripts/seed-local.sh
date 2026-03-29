@@ -178,7 +178,7 @@ $AWS dynamodb create-table \
       "KeySchema": [
         {"AttributeName":"photoId","KeyType":"HASH"}
       ],
-      "Projection": {"ProjectionType":"ALL"}
+      "Projection": {"ProjectionType":"KEYS_ONLY"}
     }
   ]' \
   --billing-mode PAY_PER_REQUEST \
@@ -298,9 +298,9 @@ WATERMARK_DLQ_ARN="arn:aws:sqs:${REGION}:${ACCOUNT_ID}:${WATERMARK_DLQ}"
 
 $AWS sqs create-queue \
   --queue-name "${WATERMARK_QUEUE}" \
-  --attributes "RedrivePolicy={\"deadLetterTargetArn\":\"${WATERMARK_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}" \
+  --attributes "VisibilityTimeout=120,RedrivePolicy={\"deadLetterTargetArn\":\"${WATERMARK_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}" \
   2>/dev/null || true
-log "queue: ${WATERMARK_QUEUE} (redrive → ${WATERMARK_DLQ}, maxReceiveCount=3)"
+log "queue: ${WATERMARK_QUEUE} (redrive → ${WATERMARK_DLQ}, maxReceiveCount=3, visibilityTimeout=120s)"
 
 # ── Cognito User Pool ─────────────────────────────────────────────────────────
 step "Cognito"
