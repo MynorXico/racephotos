@@ -16,9 +16,12 @@ interface ProcessingPipelineConstructProps {
  *                                (Rekognition DetectText typically completes in <2s,
  *                                 5-min headroom avoids re-delivery on slow starts)
  *   racephotos-watermark-dlq   — DLQ for the watermark Lambda
- *   racephotos-watermark       — main watermark queue
+ *   racephotos-watermark       — main watermark queue; 2-min visibility timeout
+ *                                (S3 GET + image watermark + S3 PUT for a typical JPEG
+ *                                 completes well under 60s; 2-min gives cold-start headroom)
  *
  * Both main queues redirect to their DLQ after maxReceiveCount: 3 (CLAUDE.md mandate).
+ * All four queues use SQS_MANAGED server-side encryption.
  *
  * S3 → SQS notification wiring:
  *   The raw bucket's ObjectCreated event must be wired to processingQueue in the
@@ -49,13 +52,17 @@ export class ProcessingPipelineConstruct extends Construct {
     // timeout overrides). Suppress unused-variable lint without modifying the config.
     void props.config;
 
+    const encryption = sqs.QueueEncryption.SQS_MANAGED;
+
     // ── Processing pipeline ───────────────────────────────────────────────────
     this.processingDlq = new sqs.Queue(this, 'ProcessingDlq', {
       queueName: 'racephotos-processing-dlq',
+      encryption,
     });
 
     this.processingQueue = new sqs.Queue(this, 'ProcessingQueue', {
       queueName: 'racephotos-processing',
+      encryption,
       // 5-minute visibility timeout: gives the photo-processor Lambda (Rekognition
       // + DynamoDB write) comfortable headroom before a message becomes re-visible.
       visibilityTimeout: cdk.Duration.seconds(300),
@@ -68,10 +75,16 @@ export class ProcessingPipelineConstruct extends Construct {
     // ── Watermark pipeline ────────────────────────────────────────────────────
     this.watermarkDlq = new sqs.Queue(this, 'WatermarkDlq', {
       queueName: 'racephotos-watermark-dlq',
+      encryption,
     });
 
     this.watermarkQueue = new sqs.Queue(this, 'WatermarkQueue', {
       queueName: 'racephotos-watermark',
+      encryption,
+      // 2-minute visibility timeout: S3 GET + in-process image watermark + S3 PUT
+      // for a typical event JPEG completes well under 60s. 120s gives Lambda cold-start
+      // headroom without letting a failed message stay invisible for too long.
+      visibilityTimeout: cdk.Duration.seconds(120),
       deadLetterQueue: {
         queue: this.watermarkDlq,
         maxReceiveCount: 3,

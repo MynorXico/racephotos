@@ -17,14 +17,24 @@ interface PhotoStorageConstructProps {
  *   - racephotos-processed-{envName} — private bucket for watermarked copies served via CloudFront
  *   - CloudFront distribution with OAI in front of the processed bucket
  *
- * Both buckets:
- *   - Block all public access (originals are never publicly accessible; AC7)
- *   - Lifecycle rule expires objects after config.photoRetentionDays days
+ * Raw bucket:
+ *   - Blocks all public access; enforces TLS-only (enforceSSL)
+ *   - Lifecycle rule expires originals after config.photoRetentionDays days
  *   - Removal policy driven by config.enableDeletionProtection
  *
- * CloudFront note: CDK 2.137 does not yet ship S3BucketOrigin.withOriginAccessControl()
- * (introduced in 2.146). OAI (S3Origin) is used here for consistency with
- * FrontendConstruct. Migrate to OAC when CDK is bumped to ≥2.147.
+ * Processed bucket:
+ *   - Blocks all public access; enforces TLS-only (enforceSSL)
+ *   - NO expiry lifecycle rule — watermarked copies must outlive any runner's purchase
+ *     entitlement. Expiring them at the same TTL as raw originals would break download
+ *     links for runners who return after the raw expiry window.
+ *   - Removal policy driven by config.enableDeletionProtection
+ *
+ * CloudFront:
+ *   - OAI pattern (S3Origin) — CDK 2.137 does not ship S3BucketOrigin.withOriginAccessControl()
+ *     (introduced in 2.146). Consistent with FrontendConstruct. Migrate to OAC when CDK ≥2.147.
+ *   - ResponseHeadersPolicy adds Cache-Control: max-age=31536000, immutable so browser clients
+ *     and CloudFront edge nodes never re-fetch a watermarked photo once cached. Photos are
+ *     content-addressed (keys never change once written by the watermark Lambda).
  *
  * AC: RS-001 AC1, AC7
  */
@@ -45,31 +55,57 @@ export class PhotoStorageConstruct extends Construct {
       ? cdk.RemovalPolicy.RETAIN
       : cdk.RemovalPolicy.DESTROY;
 
-    const lifecycleRule: s3.LifecycleRule = {
-      id: 'expire-objects',
-      enabled: true,
-      expiration: cdk.Duration.days(config.photoRetentionDays),
-    };
-
     // ── Raw bucket (private originals) ────────────────────────────────────────
     // Lambda execution role only — never publicly accessible (domain rule 7).
+    // Originals are safe to expire after photoRetentionDays: the watermarked copy
+    // in the processed bucket is the long-lived authoritative served version.
     this.rawBucket = new s3.Bucket(this, 'RawBucket', {
       bucketName: `racephotos-raw-${config.envName}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
       removalPolicy,
       autoDeleteObjects: !config.enableDeletionProtection,
-      lifecycleRules: [lifecycleRule],
+      lifecycleRules: [
+        {
+          id: 'expire-raw-originals',
+          enabled: true,
+          expiration: cdk.Duration.days(config.photoRetentionDays),
+        },
+      ],
     });
 
     // ── Processed bucket (watermarked copies) ─────────────────────────────────
     // Served exclusively via CloudFront OAI — not directly from S3.
+    // No expiry rule: watermarked photos are the long-lived served asset.
+    // Runners who purchased a photo must be able to download it indefinitely.
     this.processedBucket = new s3.Bucket(this, 'ProcessedBucket', {
       bucketName: `racephotos-processed-${config.envName}`,
       blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
+      enforceSSL: true,
       removalPolicy,
       autoDeleteObjects: !config.enableDeletionProtection,
-      lifecycleRules: [lifecycleRule],
     });
+
+    // ── CloudFront response headers policy ────────────────────────────────────
+    // Watermarked photos are content-addressed (key = photoId/processed/<uuid>.jpg).
+    // max-age=31536000 (1 year) + immutable tells browsers never to revalidate,
+    // achieving zero-latency repeat loads from the browser cache.
+    const immutableCacheHeaders = new cloudfront.ResponseHeadersPolicy(
+      this,
+      'ImmutableCachePolicy',
+      {
+        responseHeadersPolicyName: `racephotos-immutable-cache-${config.envName}`,
+        customHeadersBehavior: {
+          customHeaders: [
+            {
+              header: 'Cache-Control',
+              value: 'max-age=31536000, immutable',
+              override: true,
+            },
+          ],
+        },
+      },
+    );
 
     // ── CloudFront distribution (processed bucket) ────────────────────────────
     // OAI pattern — see class-level note about upgrading to OAC when CDK ≥2.147.
@@ -79,6 +115,7 @@ export class PhotoStorageConstruct extends Construct {
         origin: new origins.S3Origin(this.processedBucket),
         viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
         cachePolicy: cloudfront.CachePolicy.CACHING_OPTIMIZED,
+        responseHeadersPolicy: immutableCacheHeaders,
       },
     });
 

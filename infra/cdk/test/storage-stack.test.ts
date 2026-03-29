@@ -7,7 +7,7 @@ import { EnvConfig } from '../config/types';
 
 const devConfig: EnvConfig = {
   envName: 'dev',
-  account: '123456789012',
+  account: '000000000000', // LocalStack canonical placeholder — not a real AWS account ID
   region: 'us-east-1',
   rekognitionConfidenceThreshold: 0.7,
   watermarkStyle: 'text_overlay',
@@ -60,9 +60,8 @@ describe('PhotoStorageConstruct', () => {
     expect(Object.keys(resources).length).toBeGreaterThanOrEqual(2);
   });
 
-  test('both buckets have lifecycle rule expiring objects after photoRetentionDays', () => {
+  test('raw bucket has lifecycle rule expiring originals after photoRetentionDays', () => {
     const t = makeTemplate(devConfig);
-    // photoRetentionDays = 90 for devConfig
     t.hasResourceProperties('AWS::S3::Bucket', {
       BucketName: 'racephotos-raw-dev',
       LifecycleConfiguration: {
@@ -74,17 +73,17 @@ describe('PhotoStorageConstruct', () => {
         ]),
       },
     });
-    t.hasResourceProperties('AWS::S3::Bucket', {
-      BucketName: 'racephotos-processed-dev',
-      LifecycleConfiguration: {
-        Rules: Match.arrayWith([
-          Match.objectLike({
-            ExpirationInDays: 90,
-            Status: 'Enabled',
-          }),
-        ]),
-      },
+  });
+
+  test('processed bucket has NO expiry lifecycle rule (watermarked copies must outlive runner purchases)', () => {
+    const t = makeTemplate(devConfig);
+    const processed = t.findResources('AWS::S3::Bucket', {
+      Properties: { BucketName: 'racephotos-processed-dev' },
     });
+    const [resource] = Object.values(processed);
+    const props = (resource as Record<string, Record<string, unknown>>)['Properties'];
+    // LifecycleConfiguration must be absent or have no expiry rules
+    expect(props['LifecycleConfiguration']).toBeUndefined();
   });
 
   test('buckets have DESTROY removal policy when enableDeletionProtection is false', () => {
@@ -298,5 +297,94 @@ describe('ProcessingPipelineConstruct', () => {
         ]),
       }),
     });
+  });
+
+  test('S3 notification is attached to the raw bucket (not the processed bucket)', () => {
+    const app = new cdk.App();
+    const stack = new StorageStack(app, 'TestStorageStack', { config: devConfig });
+    const t = Template.fromStack(stack);
+    // The S3BucketNotifications custom resource references the raw bucket's logical ID.
+    // Obtain both bucket logical IDs and confirm the notification references the raw one.
+    const buckets = t.findResources('AWS::S3::Bucket');
+    const rawBucketId = Object.entries(buckets).find(([, r]) => {
+      const props = (r as Record<string, Record<string, unknown>>)['Properties'];
+      return (
+        typeof props['BucketName'] === 'string' && props['BucketName'].startsWith('racephotos-raw-')
+      );
+    })?.[0];
+    expect(rawBucketId).toBeDefined();
+
+    const notifs = t.findResources('Custom::S3BucketNotifications');
+    const [notifResource] = Object.values(notifs);
+    const notifProps = (notifResource as Record<string, Record<string, unknown>>)['Properties'];
+    const bucketRef = JSON.stringify(notifProps['BucketName']);
+    expect(bucketRef).toContain(rawBucketId);
+  });
+
+  test('watermark queue has 2-minute visibility timeout', () => {
+    const t = makeTemplate(devConfig);
+    t.hasResourceProperties('AWS::SQS::Queue', {
+      QueueName: 'racephotos-watermark',
+      VisibilityTimeout: 120,
+    });
+  });
+
+  test('all four SQS queues have SQS_MANAGED server-side encryption', () => {
+    const t = makeTemplate(devConfig);
+    const queues = t.findResources('AWS::SQS::Queue');
+    for (const [, resource] of Object.entries(queues)) {
+      const props = (resource as Record<string, Record<string, unknown>>)['Properties'];
+      expect(props['SqsManagedSseEnabled']).toBe(true);
+    }
+  });
+});
+
+// ── Security hardening ────────────────────────────────────────────────────────
+
+describe('Security hardening', () => {
+  test('both S3 buckets enforce TLS (deny HTTP requests)', () => {
+    const t = makeTemplate(devConfig);
+    // enforceSSL: true emits a bucket policy that denies aws:SecureTransport=false
+    const policies = t.findResources('AWS::S3::BucketPolicy');
+    const policyDocs = Object.values(policies).map((r) =>
+      JSON.stringify(
+        (r as Record<string, Record<string, unknown>>)['Properties']['PolicyDocument'],
+      ),
+    );
+    // Both raw and processed buckets should have a deny-HTTP statement
+    const denyCount = policyDocs.filter((p) => p.includes('aws:SecureTransport')).length;
+    expect(denyCount).toBeGreaterThanOrEqual(2);
+  });
+
+  test('CloudFront distribution uses REDIRECT_TO_HTTPS viewer protocol policy', () => {
+    const t = makeTemplate(devConfig);
+    t.hasResourceProperties('AWS::CloudFront::Distribution', {
+      DistributionConfig: Match.objectLike({
+        DefaultCacheBehavior: Match.objectLike({
+          ViewerProtocolPolicy: 'redirect-to-https',
+        }),
+      }),
+    });
+  });
+
+  test('all DynamoDB tables have server-side encryption enabled', () => {
+    const t = makeTemplate(devConfig);
+    const tables = t.findResources('AWS::DynamoDB::Table');
+    for (const [, resource] of Object.entries(tables)) {
+      const props = (resource as Record<string, Record<string, unknown>>)['Properties'];
+      // CDK TableEncryption.AWS_MANAGED emits { SSEEnabled: true } — SSEType is
+      // implicit (KMS is the only supported value when SSEEnabled is true).
+      expect((props['SSESpecification'] as Record<string, unknown>)?.['SSEEnabled']).toBe(true);
+    }
+  });
+
+  test('prod stack has no autoDeleteObjects custom resource (RETAIN policy)', () => {
+    const app = new cdk.App();
+    const stack = new StorageStack(app, 'ProdStack', { config: prodConfig });
+    const t = Template.fromStack(stack);
+    // CDK emits a Custom::S3AutoDeleteObjects resource only when autoDeleteObjects=true.
+    // With enableDeletionProtection=true that resource must be absent.
+    const autoDeleteResources = t.findResources('Custom::S3AutoDeleteObjects');
+    expect(Object.keys(autoDeleteResources).length).toBe(0);
   });
 });

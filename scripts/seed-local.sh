@@ -22,7 +22,7 @@ set -euo pipefail
 
 # ── Config ────────────────────────────────────────────────────────────────────
 ENDPOINT="http://localhost:4566"
-REGION="us-east-1"
+REGION="${RACEPHOTOS_REGION:-us-east-1}"
 ENV_NAME="local"
 ACCOUNT_ID="000000000000" # LocalStack fixed account ID
 

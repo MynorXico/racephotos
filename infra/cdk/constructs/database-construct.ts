@@ -45,14 +45,28 @@ export class DatabaseConstruct extends Construct {
       ? cdk.RemovalPolicy.RETAIN
       : cdk.RemovalPolicy.DESTROY;
 
+    // All tables use AWS_MANAGED encryption (AES-256 with an AWS-managed CMK).
+    // This gives a CloudTrail key-usage audit trail and a key-rotation path without
+    // the operational overhead of customer-managed KMS keys at v1.
+    // Upgrade to CUSTOMER_MANAGED for staging/prod when compliance requires it.
+    const encryption = dynamodb.TableEncryption.AWS_MANAGED;
+
     // ── racephotos-events ─────────────────────────────────────────────────────
     // PK: id (photographer creates event; event ID is the partition key)
     // GSI photographerId-createdAt-index: list events by photographer in date order
     // GSI status-createdAt-index: list events by processing status (future: moderation)
+    //
+    // NOTE — status-createdAt-index hot-partition concern (raised in security review):
+    // `status` is a low-cardinality field (e.g. "active", "draft", "closed"). At large
+    // scale all active events share one GSI partition. This GSI is reserved for a future
+    // platform-level moderation feature; it is NOT used by any v1 Lambda. Before any
+    // Lambda queries this GSI, evaluate whether a sharded PK (e.g. "active#0"…"active#7")
+    // or a sparse GSI approach is more appropriate for the query volume at that time.
     this.eventsTable = new dynamodb.Table(this, 'EventsTable', {
       tableName: 'racephotos-events',
       partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption,
       removalPolicy,
     });
 
@@ -77,6 +91,7 @@ export class DatabaseConstruct extends Construct {
       tableName: 'racephotos-photos',
       partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption,
       removalPolicy,
     });
 
@@ -100,13 +115,17 @@ export class DatabaseConstruct extends Construct {
       partitionKey: { name: 'bibKey', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'photoId', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption,
       removalPolicy,
     });
 
+    // KEYS_ONLY: the retag cleanup path only needs bibKey (base PK, always projected)
+    // to issue DeleteItem calls. ALL projection would double write cost on the
+    // highest-throughput table (up to 10,000 writes per event burst).
     this.bibIndexTable.addGlobalSecondaryIndex({
       indexName: 'photoId-index',
       partitionKey: { name: 'photoId', type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL,
+      projectionType: dynamodb.ProjectionType.KEYS_ONLY,
     });
 
     // ── racephotos-purchases ──────────────────────────────────────────────────
@@ -120,6 +139,7 @@ export class DatabaseConstruct extends Construct {
       tableName: 'racephotos-purchases',
       partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption,
       removalPolicy,
     });
 
@@ -164,6 +184,7 @@ export class DatabaseConstruct extends Construct {
       tableName: 'racephotos-photographers',
       partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption,
       removalPolicy,
     });
 
@@ -171,10 +192,13 @@ export class DatabaseConstruct extends Construct {
     // PK: rateLimitKey (format: "REDOWNLOAD#{email}")
     // TTL attribute: expiresAt — DynamoDB auto-deletes expired tokens, so the
     // redownload-resend Lambda never needs to clean up.
+    // AWS_MANAGED encryption is particularly important here: rateLimitKey embeds
+    // runner email addresses as the partition key.
     this.rateLimitsTable = new dynamodb.Table(this, 'RateLimitsTable', {
       tableName: 'racephotos-rate-limits',
       partitionKey: { name: 'rateLimitKey', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption,
       removalPolicy,
       timeToLiveAttribute: 'expiresAt',
     });
