@@ -159,12 +159,28 @@ describe('SesConstruct — email templates (AC2)', () => {
     });
   });
 
-  test('runner-redownload-resend template includes downloadLinks variable', () => {
+  test('runner-redownload-resend template uses Handlebars each iteration over downloads array', () => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::SES::Template', {
       Template: Match.objectLike({
         TemplateName: 'racephotos-runner-redownload-resend',
-        HtmlPart: Match.stringLikeRegexp('downloadLinks'),
+        HtmlPart: Match.stringLikeRegexp('#each downloads'),
+      }),
+    });
+  });
+
+  test('runner-redownload-resend template includes url and eventName variables inside each block', () => {
+    const t = makeTemplate(devConfig);
+    t.hasResourceProperties('AWS::SES::Template', {
+      Template: Match.objectLike({
+        TemplateName: 'racephotos-runner-redownload-resend',
+        HtmlPart: Match.stringLikeRegexp('\\{\\{url\\}\\}'),
+      }),
+    });
+    t.hasResourceProperties('AWS::SES::Template', {
+      Template: Match.objectLike({
+        TemplateName: 'racephotos-runner-redownload-resend',
+        HtmlPart: Match.stringLikeRegexp('\\{\\{eventName\\}\\}'),
       }),
     });
   });

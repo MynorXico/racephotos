@@ -38,7 +38,9 @@ interface SesConstructProps {
  *   photographer-claim:        runnerEmailMasked, eventName, photoReference, dashboardUrl
  *   runner-claim-confirmation: eventName, photoReference, paymentReference
  *   runner-purchase-approved:  eventName, downloadUrl
- *   runner-redownload-resend:  downloadLinks (rendered as HTML list by calling Lambda)
+ *   runner-redownload-resend:  downloads (array) — each item: { url, eventName, photoReference }
+ *                             Passed as JSON array to SendTemplatedEmail TemplateData.
+ *                             Use Handlebars {{#each downloads}} iteration; never pass raw HTML.
  */
 export class SesConstruct extends Construct {
   /** ARN of the verified SES sender identity — used for IAM grant scoping. */
@@ -193,6 +195,13 @@ export class SesConstruct extends Construct {
     });
 
     // Template 4 — Runner: re-download resend (ADR-0002 recovery path)
+    //
+    // TemplateData contract for SendTemplatedEmail (RS-011):
+    //   { "downloads": [ { "url": "...", "eventName": "...", "photoReference": "..." }, ... ] }
+    //
+    // Uses Handlebars {{#each downloads}} iteration to avoid a raw-HTML injection
+    // surface. The calling Lambda must never pass pre-built HTML — supply the
+    // structured array and let SES render it.
     new ses.CfnTemplate(this, 'RunnerRedownloadResendTemplate', {
       template: {
         templateName: 'racephotos-runner-redownload-resend',
@@ -201,7 +210,11 @@ export class SesConstruct extends Construct {
           '<html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">',
           '<h2>Your Download Links</h2>',
           '<p>Here are your active download links for approved purchases:</p>',
-          '{{downloadLinks}}',
+          '<ul>',
+          '{{#each downloads}}',
+          '  <li><a href="{{url}}">{{eventName}} — {{photoReference}}</a></li>',
+          '{{/each}}',
+          '</ul>',
           '<p style="color:#666;font-size:13px;margin-top:24px">',
           '  Each link works indefinitely. Bookmark them or keep this email.',
           '</p>',
@@ -212,7 +225,9 @@ export class SesConstruct extends Construct {
           '',
           'Here are your active download links for approved purchases:',
           '',
-          '{{downloadLinks}}',
+          '{{#each downloads}}',
+          '- {{eventName}} ({{photoReference}}): {{url}}',
+          '{{/each}}',
           '',
           'Each link works indefinitely. Bookmark them or keep this email.',
         ].join('\n'),

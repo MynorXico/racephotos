@@ -112,8 +112,9 @@ for ENV_NAME in dev qa staging prod; do
   echo "  e.g. noreply@yourdomain.com — must be verified in SES in this account."
   read -rp "  SES from-address: " SES_FROM
   if [[ -z "$SES_FROM" ]]; then
-    echo "  WARNING: ses-from-address left empty — SES emails will fail until set."
-    SES_FROM="noreply@example.com"
+    echo "  ERROR: ses-from-address is required. Aborting."
+    echo "  Verify an address in SES first (SES console → Verified identities), then re-run this script."
+    exit 1
   fi
   put "/racephotos/env/$ENV_NAME/ses-from-address" "$SES_FROM"
 done

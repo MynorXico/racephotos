@@ -444,8 +444,8 @@ seed_ses_template '{
   "Template": {
     "TemplateName": "racephotos-runner-redownload-resend",
     "SubjectPart": "Your RaceShots download links",
-    "HtmlPart": "<p>Your download links:<br>{{downloadLinks}}</p>",
-    "TextPart": "Your download links:\n{{downloadLinks}}"
+    "HtmlPart": "<ul>{{#each downloads}}<li><a href=\"{{url}}\">{{eventName}} - {{photoReference}}</a></li>{{/each}}</ul>",
+    "TextPart": "{{#each downloads}}- {{eventName}} ({{photoReference}}): {{url}}\n{{/each}}"
   }
 }'
 
