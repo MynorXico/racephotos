@@ -6,7 +6,7 @@
  */
 
 export interface EnvConfig {
-  envName: 'dev' | 'qa' | 'staging' | 'prod';
+  envName: 'local' | 'dev' | 'qa' | 'staging' | 'prod';
   account: string;
   region: string;
   rekognitionConfidenceThreshold: number;

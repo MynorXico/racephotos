@@ -3,6 +3,7 @@ import { Construct } from 'constructs';
 import { EnvConfig } from '../config/types';
 import { PlaceholderStack } from '../stacks/placeholder-stack';
 import { FrontendStack } from '../stacks/frontend-stack';
+import { StorageStack } from '../stacks/storage-stack';
 
 interface RacePhotosStageProps extends cdk.StageProps {
   config: EnvConfig;
@@ -36,6 +37,11 @@ export class RacePhotosStage extends cdk.Stage {
     // one Stack per Stage alongside application stacks. Remove once real
     // application stacks replace all resources.
     new PlaceholderStack(this, 'Placeholder', { env: props.env, config });
+
+    // StorageStack — RS-001
+    // S3 buckets, DynamoDB tables, SQS queues, and CloudFront distribution
+    // for processed photos. All Lambda stacks depend on this stack.
+    new StorageStack(this, 'Storage', { env: props.env, config });
 
     // FrontendStack — Angular SPA on S3 + CloudFront.
     // Deployed with placeholder config.json values until RS-002 (API URL)
