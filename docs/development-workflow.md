@@ -100,6 +100,72 @@ Never makes a silent architectural assumption.
 
 Review the PR and agent comments. Merge once all agents show `APPROVED`.
 
+### Step 4 — Monitor the CodePipeline execution
+
+Every merge to `main` triggers `racephotos-pipeline` in the Tools account. Always follow up:
+
+#### 4a — Find the triggered execution
+
+```bash
+aws codepipeline list-pipeline-executions \
+  --pipeline-name racephotos-pipeline \
+  --max-items 5 \
+  --profile tools_readonly \
+  --query 'pipelineExecutionSummaries[*].{id:pipelineExecutionId,status:status,startTime:startTime}' \
+  --output json
+```
+
+Match the execution whose `startTime` is closest to the merge time.
+
+#### 4b — Poll until a terminal state
+
+```bash
+aws codepipeline list-action-executions \
+  --pipeline-name racephotos-pipeline \
+  --filter pipelineExecutionId=<ID> \
+  --profile tools_readonly \
+  --query 'actionExecutionDetails[*].{stage:stageName,action:actionName,status:status}' \
+  --output json
+```
+
+Poll every ~30 s. Terminal states: `Succeeded`, `Failed`, `Cancelled`.
+
+#### 4c — Interpret `Cancelled`
+
+If overall = `Cancelled` **and** both Synth and SelfMutate = `Succeeded` → this is normal self-mutation. The pipeline rewrote itself and restarted. Find the **next** execution in `list-pipeline-executions` and monitor that one instead.
+
+#### 4d — If `Failed`
+
+1. Note the failed stage/action from `list-action-executions`.
+2. Fetch the CodeBuild logs:
+   ```bash
+   aws logs get-log-events \
+     --log-group-name /aws/codebuild/<project-name> \
+     --log-stream-name <stream-id> \
+     --profile tools_readonly
+   ```
+3. Diagnose the root cause from the log output.
+4. Create a dedicated fix branch **from `main`** (never reuse a feature branch):
+   ```bash
+   git checkout main && git pull
+   git checkout -b fix/<story>-<short-description>
+   ```
+5. Apply the fix, validate locally (`make cdk-check` / `npm test` / `go test`), commit, push, and open a PR:
+   ```bash
+   gh pr create --title "fix(...): ..." --body "..."
+   ```
+6. **Never merge the fix PR automatically.** Present the PR URL and wait for explicit human approval before merging.
+7. After approval → merge → return to step 4a.
+
+#### Infrastructure details
+
+| Detail                         | Value                 |
+| ------------------------------ | --------------------- |
+| Pipeline name                  | `racephotos-pipeline` |
+| AWS profile (read-only checks) | `tools_readonly`      |
+| Tools account                  | 142755255530          |
+| Dev account                    | 428292434919          |
+
 ---
 
 ## Agent reference
