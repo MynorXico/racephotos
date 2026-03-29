@@ -60,7 +60,13 @@ export class FrontendConstruct extends Construct {
     super(scope, id);
 
     const { config } = props;
-    const hasCustomDomain = config.domainName !== 'none';
+    // Guard against the CDK valueFromLookup dummy value ("dummy-value-for-...")
+    // that is substituted on the first synth pass before the context cache is
+    // populated. We only treat the domain as active when both domainName and
+    // certificateArn look like real values; the pipeline self-mutates and the
+    // second synth will have the real ARN in context.
+    const hasCustomDomain =
+      config.domainName !== 'none' && config.certificateArn.startsWith('arn:');
 
     const apiBaseUrl = props.apiBaseUrl ?? 'https://REPLACE_WITH_API_URL';
     const cognito: CognitoConfig = props.cognitoConfig ?? {
