@@ -10,30 +10,8 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
 import { EnvConfig } from '../config/types';
 
-/**
- * Cognito values needed for the Angular runtime config.json.
- * Passed in from CognitoConstruct (RS-002).
- * Until then, FrontendConstruct defaults to placeholder strings.
- */
-export interface CognitoConfig {
-  userPoolId: string;
-  clientId: string;
-  /** AWS region where the User Pool lives — used by Amplify to locate it. */
-  region: string;
-}
-
 interface FrontendConstructProps {
   config: EnvConfig;
-  /**
-   * API Gateway base URL injected by ApiConstruct (RS-002).
-   * Placeholder until that construct exists.
-   */
-  apiBaseUrl?: string;
-  /**
-   * Cognito values injected by CognitoConstruct (RS-002).
-   * Placeholder until that construct exists.
-   */
-  cognitoConfig?: CognitoConfig;
 }
 
 /**
@@ -48,10 +26,16 @@ interface FrontendConstructProps {
  * Custom domain + ACM certificate are wired in when config.domainName !== "none".
  * Both values come from SSM via PipelineStack.loadConfig() — nothing is hardcoded.
  *
- * config.json values come from:
- *   - config.region            — already in EnvConfig
- *   - apiBaseUrl prop          — from ApiConstruct output (RS-002), placeholder now
- *   - cognitoConfig prop       — from CognitoConstruct output (RS-002), placeholder now
+ * config.json values come from SSM via valueFromLookup (CDK context lookups):
+ *   /racephotos/env/{envName}/api-url       — written by ApiConstruct
+ *   /racephotos/env/{envName}/user-pool-id  — written by CognitoConstruct
+ *   /racephotos/env/{envName}/client-id     — written by CognitoConstruct
+ *   config.region                           — literal string from EnvConfig
+ *
+ * valueFromLookup returns a dummy string on the first synth pass (before AuthStack
+ * has deployed and written the SSM params). The pipeline self-mutates after
+ * AuthStack deploys; subsequent synths resolve real values from the context cache.
+ * This is the same pattern ApiConstruct uses for frontend-origin → CORS.
  */
 export class FrontendConstruct extends Construct {
   /** CloudFront domain name — use as the CNAME target when configuring DNS. */
@@ -69,12 +53,24 @@ export class FrontendConstruct extends Construct {
     const hasCustomDomain =
       config.domainName !== 'none' && config.certificateArn.startsWith('arn:');
 
-    const apiBaseUrl = props.apiBaseUrl ?? 'https://REPLACE_WITH_API_URL';
-    const cognito: CognitoConfig = props.cognitoConfig ?? {
-      userPoolId: 'REPLACE_WITH_USER_POOL_ID',
-      clientId: 'REPLACE_WITH_CLIENT_ID',
-      region: 'REPLACE_WITH_REGION',
-    };
+    // Read AuthStack outputs from SSM via synth-time context lookups.
+    // On first synth these return "dummy-value-for-..." strings (AuthStack hasn't
+    // deployed yet). BucketDeployment is skipped on that pass (hasRealEnv guard
+    // below). After the pipeline self-mutates the real values are in context.
+    // valueFromLookup returns plain strings — never CloudFormation tokens —
+    // so Source.jsonData's renderData never encounters unsupported intrinsics.
+    const apiBaseUrl = ssm.StringParameter.valueFromLookup(
+      this,
+      `/racephotos/env/${config.envName}/api-url`,
+    );
+    const cognitoUserPoolId = ssm.StringParameter.valueFromLookup(
+      this,
+      `/racephotos/env/${config.envName}/user-pool-id`,
+    );
+    const cognitoClientId = ssm.StringParameter.valueFromLookup(
+      this,
+      `/racephotos/env/${config.envName}/client-id`,
+    );
 
     // ── S3 bucket (private — accessible only via CloudFront OAC) ──────────
     const websiteBucket = new s3.Bucket(this, 'WebsiteBucket', {
@@ -159,9 +155,9 @@ export class FrontendConstruct extends Construct {
           s3deploy.Source.asset(angularDistPath),
           s3deploy.Source.jsonData('assets/config.json', {
             apiBaseUrl,
-            cognitoUserPoolId: cognito.userPoolId,
-            cognitoClientId: cognito.clientId,
-            cognitoRegion: cognito.region,
+            cognitoUserPoolId,
+            cognitoClientId,
+            cognitoRegion: config.region,
           }),
         ],
         destinationBucket: websiteBucket,
