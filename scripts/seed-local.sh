@@ -280,13 +280,12 @@ log "DLQ: ${PROCESSING_DLQ}"
 
 PROCESSING_DLQ_ARN="arn:aws:sqs:${REGION}:${ACCOUNT_ID}:${PROCESSING_DLQ}"
 
-$AWS sqs create-queue \
+PROCESSING_QUEUE_URL=$($AWS sqs create-queue \
   --queue-name "${PROCESSING_QUEUE}" \
   --attributes "VisibilityTimeout=300,RedrivePolicy={\"deadLetterTargetArn\":\"${PROCESSING_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}" \
-  2>/dev/null || true
+  --query "QueueUrl" --output text 2>/dev/null || \
+  $AWS sqs get-queue-url --queue-name "${PROCESSING_QUEUE}" --query "QueueUrl" --output text)
 log "queue: ${PROCESSING_QUEUE} (redrive → ${PROCESSING_DLQ}, maxReceiveCount=3, visibilityTimeout=300s)"
-
-PROCESSING_QUEUE_URL="http://sqs.${REGION}.localhost.localstack.cloud:4566/${ACCOUNT_ID}/${PROCESSING_QUEUE}"
 
 # ── Watermark pipeline ────────────────────────────────────────────────────────
 $AWS sqs create-queue \
