@@ -17,6 +17,30 @@ set -euo pipefail
 
 REGION=${AWS_REGION:-us-east-1}
 
+# ── AWS profile ───────────────────────────────────────────────────────────────
+# Prompt for the profile rather than falling back to the ambient default,
+# to avoid accidentally writing parameters to the wrong account.
+echo ""
+echo "RaceShots — SSM parameter setup"
+echo ""
+read -rp "AWS profile to use (e.g. tools): " INPUT_PROFILE
+if [[ -z "$INPUT_PROFILE" ]]; then
+  echo "ERROR: AWS profile is required. Aborting."
+  exit 1
+fi
+export AWS_PROFILE="$INPUT_PROFILE"
+
+# Verify the profile resolves to the expected account before writing anything.
+RESOLVED_ACCOUNT=$(aws sts get-caller-identity --query Account --output text 2>/dev/null || true)
+if [[ -z "$RESOLVED_ACCOUNT" ]]; then
+  echo "ERROR: Could not authenticate with profile '$AWS_PROFILE'."
+  echo "Check that the profile exists in ~/.aws/config and credentials are valid."
+  exit 1
+fi
+echo "Authenticated as account: $RESOLVED_ACCOUNT (profile: $AWS_PROFILE)"
+echo "Region: $REGION"
+echo ""
+
 put() {
   local name=$1
   local value=$2
@@ -30,12 +54,6 @@ put() {
     --output text
   echo "  set $name"
 }
-
-echo ""
-echo "RaceShots — SSM parameter setup"
-echo "Region: $REGION"
-echo "Profile: ${AWS_PROFILE:-default}"
-echo ""
 
 # ── TOOLS account ─────────────────────────────────────────────────────────────
 read -rp "TOOLS account ID:  " TOOLS_ACCOUNT
@@ -90,5 +108,5 @@ echo ""
 echo "Done. Run 'cdk synth' to verify all parameters resolve correctly."
 echo ""
 echo "Tip: verify with:"
-echo "  AWS_PROFILE=tools aws ssm get-parameters-by-path \\"
+echo "  AWS_PROFILE=$AWS_PROFILE aws ssm get-parameters-by-path \\"
 echo "    --path '/racephotos' --recursive --output table"
