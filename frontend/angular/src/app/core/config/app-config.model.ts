@@ -24,7 +24,7 @@ export interface AppConfig {
    *  Example: "1a2b3c4d5e6f7g8h9i0j" */
   cognitoClientId: string;
 
-  /** Cognito Hosted UI / OAuth domain (without https://).
-   *  Example: "auth.dev.example.com" */
-  cognitoOauthDomain: string;
+  /** AWS region where the Cognito User Pool is deployed — used by Amplify.
+   *  Example: "us-east-1" */
+  cognitoRegion: string;
 }

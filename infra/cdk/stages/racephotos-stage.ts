@@ -4,6 +4,7 @@ import { EnvConfig } from '../config/types';
 import { PlaceholderStack } from '../stacks/placeholder-stack';
 import { FrontendStack } from '../stacks/frontend-stack';
 import { StorageStack } from '../stacks/storage-stack';
+import { AuthStack } from '../stacks/auth-stack';
 
 interface RacePhotosStageProps extends cdk.StageProps {
   config: EnvConfig;
@@ -16,16 +17,13 @@ interface RacePhotosStageProps extends cdk.StageProps {
  * class to Dev, QA, Staging, and Prod — parameterised by EnvConfig.
  *
  * Stacks are added here incrementally as features are built:
- *   RS-001  → StorageStack (S3 + DynamoDB)
- *   RS-002  → PhotoUploadStack (Lambda + API Gateway route) — also sets apiBaseUrl
- *   RS-003  → PhotoProcessorStack (Lambda + SQS consumer)
- *   RS-004  → WatermarkStack (Lambda + S3 trigger)
- *   RS-005  → SearchStack (Lambda + API Gateway route)
- *   RS-006  → PaymentStack (Lambda + DynamoDB purchase table)
- *   RS-007  → AuthStack (Cognito) — also wires cognitoConfig into FrontendStack
- *
- * FrontendStack deploys the Angular SPA with placeholder config.json until
- * ApiConstruct (RS-002) and CognitoConstruct (RS-007) supply real values.
+ *   RS-001  → StorageStack (S3 + DynamoDB + SQS)
+ *   RS-002  → AuthStack (Cognito + API Gateway) — also wires cognitoConfig + apiBaseUrl into FrontendStack
+ *   RS-003  → PhotoUploadStack (Lambda + API Gateway route)
+ *   RS-004  → PhotoProcessorStack (Lambda + SQS consumer)
+ *   RS-005  → WatermarkStack (Lambda + S3 trigger)
+ *   RS-006  → SearchStack (Lambda + API Gateway route)
+ *   RS-007  → PaymentStack (Lambda + DynamoDB purchase table)
  */
 export class RacePhotosStage extends cdk.Stage {
   constructor(scope: Construct, id: string, props: RacePhotosStageProps) {
@@ -39,13 +37,26 @@ export class RacePhotosStage extends cdk.Stage {
     new PlaceholderStack(this, 'Placeholder', { env: props.env, config });
 
     // StorageStack — RS-001
-    // S3 buckets, DynamoDB tables, SQS queues, and CloudFront distribution
-    // for processed photos. All Lambda stacks depend on this stack.
+    // S3 buckets, DynamoDB tables, SQS queues. All Lambda stacks depend on this.
     new StorageStack(this, 'Storage', { env: props.env, config });
 
+    // AuthStack — RS-002
+    // Cognito User Pool + HTTP API Gateway. Must be created before FrontendStack
+    // so its outputs (userPoolId, clientId, region, apiUrl) can be wired into
+    // FrontendConstruct's config.json.
+    const auth = new AuthStack(this, 'Auth', { env: props.env, config });
+
     // FrontendStack — Angular SPA on S3 + CloudFront.
-    // Deployed with placeholder config.json values until RS-002 (API URL)
-    // and RS-007 (Cognito) are built and wired in here.
-    new FrontendStack(this, 'Frontend', { env: props.env, config });
+    // Receives Cognito config and API URL from AuthStack.
+    new FrontendStack(this, 'Frontend', {
+      env: props.env,
+      config,
+      apiBaseUrl: auth.api.apiUrl,
+      cognitoConfig: {
+        userPoolId: auth.cognito.userPoolId,
+        clientId: auth.cognito.clientId,
+        region: auth.cognito.region,
+      },
+    });
   }
 }

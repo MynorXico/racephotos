@@ -44,8 +44,10 @@ PROCESSING_DLQ="racephotos-processing-dlq"
 WATERMARK_QUEUE="racephotos-watermark"
 WATERMARK_DLQ="racephotos-watermark-dlq"
 
-USER_POOL_NAME="racephotos-users-${ENV_NAME}"
-USER_POOL_CLIENT_NAME="racephotos-app-${ENV_NAME}"
+# Cognito names have NO envName suffix — each env deploys to an isolated AWS
+# account, so names never collide (matches CDK CognitoConstruct).
+USER_POOL_NAME="racephotos-photographers"
+USER_POOL_CLIENT_NAME="racephotos-photographers-client"
 
 # Use awslocal if available, otherwise fall back to aws with endpoint
 if command -v awslocal &>/dev/null; then
@@ -366,6 +368,6 @@ echo " Update frontend/angular/src/assets/config.json with:"
 echo ""
 echo "   \"cognitoUserPoolId\": \"${USER_POOL_ID}\","
 echo "   \"cognitoClientId\":   \"${CLIENT_ID}\","
-echo "   \"cognitoOauthDomain\": \"localhost.localstack.cloud:4566\""
+echo "   \"cognitoRegion\":     \"${REGION}\""
 echo "════════════════════════════════════════════════════════════"
 echo ""

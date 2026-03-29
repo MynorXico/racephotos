@@ -4,5 +4,5 @@
   "region": "us-east-1",
   "cognitoUserPoolId": "REPLACE_WITH_USER_POOL_ID",
   "cognitoClientId": "REPLACE_WITH_CLIENT_ID",
-  "cognitoOauthDomain": "REPLACE_WITH_OAUTH_DOMAIN"
+  "cognitoRegion": "us-east-1"
 }
