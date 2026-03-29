@@ -186,7 +186,10 @@ describe('DatabaseConstruct', () => {
         Match.objectLike({ IndexName: 'photoId-claimedAt-index' }),
         Match.objectLike({ IndexName: 'runnerEmail-claimedAt-index' }),
         Match.objectLike({ IndexName: 'downloadToken-index' }),
-        Match.objectLike({ IndexName: 'photoId-runnerEmail-index' }),
+        Match.objectLike({
+          IndexName: 'photoId-runnerEmail-index',
+          Projection: Match.objectLike({ ProjectionType: 'KEYS_ONLY' }),
+        }),
         Match.objectLike({ IndexName: 'photographerId-claimedAt-index' }),
       ]),
     });

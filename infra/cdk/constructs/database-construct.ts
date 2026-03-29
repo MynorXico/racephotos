@@ -163,11 +163,13 @@ export class DatabaseConstruct extends Construct {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
+    // KEYS_ONLY: idempotency check in create-purchase only needs to know whether
+    // a (photoId, runnerEmail) record exists — it never reads attributes from this GSI.
     this.purchasesTable.addGlobalSecondaryIndex({
       indexName: 'photoId-runnerEmail-index',
       partitionKey: { name: 'photoId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'runnerEmail', type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL,
+      projectionType: dynamodb.ProjectionType.KEYS_ONLY,
     });
 
     this.purchasesTable.addGlobalSecondaryIndex({
