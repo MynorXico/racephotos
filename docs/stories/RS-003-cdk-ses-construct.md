@@ -7,7 +7,7 @@
 
 ## Context
 
-Two ADRs require SES email sending: ADR-0001 (photographer notified when a purchase claim is submitted) and ADR-0002 (runner receives claim confirmation, approval notification with download link, and re-download resend). All four email templates and the SES verified sender identity must exist before payment and download Lambda stories are implemented.
+Journey 3 (Runner pays and downloads) depends on two SES notification flows: the photographer is notified of each new purchase claim (ADR-0001), and the runner receives a claim confirmation, an approval notification with their permanent download link, and a re-download resend on request (ADR-0002). All four email templates and the SES verified sender identity must exist before the payment and download Lambda stories (RS-006, RS-009) are implemented.
 
 ## Acceptance criteria
 
@@ -29,9 +29,15 @@ Two ADRs require SES email sending: ADR-0001 (photographer notified when a purch
 
 ## Tech notes
 
+- Lambda module path: N/A — infra-only story
+- Interface(s) to implement: N/A — infra-only story
+- DynamoDB access pattern: N/A — infra-only story
 - New construct file: `infra/cdk/constructs/ses-construct.ts`
+- New script: `scripts/seed-ssm.sh` — prompts contributors to populate SSM parameters per environment; must be created in this story
 - New SSM parameter: `/racephotos/env/{envName}/ses-from-address` — seeded by `seed-ssm.sh`
-- New env var used by Lambdas (not introduced in this story, documented here for reference): `RACEPHOTOS_SES_FROM_ADDRESS`
+- New env vars used by Lambdas (not introduced in this story, documented here for reference):
+  - `RACEPHOTOS_SES_FROM_ADDRESS` — verified SES sender address; injected by `SesConstruct` into downstream Lambdas
+  - `RACEPHOTOS_PHOTOGRAPHER_EMAIL` — destination address for approval notifications (ADR-0001); injected by RS-006 (payment Lambda)
 - Template HTML: minimal — event name, key values, a prominent button/link. Plain text alternative required for all templates.
 - `SesConstruct` props: `{ config: EnvConfig, sesFromAddress: string }` — `sesFromAddress` loaded via `ssm.StringParameter.valueFromLookup`
 - `generate-cdk-context.sh` will automatically pick up the new SSM parameter on the next run
@@ -41,6 +47,8 @@ Two ADRs require SES email sending: ADR-0001 (photographer notified when a purch
 
 ### All stories
 
+> Note: this is a CDK TypeScript story with no Go Lambda code. The first three items apply as CDK unit tests (jest + `@aws-cdk/assertions`), not Go tests. There is no `//go:build integration` test; LocalStack coverage is provided by AC5 via `seed-local.sh`.
+
 - [ ] Interface written before implementation
 - [ ] Table-driven unit tests written before implementation
 - [ ] Unit tests pass (`make test-unit`)
@@ -49,5 +57,6 @@ Two ADRs require SES email sending: ADR-0001 (photographer notified when a purch
 - [ ] CDK construct updated and `cdk synth` passes
 - [ ] `environments.example.ts` updated if new config key added
 - [ ] `.env.example` updated if new env var added
+- [ ] `scripts/seed-ssm.sh` created and prompts for `/racephotos/env/{envName}/ses-from-address`
 - [ ] ADR written for any non-obvious architectural decision
 - [ ] Story status set to `done`
