@@ -175,21 +175,21 @@ AWS_PROFILE=tools aws ssm get-parameters-by-path \
 ## Step 4 — Deploy the pipeline
 
 ```bash
-cd infra/cdk
-npm install
-
 # These two exports are required before every cdk synth/deploy from your laptop.
 # Add them to your shell profile or .env.local for convenience.
 export CDK_DEFAULT_ACCOUNT=$(AWS_PROFILE=tools aws sts get-caller-identity \
   --query Account --output text)
 export CDK_DEFAULT_REGION=us-east-1
 
-# First synth populates cdk.context.json with SSM values.
-# Run twice — second run uses cached real values.
-AWS_PROFILE=tools npx cdk synth
-AWS_PROFILE=tools npx cdk synth
+# Generate cdk.context.json from SSM.
+# This resolves all valueFromLookup calls so cdk synth never sees dummy values.
+# cdk.context.json is gitignored — account IDs must not be committed.
+# The pipeline runs this script automatically on every synth.
+AWS_PROFILE=tools ./scripts/generate-cdk-context.sh
 
-# Deploy
+# Synth and deploy
+cd infra/cdk && npm install
+AWS_PROFILE=tools npx cdk synth
 AWS_PROFILE=tools npx cdk deploy RacePhotosPipeline
 ```
 
