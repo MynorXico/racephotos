@@ -226,18 +226,8 @@ in one line instead of duplicating alarm configuration across 5 Lambdas.
 
 ### PR 9 — Complete v1 story backlog
 
-**Deliverables (10 story files in `docs/stories/`):**
-
-- `RS-001-cdk-storage-constructs.md`
-- `RS-002-photo-upload-lambda.md`
-- `RS-003-photo-processor-lambda.md`
-- `RS-004-watermark-lambda.md`
-- `RS-005-search-lambda.md`
-- `RS-006-payment-lambda.md`
-- `RS-007-frontend-shell.md`
-- `RS-008-frontend-search-page.md`
-- `RS-009-frontend-purchase-flow.md`
-- `RS-010-frontend-photographer-dashboard.md`
+Story count will exceed 10 — scope was re-evaluated against `PRODUCT_CONTEXT.md`.
+Final list is determined after all open decisions below are resolved.
 
 Each story must: reference the relevant ADRs, list all acceptance criteria,
 specify interfaces and env vars, and have a fully filled-in Definition of Done.
@@ -245,6 +235,21 @@ specify interfaces and env vars, and have a fully filled-in Definition of Done.
 **Why before code:** agents receive one story file as their entire context.
 An incomplete story produces incomplete code. Writing all stories upfront also
 surfaces cross-story dependencies and inconsistencies before they become bugs.
+
+#### Open decisions blocking PR 9 (answer before writing stories)
+
+| #   | Question                                                                                                                                                                                                                                                                                                                                         | Impact                                                                                                     | Status  |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------- | ------- |
+| P1  | **Processing chain**: how does photo-processor trigger watermark Lambda? Option A: photo-processor publishes to a second SQS queue → watermark consumes it (preferred — DLQ isolation per stage). Option B: photo-processor async-invokes watermark directly. Option C: raw S3 bucket triggers both Lambdas independently (race condition risk). | Determines whether there are 1 or 2 SQS queues; affects RS-001 CDK construct and RS-003/RS-004 story split | ⬜ open |
+| P2  | **Batch presigned URLs**: does the Angular bulk-upload UI request presigned URLs one-at-a-time or in batch (one API call returns N URLs)?                                                                                                                                                                                                        | Changes the upload Lambda API contract and the frontend upload story significantly                         | ⬜ open |
+| P3  | **Event management Lambda**: photographers must create events before uploading. Should this be a dedicated `event-management` Lambda (create/get/update event, list events for photographer) or folded into another Lambda?                                                                                                                      | Determines whether a new Lambda module and story are needed                                                | ⬜ open |
+| P4  | **Public events homepage**: ADR-0004 says events are publicly listed. Is there a public "browse all events" page in v1, or are events only accessible via the photographer's shared direct link / QR code?                                                                                                                                       | Adds or removes a frontend story and a search/list endpoint                                                | ⬜ open |
+| P5  | **Currency**: the Event data model has a `currency` field (GTQ, USD, EUR). Is this configured per-event by the photographer, or set once at the photographer-account level?                                                                                                                                                                      | Affects event creation UI and Event CDK/schema                                                             | ⬜ open |
+| P6  | **Photographer dashboard split**: the dashboard needs to show (a) the review queue — photos with no detected bib awaiting manual tagging — and (b) pending purchase approvals. Are these the same page/tabs, or separate frontend stories?                                                                                                       | Affects story count and scope of RS-010 equivalent                                                         | ⬜ open |
+| P7  | **Watermark — logo upload v1**: PRODUCT_CONTEXT.md says "text-only initially." Is photographer logo upload out of scope for v1 (watermark = event name text only), or should it be included?                                                                                                                                                     | Determines whether a file-upload flow and S3 asset storage are needed for the watermark Lambda             | ⬜ open |
+| P8  | **Re-download / download token Lambda placement**: ADR-0002 defines `GET /download/{token}` and `POST /purchases/redownload-resend`. Should these live in the payment Lambda (same service) or a separate download Lambda?                                                                                                                       | Affects Lambda module boundaries and story assignments                                                     | ⬜ open |
+| P9  | **SES CDK construct**: SES is needed by both photographer approval (ADR-0001) and runner email (ADR-0002). Should there be a dedicated SES CDK construct story (verified identity, IAM grants, SES templates), or is SES infrastructure folded into the payment/approval Lambda stories?                                                         | Affects story count and CDK construct structure                                                            | ⬜ open |
+| P10 | **Manual bib tagging v1 scope**: Journey step 7 — photographer manually tags bib numbers for undetected photos. Is this in v1 scope? Requires: backend endpoint (`PUT /photos/{id}/bibs`) + frontend review queue UI. Or is it a v2 feature?                                                                                                     | Adds or removes a backend Lambda endpoint and a frontend story                                             | ⬜ open |
 
 ---
 
