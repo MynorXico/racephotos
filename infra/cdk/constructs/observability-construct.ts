@@ -15,13 +15,6 @@ export interface ObservabilityProps {
    */
   logRetentionDays: number;
   /**
-   * Drives the removal policy for the log retention custom resource.
-   * Pass EnvConfig.enableDeletionProtection — consistent with every other construct.
-   *   false → RemovalPolicy.DESTROY  (dev/qa: clean up on stack delete)
-   *   true  → RemovalPolicy.RETAIN   (prod: keep logs after stack delete)
-   */
-  enableDeletionProtection: boolean;
-  /**
    * DLQ to monitor. When provided, a CloudWatch Alarm fires when
    * ApproximateNumberOfMessagesVisible >= 1 in any 5-minute window.
    *
@@ -73,7 +66,7 @@ export class ObservabilityConstruct extends Construct {
   constructor(scope: Construct, id: string, props: ObservabilityProps) {
     super(scope, id);
 
-    const { lambda: fn, logRetentionDays, enableDeletionProtection, dlq } = props;
+    const { lambda: fn, logRetentionDays, dlq } = props;
 
     // ── X-Ray active tracing ──────────────────────────────────────────────
     // Sets ACTIVE mode: Lambda traces every invocation and propagates the
@@ -96,16 +89,14 @@ export class ObservabilityConstruct extends Construct {
     // without taking CloudFormation ownership of the log group. This is the same
     // mechanism lambda.Function uses internally for its own logRetention prop.
     //
-    // removalPolicy controls what happens to the log group when the stack is
-    // deleted — mirrors enableDeletionProtection to stay consistent with project
-    // conventions for all other retained resources.
+    // Note: logs.LogRetention has a removalPolicy prop, but it controls the
+    // internal backing Lambda's own log group — NOT the application log group.
+    // The application log group is never owned by CloudFormation and therefore
+    // always persists after stack deletion. No removalPolicy is set here.
     this.logGroupName = `/aws/lambda/${fn.functionName}`;
     new logs.LogRetention(this, 'LogRetention', {
       logGroupName: this.logGroupName,
       retention: this.toRetentionDays(logRetentionDays),
-      removalPolicy: enableDeletionProtection
-        ? cdk.RemovalPolicy.RETAIN
-        : cdk.RemovalPolicy.DESTROY,
     });
 
     // ── Lambda error alarm ────────────────────────────────────────────────

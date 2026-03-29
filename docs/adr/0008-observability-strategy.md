@@ -106,11 +106,6 @@ export interface ObservabilityProps {
   /** Log retention in days — driven by EnvConfig.photoRetentionDays. */
   logRetentionDays: number;
   /**
-   * Drives removal policy — pass EnvConfig.enableDeletionProtection.
-   * false → DESTROY (dev/qa), true → RETAIN (prod).
-   */
-  enableDeletionProtection: boolean;
-  /**
    * DLQ to monitor. When provided, a CloudWatch Alarm is created on
    * ApproximateNumberOfMessagesVisible >= 1 over 1 evaluation period.
    * Required for every SQS-triggered Lambda (CLAUDE.md mandate).
