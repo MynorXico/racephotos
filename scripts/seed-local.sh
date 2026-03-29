@@ -284,7 +284,7 @@ PROCESSING_DLQ_ARN="arn:aws:sqs:${REGION}:${ACCOUNT_ID}:${PROCESSING_DLQ}"
 
 PROCESSING_QUEUE_URL=$($AWS sqs create-queue --queue-name "${PROCESSING_QUEUE}" --query "QueueUrl" --output text)
 $AWS sqs set-queue-attributes --queue-url "${PROCESSING_QUEUE_URL}" \
-  --attributes "VisibilityTimeout=300,RedrivePolicy={\"deadLetterTargetArn\":\"${PROCESSING_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}"
+  --attributes "{\"VisibilityTimeout\":\"300\",\"RedrivePolicy\":\"{\\\"deadLetterTargetArn\\\":\\\"${PROCESSING_DLQ_ARN}\\\",\\\"maxReceiveCount\\\":\\\"3\\\"}\"}"
 log "queue: ${PROCESSING_QUEUE} (redrive → ${PROCESSING_DLQ}, maxReceiveCount=3, visibilityTimeout=300s)"
 
 # ── Watermark pipeline ────────────────────────────────────────────────────────
@@ -297,45 +297,58 @@ WATERMARK_DLQ_ARN="arn:aws:sqs:${REGION}:${ACCOUNT_ID}:${WATERMARK_DLQ}"
 
 WATERMARK_QUEUE_URL=$($AWS sqs create-queue --queue-name "${WATERMARK_QUEUE}" --query "QueueUrl" --output text)
 $AWS sqs set-queue-attributes --queue-url "${WATERMARK_QUEUE_URL}" \
-  --attributes "VisibilityTimeout=120,RedrivePolicy={\"deadLetterTargetArn\":\"${WATERMARK_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}"
+  --attributes "{\"VisibilityTimeout\":\"120\",\"RedrivePolicy\":\"{\\\"deadLetterTargetArn\\\":\\\"${WATERMARK_DLQ_ARN}\\\",\\\"maxReceiveCount\\\":\\\"3\\\"}\"}"
 log "queue: ${WATERMARK_QUEUE} (redrive → ${WATERMARK_DLQ}, maxReceiveCount=3, visibilityTimeout=120s)"
 
 # ── Cognito User Pool ─────────────────────────────────────────────────────────
 step "Cognito"
 
-# Create user pool (or get existing)
-EXISTING_POOL_ID=$($AWS cognito-idp list-user-pools --max-results 60 \
-  --query "UserPools[?Name=='${USER_POOL_NAME}'].Id | [0]" --output text 2>/dev/null || echo "None")
+# cognito-idp requires LocalStack Pro. On Community edition the API returns
+# InternalFailure. Detect this early and skip gracefully with a warning so the
+# rest of the seed (S3/DynamoDB/SQS) still completes successfully.
+USER_POOL_ID="NOT_AVAILABLE"
+CLIENT_ID="NOT_AVAILABLE"
 
-if [[ -z "${EXISTING_POOL_ID}" || "${EXISTING_POOL_ID}" == "None" ]]; then
-  USER_POOL_ID=$($AWS cognito-idp create-user-pool \
-    --pool-name "${USER_POOL_NAME}" \
-    --auto-verified-attributes email \
-    --username-attributes email \
-    --policies '{"PasswordPolicy":{"MinimumLength":8,"RequireUppercase":true,"RequireLowercase":true,"RequireNumbers":true,"RequireSymbols":true}}' \
-    --query "UserPool.Id" --output text)
+if ! $AWS cognito-idp list-user-pools --max-results 1 --output text >/dev/null 2>&1; then
+  echo "  ⚠  cognito-idp not available (LocalStack Community — Pro required)."
+  echo "     S3 / DynamoDB / SQS resources were seeded successfully."
+  echo "     To use Cognito locally, upgrade to LocalStack Pro or point the app"
+  echo "     at a real Cognito User Pool and set RACEPHOTOS_ENV=dev."
 else
-  USER_POOL_ID="${EXISTING_POOL_ID}"
-fi
-log "user pool: ${USER_POOL_NAME} (${USER_POOL_ID})"
+  # Create user pool (or get existing)
+  EXISTING_POOL_ID=$($AWS cognito-idp list-user-pools --max-results 60 \
+    --query "UserPools[?Name=='${USER_POOL_NAME}'].Id | [0]" --output text 2>/dev/null || echo "None")
 
-# Create app client (or get existing)
-EXISTING_CLIENT_ID=$($AWS cognito-idp list-user-pool-clients \
-  --user-pool-id "${USER_POOL_ID}" \
-  --query "UserPoolClients[?ClientName=='${USER_POOL_CLIENT_NAME}'].ClientId | [0]" \
-  --output text 2>/dev/null || echo "None")
+  if [[ -z "${EXISTING_POOL_ID}" || "${EXISTING_POOL_ID}" == "None" ]]; then
+    USER_POOL_ID=$($AWS cognito-idp create-user-pool \
+      --pool-name "${USER_POOL_NAME}" \
+      --auto-verified-attributes email \
+      --username-attributes email \
+      --policies '{"PasswordPolicy":{"MinimumLength":8,"RequireUppercase":true,"RequireLowercase":true,"RequireNumbers":true,"RequireSymbols":true}}' \
+      --query "UserPool.Id" --output text)
+  else
+    USER_POOL_ID="${EXISTING_POOL_ID}"
+  fi
+  log "user pool: ${USER_POOL_NAME} (${USER_POOL_ID})"
 
-if [[ -z "${EXISTING_CLIENT_ID}" || "${EXISTING_CLIENT_ID}" == "None" ]]; then
-  CLIENT_ID=$($AWS cognito-idp create-user-pool-client \
+  # Create app client (or get existing)
+  EXISTING_CLIENT_ID=$($AWS cognito-idp list-user-pool-clients \
     --user-pool-id "${USER_POOL_ID}" \
-    --client-name "${USER_POOL_CLIENT_NAME}" \
-    --no-generate-secret \
-    --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH ALLOW_USER_SRP_AUTH \
-    --query "UserPoolClient.ClientId" --output text)
-else
-  CLIENT_ID="${EXISTING_CLIENT_ID}"
+    --query "UserPoolClients[?ClientName=='${USER_POOL_CLIENT_NAME}'].ClientId | [0]" \
+    --output text 2>/dev/null || echo "None")
+
+  if [[ -z "${EXISTING_CLIENT_ID}" || "${EXISTING_CLIENT_ID}" == "None" ]]; then
+    CLIENT_ID=$($AWS cognito-idp create-user-pool-client \
+      --user-pool-id "${USER_POOL_ID}" \
+      --client-name "${USER_POOL_CLIENT_NAME}" \
+      --no-generate-secret \
+      --explicit-auth-flows ALLOW_USER_PASSWORD_AUTH ALLOW_REFRESH_TOKEN_AUTH ALLOW_USER_SRP_AUTH \
+      --query "UserPoolClient.ClientId" --output text)
+  else
+    CLIENT_ID="${EXISTING_CLIENT_ID}"
+  fi
+  log "app client: ${USER_POOL_CLIENT_NAME} (${CLIENT_ID})"
 fi
-log "app client: ${USER_POOL_CLIENT_NAME} (${CLIENT_ID})"
 
 # ── SES sender identity ───────────────────────────────────────────────────────
 step "SES"
