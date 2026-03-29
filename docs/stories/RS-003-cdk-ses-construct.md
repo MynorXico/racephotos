@@ -19,11 +19,11 @@ Journey 3 (Runner pays and downloads) depends on two SES notification flows: the
   4. `racephotos-runner-redownload-resend`: sent on re-download request; includes all active download links for the runner's approved purchases
 - [ ] AC3: Given `SesConstruct` exposes a `grantSendEmail(grantee)` method, when called by a Lambda construct, then `ses:SendEmail` and `ses:SendTemplatedEmail` are granted on the verified identity ARN.
 - [ ] AC4: Given `scripts/seed-ssm.sh` runs, then it prompts for `/racephotos/env/{envName}/ses-from-address` per environment.
-- [ ] AC5: Given `scripts/seed-local.sh` runs, then a LocalStack SES identity is created for the local from-address (from `.env.local`).
+- [ ] AC5: Given `scripts/seed-local.sh` runs, then a LocalStack SES identity is created for the local from-address (from `.env.local`) and all four SES email templates (`racephotos-photographer-claim`, `racephotos-runner-claim-confirmation`, `racephotos-runner-purchase-approved`, `racephotos-runner-redownload-resend`) are created idempotently via `aws ses create-template --endpoint-url=http://localhost:4566`.
 
 ## Out of scope
 
-- Sending emails (handled by Lambda stories RS-010, RS-011, RS-012)
+- Sending emails — RS-006 (payment Lambda) sends the runner approval email and claim confirmation per ADR-0002; photographer claim notification is also sent from RS-006 per ADR-0001. Re-download resend email is handled by a separate Lambda story (RS-011 or equivalent). This story only provisions the SES identity and templates.
 - SES production sandbox lift (manual AWS support request — documented in `docs/setup/aws-bootstrap.md`)
 - HTML template design (plain text + minimal HTML in v1)
 
@@ -32,6 +32,7 @@ Journey 3 (Runner pays and downloads) depends on two SES notification flows: the
 - Lambda module path: N/A — infra-only story
 - Interface(s) to implement: N/A — infra-only story
 - DynamoDB access pattern: N/A — infra-only story
+- ADR dependency: ADR-0001 (photographer approval via email — accepted), ADR-0002 (runner re-download via download token — accepted)
 - New construct file: `infra/cdk/constructs/ses-construct.ts`
 - New script: `scripts/seed-ssm.sh` — prompts contributors to populate SSM parameters per environment; must be created in this story
 - New SSM parameter: `/racephotos/env/{envName}/ses-from-address` — seeded by `seed-ssm.sh`
@@ -39,7 +40,7 @@ Journey 3 (Runner pays and downloads) depends on two SES notification flows: the
   - `RACEPHOTOS_SES_FROM_ADDRESS` — verified SES sender address; injected by `SesConstruct` into downstream Lambdas
   - `RACEPHOTOS_PHOTOGRAPHER_EMAIL` — destination address for approval notifications (ADR-0001); injected by RS-006 (payment Lambda)
 - Template HTML: minimal — event name, key values, a prominent button/link. Plain text alternative required for all templates.
-- `SesConstruct` props: `{ config: EnvConfig, sesFromAddress: string }` — `sesFromAddress` loaded via `ssm.StringParameter.valueFromLookup`
+- `SesConstruct` props: `{ config: EnvConfig, sesFromAddress: string }` — `sesFromAddress` loaded via `ssm.StringParameter.valueFromLookup` in the stage, not from `EnvConfig`. **Note**: ADR-0001 specified `sesFromAddress` as a new `EnvConfig` key; this story intentionally diverges from that — storing a verified email address in `environments.ts` would expose contributor email addresses in version control. SSM is the correct layer for this value. `environments.example.ts` does **not** need a new key for this story.
 - `generate-cdk-context.sh` will automatically pick up the new SSM parameter on the next run
 - `docs/setup/aws-bootstrap.md`: add note that SES must be moved out of sandbox mode in prod before runners can receive emails (one-time AWS support request)
 
