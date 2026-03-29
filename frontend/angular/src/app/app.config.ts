@@ -25,20 +25,13 @@ function initializeApp(configService: AppConfigService): () => Promise<void> {
     await configService.load();
     const cfg = configService.get();
 
+    // Custom Angular login page — Amplify's signIn() is called directly.
+    // The Cognito hosted UI / OAuth redirect flow is not used (ADR-0007).
     Amplify.configure({
       Auth: {
         Cognito: {
           userPoolId: cfg.cognitoUserPoolId,
           userPoolClientId: cfg.cognitoClientId,
-          loginWith: {
-            oauth: {
-              domain: cfg.cognitoOauthDomain,
-              scopes: ['email', 'openid', 'profile'],
-              redirectSignIn: [`${window.location.origin}/auth/callback`],
-              redirectSignOut: [`${window.location.origin}/`],
-              responseType: 'code',
-            },
-          },
         },
       },
     });
