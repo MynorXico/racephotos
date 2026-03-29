@@ -9,6 +9,7 @@ Solutions to known issues encountered during setup and development.
 ### "No stacks match the name(s) RacePhotosPipeline"
 
 **Symptom**
+
 ```
 npx cdk deploy RacePhotosPipeline
 Error: No stacks match the name(s) RacePhotosPipeline
@@ -21,6 +22,7 @@ lives in `infra/cdk/`, it generates `bin/cdk.ts` — not `bin/app.ts`. The
 
 **Fix**
 Open `infra/cdk/cdk.json` and update the `app` field:
+
 ```json
 {
   "app": "npx ts-node --prefer-ts-exts bin/app.ts"
@@ -28,6 +30,7 @@ Open `infra/cdk/cdk.json` and update the `app` field:
 ```
 
 Then delete the generated file if it still exists:
+
 ```bash
 rm -f infra/cdk/bin/cdk.ts
 ```
@@ -37,6 +40,7 @@ rm -f infra/cdk/bin/cdk.ts
 ### "App at '' should be created in the scope of a Stack, but no Stack found"
 
 **Symptom**
+
 ```
 Error: App at '' should be created in the scope of a Stack, but no Stack found
     at Function.valueFromLookup (parameter.js)
@@ -51,6 +55,7 @@ scope, which is not a Stack and triggers this error.
 
 **Fix**
 Move all SSM lookups inside the stack constructor, using `this` as the scope:
+
 ```typescript
 // ✗ Wrong — called in app.ts with app as scope
 const owner = ssm.StringParameter.valueFromLookup(app, "/racephotos/github/owner");
@@ -70,12 +75,13 @@ API call.
 
 **Fix**
 Export both variables before running `cdk synth`:
+
 ```bash
 export CDK_DEFAULT_ACCOUNT=$(AWS_PROFILE=tools aws sts get-caller-identity \
   --query Account --output text)
 export CDK_DEFAULT_REGION=us-east-1
 
-AWS_PROFILE=tools npx cdk synth
+npx cdk synth --profile tools
 ```
 
 ---
@@ -94,9 +100,10 @@ the cache in the background.
 
 **Fix**
 Run `cdk synth` a second time — the second run reads the cached real values:
+
 ```bash
-AWS_PROFILE=tools npx cdk synth  # first run — populates cdk.context.json
-AWS_PROFILE=tools npx cdk synth  # second run — uses real values
+npx cdk synth --profile tools  # first run — populates cdk.context.json
+npx cdk synth --profile tools  # second run — uses real values
 ```
 
 ---
@@ -104,6 +111,7 @@ AWS_PROFILE=tools npx cdk synth  # second run — uses real values
 ### TypeScript build errors: "Cannot find module '../config/environments'"
 
 **Symptom**
+
 ```
 stacks/pipeline-stack.ts(8,32): error TS2307:
   Cannot find module '../config/environments' or its corresponding type declarations.
@@ -118,12 +126,13 @@ CodePipeline.
 Type definitions live in `config/types.ts` (committed). Values are loaded at
 runtime from SSM inside the stack constructor. Import types from `types.ts`,
 never from `environments.ts`:
+
 ```typescript
 // ✗ Wrong
-import { PipelineConfig } from "../config/environments";
+import { PipelineConfig } from '../config/environments';
 
 // ✓ Correct
-import { PipelineConfig } from "../config/types";
+import { PipelineConfig } from '../config/types';
 ```
 
 ---
@@ -146,6 +155,7 @@ Ensure no committed file imports from `environments.ts`. All imports must use
 ### Node version warning from CDK CLI
 
 **Symptom**
+
 ```
 !! Node 21 has reached end-of-life on 2024-06-01 and is not supported. !!
 ```
@@ -156,6 +166,7 @@ cause failures — other issues may coincide with it but are independent.
 
 **Recommendation**
 Upgrade to Node 20 LTS to avoid any future compatibility issues:
+
 ```bash
 nvm install 20
 nvm use 20
@@ -172,6 +183,7 @@ repo root automatically selects the correct version.
 ### Pipeline synth step fails: "not authorized to perform: ssm:GetParameter"
 
 **Symptom**
+
 ```
 [Error at /RacePhotosPipeline] User: arn:aws:sts::ACCOUNT:assumed-role/
 RacePhotosPipeline-PipelineBuildSynthCdkBuildProjec-.../AWSCodeBuild-...
@@ -201,7 +213,7 @@ export CDK_DEFAULT_ACCOUNT=$(AWS_PROFILE=tools aws sts get-caller-identity \
   --query Account --output text)
 export CDK_DEFAULT_REGION=us-east-1
 
-AWS_PROFILE=tools npx cdk deploy RacePhotosPipeline
+npx cdk deploy --profile tools RacePhotosPipeline
 ```
 
 After the deploy completes, re-trigger the pipeline (push a commit or click
@@ -220,12 +232,14 @@ succeed, and the pipeline will self-mutate to stay in sync going forward.
 ### "Unable to resolve AWS account to use"
 
 **Symptom**
+
 ```
 Unable to resolve AWS account to use. It must be either configured when you
 define your CDK Stack, or through the environment
 ```
 
 **Fix**
+
 ```bash
 export CDK_DEFAULT_ACCOUNT=$(AWS_PROFILE=tools aws sts get-caller-identity \
   --query Account --output text)
@@ -244,6 +258,7 @@ Either the parameters were not created, or the active AWS profile does not
 have `ssm:GetParameter` permissions in the TOOLS account.
 
 **Diagnosis**
+
 ```bash
 # Verify parameters exist
 AWS_PROFILE=tools aws ssm get-parameters-by-path \
@@ -257,6 +272,7 @@ AWS_PROFILE=tools aws sts get-caller-identity
 ```
 
 If the parameters table is empty, re-run the seed script:
+
 ```bash
 AWS_PROFILE=tools ./scripts/seed-ssm.sh
 ```
@@ -266,6 +282,7 @@ AWS_PROFILE=tools ./scripts/seed-ssm.sh
 ### Cross-account deploy role not found
 
 **Symptom**
+
 ```
 RacePhotosPipeline failed: Could not assume role
 arn:aws:iam::DEV_ACCOUNT:role/cdk-hnb659fds-deploy-role-...
@@ -277,8 +294,9 @@ TOOLS account, or bootstrap was run without the `--trust` flag.
 
 **Fix**
 Re-bootstrap the target account with explicit trust:
+
 ```bash
-AWS_PROFILE=dev cdk bootstrap \
+cdk bootstrap --profile dev \
   aws://DEV_ACCOUNT_ID/REGION \
   --trust TOOLS_ACCOUNT_ID \
   --trust-for-lookup TOOLS_ACCOUNT_ID \
@@ -286,6 +304,7 @@ AWS_PROFILE=dev cdk bootstrap \
 ```
 
 To verify trust is in place:
+
 ```bash
 AWS_PROFILE=dev aws iam get-role \
   --role-name cdk-hnb659fds-deploy-role-DEV_ACCOUNT_ID-REGION \
@@ -307,7 +326,8 @@ contributors.
 
 If you want to force CDK to re-resolve all context values (e.g. after rotating
 an SSM parameter), delete the file and run `cdk synth` again:
+
 ```bash
 rm infra/cdk/cdk.context.json
-AWS_PROFILE=tools npx cdk synth
+npx cdk synth --profile tools
 ```
