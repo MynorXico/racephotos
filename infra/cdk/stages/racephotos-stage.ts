@@ -55,28 +55,13 @@ export class RacePhotosStage extends cdk.Stage {
     new SesStack(this, 'Ses', { env: props.env, config });
 
     // FrontendStack — Angular SPA on S3 + CloudFront.
-    // Receives Cognito config and API URL from AuthStack.
-    //
-    // Values are passed via cdk.Fn.importValue() rather than raw CDK tokens because
-    // BucketDeployment's Source.jsonData substitution mechanism does not trigger CDK's
-    // automatic cross-stack export/import path. Passing raw tokens (Fn::GetAtt / Ref)
-    // from AuthStack directly would embed them in FrontendStack's SourceMarkers without
-    // a corresponding CfnOutput export, causing a CloudFormation validation error:
-    // "Fn::GetAtt references undefined resource".
+    // FrontendConstruct reads apiBaseUrl, userPoolId, and clientId from SSM via
+    // valueFromLookup — no cross-stack CDK token references. addDependency()
+    // ensures AuthStack (which writes those SSM params) deploys first.
     const frontendStack = new FrontendStack(this, 'Frontend', {
       env: props.env,
       config,
-      apiBaseUrl: cdk.Fn.importValue(auth.apiUrlExportName),
-      cognitoConfig: {
-        userPoolId: cdk.Fn.importValue(auth.userPoolIdExportName),
-        clientId: cdk.Fn.importValue(auth.clientIdExportName),
-        // config.region is a literal string — no cross-stack reference needed.
-        region: config.region,
-      },
     });
-    // Fn.importValue() is an explicit string import; CDK does not auto-detect the
-    // stack dependency. addDependency() ensures AuthStack deploys before FrontendStack
-    // in the CDK Pipelines wave.
     frontendStack.addDependency(auth);
   }
 }

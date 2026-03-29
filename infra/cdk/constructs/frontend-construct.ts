@@ -10,30 +10,8 @@ import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
 import { EnvConfig } from '../config/types';
 
-/**
- * Cognito values needed for the Angular runtime config.json.
- * Passed in from CognitoConstruct (RS-002).
- * Until then, FrontendConstruct defaults to placeholder strings.
- */
-export interface CognitoConfig {
-  userPoolId: string;
-  clientId: string;
-  /** AWS region where the User Pool lives — used by Amplify to locate it. */
-  region: string;
-}
-
 interface FrontendConstructProps {
   config: EnvConfig;
-  /**
-   * API Gateway base URL injected by ApiConstruct (RS-002).
-   * Placeholder until that construct exists.
-   */
-  apiBaseUrl?: string;
-  /**
-   * Cognito values injected by CognitoConstruct (RS-002).
-   * Placeholder until that construct exists.
-   */
-  cognitoConfig?: CognitoConfig;
 }
 
 /**
@@ -48,10 +26,16 @@ interface FrontendConstructProps {
  * Custom domain + ACM certificate are wired in when config.domainName !== "none".
  * Both values come from SSM via PipelineStack.loadConfig() — nothing is hardcoded.
  *
- * config.json values come from:
- *   - config.region            — already in EnvConfig
- *   - apiBaseUrl prop          — from ApiConstruct output (RS-002), placeholder now
- *   - cognitoConfig prop       — from CognitoConstruct output (RS-002), placeholder now
+ * config.json values come from SSM via deploy-time CfnParameters:
+ *   /racephotos/env/{envName}/api-url       — written by ApiConstruct
+ *   /racephotos/env/{envName}/user-pool-id  — written by CognitoConstruct
+ *   /racephotos/env/{envName}/client-id     — written by CognitoConstruct
+ *   config.region                           — literal string from EnvConfig
+ *
+ * valueForStringParameter creates AWS::SSM::Parameter::Value<String> CloudFormation
+ * parameters resolved at deploy time — no CDK synth-time lookup, no lookup role
+ * assumption required. AuthStack deploys before FrontendStack (addDependency),
+ * so the SSM params always exist when CloudFormation resolves them.
  */
 export class FrontendConstruct extends Construct {
   /** CloudFront domain name — use as the CNAME target when configuring DNS. */
@@ -69,12 +53,31 @@ export class FrontendConstruct extends Construct {
     const hasCustomDomain =
       config.domainName !== 'none' && config.certificateArn.startsWith('arn:');
 
-    const apiBaseUrl = props.apiBaseUrl ?? 'https://REPLACE_WITH_API_URL';
-    const cognito: CognitoConfig = props.cognitoConfig ?? {
-      userPoolId: 'REPLACE_WITH_USER_POOL_ID',
-      clientId: 'REPLACE_WITH_CLIENT_ID',
-      region: 'REPLACE_WITH_REGION',
-    };
+    // Read AuthStack SSM outputs via deploy-time CloudFormation SSM parameters.
+    //
+    // valueForStringParameter creates a CfnParameter of type
+    // AWS::SSM::Parameter::Value<String> in FrontendStack. CloudFormation
+    // resolves it at deploy time by calling ssm:GetParameter within the same
+    // (Dev) account — no synth-time lookup, no CDK lookup role assumption.
+    //
+    // The resulting token is a { Ref: <CfnParamLogicalId> } — which IS in
+    // renderData's accepted intrinsics list (Ref / Fn::GetAtt / Fn::Select),
+    // so Source.jsonData works without errors.
+    //
+    // AuthStack deploys before FrontendStack (addDependency in the stage),
+    // so the SSM params exist by the time CloudFormation resolves them here.
+    const apiBaseUrl = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/racephotos/env/${config.envName}/api-url`,
+    );
+    const cognitoUserPoolId = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/racephotos/env/${config.envName}/user-pool-id`,
+    );
+    const cognitoClientId = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/racephotos/env/${config.envName}/client-id`,
+    );
 
     // ── S3 bucket (private — accessible only via CloudFront OAC) ──────────
     const websiteBucket = new s3.Bucket(this, 'WebsiteBucket', {
@@ -159,9 +162,9 @@ export class FrontendConstruct extends Construct {
           s3deploy.Source.asset(angularDistPath),
           s3deploy.Source.jsonData('assets/config.json', {
             apiBaseUrl,
-            cognitoUserPoolId: cognito.userPoolId,
-            cognitoClientId: cognito.clientId,
-            cognitoRegion: cognito.region,
+            cognitoUserPoolId,
+            cognitoClientId,
+            cognitoRegion: config.region,
           }),
         ],
         destinationBucket: websiteBucket,

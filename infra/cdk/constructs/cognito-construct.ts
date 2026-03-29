@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import * as cognito from 'aws-cdk-lib/aws-cognito';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
 import { EnvConfig } from '../config/types';
 
@@ -15,8 +16,10 @@ interface CognitoConstructProps {
  *   - User Pool Client `racephotos-photographers-client` (no secret, SPA-safe)
  *
  * Outputs consumed by:
- *   - ApiConstruct  — JWT authorizer issuer + audience
- *   - FrontendConstruct — config.json runtime config (userPoolId, clientId, region)
+ *   - ApiConstruct     — JWT authorizer issuer + audience (direct CDK props, same stack)
+ *   - FrontendConstruct — config.json runtime config via SSM valueFromLookup:
+ *       /racephotos/env/{envName}/user-pool-id
+ *       /racephotos/env/{envName}/client-id
  *
  * Auth flow: custom Angular login page using Amplify signIn() (USER_SRP_AUTH).
  * The Cognito hosted UI is not used.
@@ -83,5 +86,21 @@ export class CognitoConstruct extends Construct {
     this.userPoolArn = this.userPool.userPoolArn;
     this.clientId = this.userPoolClient.userPoolClientId;
     this.region = cdk.Stack.of(this).region;
+
+    // Publish to SSM so FrontendConstruct can read them via valueFromLookup
+    // without creating a cross-stack CDK token reference. BucketDeployment's
+    // Source.jsonData substitution only accepts Ref/Fn::GetAtt/Fn::Select —
+    // any other token form (including Fn::ImportValue) throws at synth time.
+    new ssm.StringParameter(this, 'UserPoolIdParam', {
+      parameterName: `/racephotos/env/${config.envName}/user-pool-id`,
+      stringValue: this.userPoolId,
+      description: `Cognito User Pool ID — ${config.envName}`,
+    });
+
+    new ssm.StringParameter(this, 'ClientIdParam', {
+      parameterName: `/racephotos/env/${config.envName}/client-id`,
+      stringValue: this.clientId,
+      description: `Cognito User Pool Client ID — ${config.envName}`,
+    });
   }
 }

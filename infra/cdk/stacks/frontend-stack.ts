@@ -1,14 +1,10 @@
 import * as cdk from 'aws-cdk-lib';
 import { Construct } from 'constructs';
 import { EnvConfig } from '../config/types';
-import { FrontendConstruct, CognitoConfig } from '../constructs/frontend-construct';
+import { FrontendConstruct } from '../constructs/frontend-construct';
 
 interface FrontendStackProps extends cdk.StackProps {
   config: EnvConfig;
-  /** Injected by ApiConstruct (RS-002). Placeholder until then. */
-  apiBaseUrl?: string;
-  /** Injected by CognitoConstruct (RS-002). Placeholder until then. */
-  cognitoConfig?: CognitoConfig;
 }
 
 /**
@@ -26,8 +22,6 @@ export class FrontendStack extends cdk.Stack {
 
     const frontend = new FrontendConstruct(this, 'Frontend', {
       config: props.config,
-      apiBaseUrl: props.apiBaseUrl,
-      cognitoConfig: props.cognitoConfig,
     });
 
     this.distributionDomainName = frontend.distributionDomainName;
