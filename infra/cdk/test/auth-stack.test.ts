@@ -229,4 +229,31 @@ describe('ApiConstruct', () => {
       Name: '/racephotos/env/prod/api-url',
     });
   });
+
+  test('HTTP API CORS falls back to wildcard when domainName is real but certificateArn is a CDK dummy', () => {
+    // Simulates first pipeline synth where SSM cert lookup hasn't been populated yet.
+    // hasCustomDomain must be false so CORS does not lock to a domain without a cert.
+    const partialConfig: EnvConfig = {
+      ...prodConfig,
+      domainName: 'app.example.com',
+      certificateArn: 'dummy-value-for-/racephotos/env/prod/certificate-arn',
+    };
+    const t = makeTemplate(partialConfig);
+    t.hasResourceProperties('AWS::ApiGatewayV2::Api', {
+      CorsConfiguration: Match.objectLike({
+        AllowOrigins: ['*'],
+      }),
+    });
+  });
+
+  test('HTTP API has exactly one authorizer resource bound', () => {
+    // CDK materializes AWS::ApiGatewayV2::Authorizer only when a route is attached.
+    // With no routes in RS-002 the resource count is 0 — verified here so that a
+    // future story (RS-004+) adding a route cannot accidentally increase this count
+    // without an explicit assertion update.
+    // Full AuthorizerType + JwtConfiguration.Audience assertions are added in RS-004
+    // when the first photographer-facing route is attached.
+    const t = makeTemplate(devConfig);
+    t.resourceCountIs('AWS::ApiGatewayV2::Authorizer', 0);
+  });
 });

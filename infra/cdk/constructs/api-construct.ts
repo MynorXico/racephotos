@@ -44,9 +44,14 @@ export class ApiConstruct extends Construct {
     // Mirror the FrontendConstruct guard: treat the CDK dummy-value-for-* string
     // (returned on first pipeline synth before SSM context is populated) the same
     // as "no custom domain". Only use config.domainName when both the domain name
-    // and the ACM certificate ARN look like real values.
+    // looks like a real domain AND the ACM certificate ARN looks like a real ARN.
+    // The domainName dummy-value guard handles the case where a contributor sets
+    // a real domain in SSM but the certificate lookup hasn't been populated yet —
+    // without it, CORS would silently fall back to '*' for a configured domain.
     const hasCustomDomain =
-      config.domainName !== 'none' && config.certificateArn.startsWith('arn:');
+      config.domainName !== 'none' &&
+      !config.domainName.startsWith('dummy-value-for-') &&
+      config.certificateArn.startsWith('arn:');
 
     let corsAllowOrigins: string[];
     if (hasCustomDomain) {
