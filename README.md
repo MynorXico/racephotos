@@ -16,20 +16,20 @@ Open-source race photo platform. Photographers upload event photos; runners find
 
 ## Architecture
 
-| Layer | Technology |
-|---|---|
-| Lambda runtime | Go 1.22+ |
-| Infrastructure | AWS CDK (TypeScript) |
-| Database | DynamoDB (on-demand) |
-| Storage | S3 (two buckets: private originals + watermarked) |
-| Queue | SQS + Dead Letter Queue |
-| AI bib detection | Amazon Rekognition — `DetectText` |
-| Auth | Amazon Cognito User Pools |
-| CDN | Amazon CloudFront |
-| Frontend | Angular 17+ |
-| Local dev | LocalStack via Docker |
-| CI/CD | GitHub Actions + AWS CDK Pipelines |
-| Observability | CloudWatch Logs, Alarms, X-Ray |
+| Layer            | Technology                                        |
+| ---------------- | ------------------------------------------------- |
+| Lambda runtime   | Go 1.22+                                          |
+| Infrastructure   | AWS CDK (TypeScript)                              |
+| Database         | DynamoDB (on-demand)                              |
+| Storage          | S3 (two buckets: private originals + watermarked) |
+| Queue            | SQS + Dead Letter Queue                           |
+| AI bib detection | Amazon Rekognition — `DetectText`                 |
+| Auth             | Amazon Cognito User Pools                         |
+| CDN              | Amazon CloudFront                                 |
+| Frontend         | Angular 17+                                       |
+| Local dev        | LocalStack via Docker                             |
+| CI/CD            | GitHub Actions + AWS CDK Pipelines                |
+| Observability    | CloudWatch Logs, Alarms, X-Ray                    |
 
 ### Multi-account layout
 
@@ -130,8 +130,8 @@ export CDK_DEFAULT_ACCOUNT=$(AWS_PROFILE=tools aws sts get-caller-identity \
   --query Account --output text)
 export CDK_DEFAULT_REGION=us-east-1
 
-AWS_PROFILE=tools npx cdk synth   # run twice if values look like dummy-value-for-*
-AWS_PROFILE=tools npx cdk deploy RacePhotosPipeline
+npx cdk synth --profile tools   # run twice if values look like dummy-value-for-*
+npx cdk deploy --profile tools RacePhotosPipeline
 ```
 
 After this, every push to `main` triggers the pipeline automatically. You never run `cdk deploy` again manually.

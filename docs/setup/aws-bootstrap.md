@@ -34,32 +34,32 @@ TOOLS_ACCOUNT=$(AWS_PROFILE=tools aws sts get-caller-identity \
   --query Account --output text)
 
 # Bootstrap TOOLS (no trust needed — it is the orchestrator)
-AWS_PROFILE=tools cdk bootstrap aws://$TOOLS_ACCOUNT/$REGION \
+cdk bootstrap --profile tools aws://$TOOLS_ACCOUNT/$REGION \
   --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess
 
 # Bootstrap DEV
-AWS_PROFILE=dev cdk bootstrap \
+cdk bootstrap --profile dev \
   aws://$(AWS_PROFILE=dev aws sts get-caller-identity --query Account --output text)/$REGION \
   --trust $TOOLS_ACCOUNT \
   --trust-for-lookup $TOOLS_ACCOUNT \
   --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess
 
 # Bootstrap QA
-AWS_PROFILE=qa cdk bootstrap \
+cdk bootstrap --profile qa \
   aws://$(AWS_PROFILE=qa aws sts get-caller-identity --query Account --output text)/$REGION \
   --trust $TOOLS_ACCOUNT \
   --trust-for-lookup $TOOLS_ACCOUNT \
   --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess
 
 # Bootstrap STAGING
-AWS_PROFILE=staging cdk bootstrap \
+cdk bootstrap --profile staging \
   aws://$(AWS_PROFILE=staging aws sts get-caller-identity --query Account --output text)/$REGION \
   --trust $TOOLS_ACCOUNT \
   --trust-for-lookup $TOOLS_ACCOUNT \
   --cloudformation-execution-policies arn:aws:iam::aws:policy/AdministratorAccess
 
 # Bootstrap PROD
-AWS_PROFILE=prod cdk bootstrap \
+cdk bootstrap --profile prod \
   aws://$(AWS_PROFILE=prod aws sts get-caller-identity --query Account --output text)/$REGION \
   --trust $TOOLS_ACCOUNT \
   --trust-for-lookup $TOOLS_ACCOUNT \
@@ -189,8 +189,8 @@ AWS_PROFILE=tools ./scripts/generate-cdk-context.sh
 
 # Synth and deploy
 cd infra/cdk && npm install
-AWS_PROFILE=tools npx cdk synth
-AWS_PROFILE=tools npx cdk deploy RacePhotosPipeline
+npx cdk synth --profile tools
+npx cdk deploy --profile tools RacePhotosPipeline
 ```
 
 > **Important:** After this deploy, the pipeline is self-mutating. Every push

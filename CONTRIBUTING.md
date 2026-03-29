@@ -54,7 +54,7 @@ committed. Before running `cdk synth` locally, generate it from your SSM paramet
 AWS_PROFILE=tools ./scripts/generate-cdk-context.sh
 
 cd infra/cdk
-AWS_PROFILE=tools npx cdk synth
+npx cdk synth --profile tools
 ```
 
 The pipeline runs `generate-cdk-context.sh` automatically on every synth — no manual

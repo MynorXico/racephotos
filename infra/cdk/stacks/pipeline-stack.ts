@@ -61,6 +61,9 @@ export class PipelineStack extends cdk.Stack {
           // Build Angular first — FrontendConstruct references dist/browser/
           // as a CDK asset so it must exist before cdk synth runs.
           'cd frontend/angular && npm ci && npx ng build --configuration=production && cd ../..',
+          // Verify Angular build produced the expected output directory.
+          // Fails fast with a clear message rather than a cryptic CDK asset error.
+          'test -d frontend/angular/dist/racephotos/browser || { echo "ERROR: Angular build did not produce frontend/angular/dist/racephotos/browser"; exit 1; }',
           // Populate cdk.context.json from SSM so valueFromLookup gets real
           // values on every synth run — no dummy-value failures, no account
           // IDs committed to git.
