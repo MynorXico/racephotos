@@ -1,4 +1,9 @@
-#!/usr/bin/env bash
+#!/bin/sh
+# husky always invokes hooks via `sh -e`, ignoring the shebang. Re-exec under
+# bash so we can use associative arrays and pipefail.
+# shellcheck disable=SC2128
+[ -z "${BASH_VERSION:-}" ] && exec bash "$0" "$@"
+
 # pre-push — mirrors the CI pipeline jobs so failures are caught locally.
 #
 # Runs four job groups in parallel (same as CI):
