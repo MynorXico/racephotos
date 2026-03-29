@@ -2,7 +2,7 @@
 
 **ID**: RS-002
 **Epic**: Infrastructure
-**Status**: ready
+**Status**: done
 **Has UI**: no
 
 ## Context
@@ -12,7 +12,7 @@ Photographers authenticate via Amazon Cognito (ADR-0007). All photographer-facin
 ## Acceptance criteria
 
 - [ ] AC1: Given a CDK synth runs, when `CognitoConstruct` is instantiated, then a Cognito User Pool `racephotos-photographers` is created with: email as required attribute, email verification required, self sign-up enabled, password policy (min 8 chars, upper+lower+number+symbol).
-- [ ] AC2: Given a CDK synth runs, then a Cognito User Pool Client `racephotos-photographers-client` is created with no client secret (SPA), auth flows `ALLOW_USER_PASSWORD_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH`.
+- [ ] AC2: Given a CDK synth runs, then a Cognito User Pool Client `racephotos-photographers-client` is created with no client secret (SPA), auth flows `ALLOW_USER_SRP_AUTH` (Amplify default), `ALLOW_USER_PASSWORD_AUTH` (local env only), and `ALLOW_REFRESH_TOKEN_AUTH`.
 - [ ] AC3: Given a CDK synth runs, when `ApiConstruct` is instantiated, then an API Gateway HTTP API `racephotos-api` is created with: a JWT authorizer using the Cognito User Pool, CORS configured to allow the CloudFront frontend domain (from `FrontendConstruct` output), and no routes (routes added per Lambda story).
 - [ ] AC4: Given `CognitoConstruct` outputs are available, when `FrontendConstruct` is updated, then `config.json` injected into the S3 bucket includes `cognitoUserPoolId`, `cognitoClientId`, and `cognitoRegion` with real values (not placeholders).
 - [ ] AC5: Given the API Gateway is deployed, then the API base URL is stored in SSM at `/racephotos/env/{envName}/api-url` and `AppConfig` in Angular reads it from `config.json`.
@@ -42,6 +42,7 @@ Photographers authenticate via Amazon Cognito (ADR-0007). All photographer-facin
 - `AppConfig` in Angular (`src/app/core/config/app-config.model.ts`) must include `cognitoUserPoolId`, `cognitoClientId`, `cognitoRegion`, `apiBaseUrl` — update if not already present
 - CORS allowed origins: `['https://${config.domainName}']` when custom domain set, else `['https://${distribution.distributionDomainName}']`
 - `seed-local.sh` Cognito setup: already created in PR6; verify it creates a pool + client and prints IDs
+- **Unauthenticated routes**: `defaultAuthorizer` on the HTTP API applies to all routes. Runner-facing endpoints (bib search, purchase-claim, download link) must explicitly set `authorizationType: HttpNoneAuthorizer` when added in later stories. Photographer-facing routes use the default JWT authorizer.
 
 ## Definition of Done
 

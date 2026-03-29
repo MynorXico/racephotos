@@ -6,19 +6,20 @@ import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
 import * as acm from 'aws-cdk-lib/aws-certificatemanager';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
 import { EnvConfig } from '../config/types';
 
 /**
  * Cognito values needed for the Angular runtime config.json.
- * Passed in from CognitoConstruct once it is built (RS-007).
+ * Passed in from CognitoConstruct (RS-002).
  * Until then, FrontendConstruct defaults to placeholder strings.
  */
 export interface CognitoConfig {
   userPoolId: string;
   clientId: string;
-  /** Cognito hosted-UI domain without protocol, e.g. "auth.dev.example.com" */
-  oauthDomain: string;
+  /** AWS region where the User Pool lives — used by Amplify to locate it. */
+  region: string;
 }
 
 interface FrontendConstructProps {
@@ -29,7 +30,7 @@ interface FrontendConstructProps {
    */
   apiBaseUrl?: string;
   /**
-   * Cognito values injected by CognitoConstruct (RS-007).
+   * Cognito values injected by CognitoConstruct (RS-002).
    * Placeholder until that construct exists.
    */
   cognitoConfig?: CognitoConfig;
@@ -49,9 +50,8 @@ interface FrontendConstructProps {
  *
  * config.json values come from:
  *   - config.region            — already in EnvConfig
- *   - apiBaseUrl prop          — from ApiConstruct output (future), placeholder now
- *   - cognitoConfig prop       — from CognitoConstruct output (RS-007), placeholder now
- *   - config.domainName        — used to derive cognitoOauthDomain when custom domain set
+ *   - apiBaseUrl prop          — from ApiConstruct output (RS-002), placeholder now
+ *   - cognitoConfig prop       — from CognitoConstruct output (RS-002), placeholder now
  */
 export class FrontendConstruct extends Construct {
   /** CloudFront domain name — use as the CNAME target when configuring DNS. */
@@ -73,7 +73,7 @@ export class FrontendConstruct extends Construct {
     const cognito: CognitoConfig = props.cognitoConfig ?? {
       userPoolId: 'REPLACE_WITH_USER_POOL_ID',
       clientId: 'REPLACE_WITH_CLIENT_ID',
-      oauthDomain: hasCustomDomain ? `auth.${config.domainName}` : 'REPLACE_WITH_OAUTH_DOMAIN',
+      region: 'REPLACE_WITH_REGION',
     };
 
     // ── S3 bucket (private — accessible only via CloudFront OAC) ──────────
@@ -159,10 +159,9 @@ export class FrontendConstruct extends Construct {
           s3deploy.Source.asset(angularDistPath),
           s3deploy.Source.jsonData('assets/config.json', {
             apiBaseUrl,
-            region: config.region,
             cognitoUserPoolId: cognito.userPoolId,
             cognitoClientId: cognito.clientId,
-            cognitoOauthDomain: cognito.oauthDomain,
+            cognitoRegion: cognito.region,
           }),
         ],
         destinationBucket: websiteBucket,
@@ -170,6 +169,18 @@ export class FrontendConstruct extends Construct {
         distributionPaths: ['/*'],
       });
     }
+
+    // ── SSM: publish distribution domain for ApiConstruct CORS ────────────
+    // ApiConstruct reads this via valueFromLookup (CDK context, not a
+    // CloudFormation cross-stack reference) to avoid a circular dependency
+    // between AuthStack and FrontendStack. On first deploy the value is a
+    // dummy; the pipeline self-mutates and picks up the real domain on the
+    // next synth run.
+    new ssm.StringParameter(this, 'FrontendOriginParam', {
+      parameterName: `/racephotos/env/${config.envName}/frontend-origin`,
+      stringValue: distribution.distributionDomainName,
+      description: `CloudFront domain for ${config.envName} — consumed by ApiConstruct CORS`,
+    });
 
     // ── CloudFormation outputs ─────────────────────────────────────────────
     new cdk.CfnOutput(this, 'FrontendUrl', {
