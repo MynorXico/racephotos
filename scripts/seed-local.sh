@@ -350,12 +350,104 @@ else
   log "app client: ${USER_POOL_CLIENT_NAME} (${CLIENT_ID})"
 fi
 
-# ── SES sender identity ───────────────────────────────────────────────────────
+# ── SSM parameters ────────────────────────────────────────────────────────────
+# Mirror the SSM parameters written by CDK constructs at deploy time.
+# FrontendConstruct reads these via valueFromLookup during cdk synth.
+# Parameters are written unconditionally so cdk synth works against LocalStack
+# even when Cognito is unavailable (values fall back to NOT_AVAILABLE).
+step "SSM"
+
+$AWS ssm put-parameter \
+  --name "/racephotos/env/${ENV_NAME}/user-pool-id" \
+  --value "${USER_POOL_ID}" \
+  --type String \
+  --overwrite 2>/dev/null || true
+log "param: /racephotos/env/${ENV_NAME}/user-pool-id = ${USER_POOL_ID}"
+
+$AWS ssm put-parameter \
+  --name "/racephotos/env/${ENV_NAME}/client-id" \
+  --value "${CLIENT_ID}" \
+  --type String \
+  --overwrite 2>/dev/null || true
+log "param: /racephotos/env/${ENV_NAME}/client-id = ${CLIENT_ID}"
+
+# api-url: placeholder until API Gateway is seeded (RS-003+).
+# Updated automatically when the photo-upload Lambda stack is seeded.
+$AWS ssm put-parameter \
+  --name "/racephotos/env/${ENV_NAME}/api-url" \
+  --value "http://localhost:4566" \
+  --type String \
+  --overwrite 2>/dev/null || true
+log "param: /racephotos/env/${ENV_NAME}/api-url = http://localhost:4566 (placeholder)"
+
+# ── SES sender identity + templates ──────────────────────────────────────────
 step "SES"
 
+# Read local from-address from .env.local; fall back to example placeholder.
+SES_FROM_ADDRESS="${RACEPHOTOS_SES_FROM_ADDRESS:-noreply@example.com}"
+
 $AWS ses verify-email-identity \
-  --email-address "noreply@example.com" 2>/dev/null || true
-log "verified sender: noreply@example.com"
+  --email-address "${SES_FROM_ADDRESS}" 2>/dev/null || true
+log "verified sender: ${SES_FROM_ADDRESS}"
+
+# Seed the SSM parameter that SesStack reads via valueFromLookup.
+# This allows cdk synth against LocalStack to resolve a real (dummy) value
+# instead of the CDK dummy placeholder.
+$AWS ssm put-parameter \
+  --name "/racephotos/env/${ENV_NAME}/ses-from-address" \
+  --value "${SES_FROM_ADDRESS}" \
+  --type String \
+  --overwrite 2>/dev/null || true
+log "param: /racephotos/env/${ENV_NAME}/ses-from-address = ${SES_FROM_ADDRESS}"
+
+# SES email templates — aws ses create-template is NOT idempotent; it errors
+# if the template already exists. The script deletes-then-creates to ensure
+# the latest template content is always applied on re-runs.
+seed_ses_template() {
+  local template_json="$1"
+  local template_name
+  template_name=$(echo "$template_json" | python3 -c "import sys,json; print(json.load(sys.stdin)['Template']['TemplateName'])")
+
+  $AWS ses delete-template --template-name "${template_name}" 2>/dev/null || true
+  $AWS ses create-template --cli-input-json "$template_json" 2>/dev/null || true
+  log "SES template: ${template_name}"
+}
+
+seed_ses_template '{
+  "Template": {
+    "TemplateName": "racephotos-photographer-claim",
+    "SubjectPart": "New purchase claim — {{eventName}}",
+    "HtmlPart": "<p>Runner: {{runnerEmailMasked}}<br>Event: {{eventName}}<br>Photo: {{photoReference}}<br><a href=\"{{dashboardUrl}}\">Review in dashboard</a></p>",
+    "TextPart": "New purchase claim.\nRunner: {{runnerEmailMasked}}\nEvent: {{eventName}}\nPhoto: {{photoReference}}\nDashboard: {{dashboardUrl}}"
+  }
+}'
+
+seed_ses_template '{
+  "Template": {
+    "TemplateName": "racephotos-runner-claim-confirmation",
+    "SubjectPart": "Payment claim received — {{eventName}}",
+    "HtmlPart": "<p>Event: {{eventName}}<br>Photo: {{photoReference}}<br>Payment reference: <strong>{{paymentReference}}</strong></p>",
+    "TextPart": "Payment claim received.\nEvent: {{eventName}}\nPhoto: {{photoReference}}\nPayment reference: {{paymentReference}}"
+  }
+}'
+
+seed_ses_template '{
+  "Template": {
+    "TemplateName": "racephotos-runner-purchase-approved",
+    "SubjectPart": "Your photo is ready to download — {{eventName}}",
+    "HtmlPart": "<p>Event: {{eventName}}<br><a href=\"{{downloadUrl}}\">Download photo</a><br>This link works indefinitely.</p>",
+    "TextPart": "Your photo is ready.\nEvent: {{eventName}}\nDownload: {{downloadUrl}}\nThis link works indefinitely."
+  }
+}'
+
+seed_ses_template '{
+  "Template": {
+    "TemplateName": "racephotos-runner-redownload-resend",
+    "SubjectPart": "Your RaceShots download links",
+    "HtmlPart": "<p>Your download links:<br>{{downloadLinks}}</p>",
+    "TextPart": "Your download links:\n{{downloadLinks}}"
+  }
+}'
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""

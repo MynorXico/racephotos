@@ -219,6 +219,37 @@ If Source shows a failure, check that the CodeStar Connection is in
 
 ---
 
+## Step 3b — SES sandbox lift (production only)
+
+By default, AWS places new SES accounts in **sandbox mode**. In sandbox mode SES
+can only send email to verified addresses — which means runners cannot receive
+purchase confirmation or download link emails unless their addresses are
+pre-verified.
+
+**This is a one-time manual step, required only for production.**
+
+1. Sign in to the **production account** in the AWS Console.
+2. Go to **Amazon SES → Account dashboard**.
+3. Click **Request production access**.
+4. Fill in the form:
+   - Mail type: **Transactional**
+   - Website URL: your RaceShots deployment URL
+   - Use case description: "Sending purchase confirmations and photo download
+     links to runners who have paid for race event photos."
+5. Submit. AWS typically responds within 24 hours.
+
+Once approved, SES can send to any email address.
+
+**In dev/qa/staging**, sandbox mode is acceptable — use a verified test address
+for the sender (`RACEPHOTOS_SES_FROM_ADDRESS` in SSM) and verify any test
+runner addresses you want to send to in the SES console.
+
+> **Note:** The sender address set in SSM (`/racephotos/env/{envName}/ses-from-address`)
+> must always be a verified identity in SES for that environment's account.
+> Run `scripts/seed-ssm.sh` to set this value before the first `cdk deploy`.
+
+---
+
 ## Adding a new environment stage
 
 When you are ready to deploy the first application stack to DEV:

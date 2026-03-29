@@ -102,6 +102,20 @@ for ENV_NAME in dev qa staging prod; do
     read -rp "  ACM certificate ARN (us-east-1): " CERT_ARN
     put "/racephotos/env/$ENV_NAME/certificate-arn" "$CERT_ARN"
   fi
+
+  # SES verified sender address (RS-003)
+  # This value is intentionally NOT in environments.ts — email addresses must
+  # not appear in version control. In dev you can use any address you have
+  # verified in the SES console. In prod SES must be out of sandbox mode.
+  # See docs/setup/aws-bootstrap.md for SES sandbox lift instructions.
+  echo "  SES sender address: the verified From: address for all outbound emails."
+  echo "  e.g. noreply@yourdomain.com — must be verified in SES in this account."
+  read -rp "  SES from-address: " SES_FROM
+  if [[ -z "$SES_FROM" ]]; then
+    echo "  WARNING: ses-from-address left empty — SES emails will fail until set."
+    SES_FROM="noreply@example.com"
+  fi
+  put "/racephotos/env/$ENV_NAME/ses-from-address" "$SES_FROM"
 done
 
 echo ""
