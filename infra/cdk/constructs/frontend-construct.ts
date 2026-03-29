@@ -26,16 +26,16 @@ interface FrontendConstructProps {
  * Custom domain + ACM certificate are wired in when config.domainName !== "none".
  * Both values come from SSM via PipelineStack.loadConfig() — nothing is hardcoded.
  *
- * config.json values come from SSM via valueFromLookup (CDK context lookups):
+ * config.json values come from SSM via deploy-time CfnParameters:
  *   /racephotos/env/{envName}/api-url       — written by ApiConstruct
  *   /racephotos/env/{envName}/user-pool-id  — written by CognitoConstruct
  *   /racephotos/env/{envName}/client-id     — written by CognitoConstruct
  *   config.region                           — literal string from EnvConfig
  *
- * valueFromLookup returns a dummy string on the first synth pass (before AuthStack
- * has deployed and written the SSM params). The pipeline self-mutates after
- * AuthStack deploys; subsequent synths resolve real values from the context cache.
- * This is the same pattern ApiConstruct uses for frontend-origin → CORS.
+ * valueForStringParameter creates AWS::SSM::Parameter::Value<String> CloudFormation
+ * parameters resolved at deploy time — no CDK synth-time lookup, no lookup role
+ * assumption required. AuthStack deploys before FrontendStack (addDependency),
+ * so the SSM params always exist when CloudFormation resolves them.
  */
 export class FrontendConstruct extends Construct {
   /** CloudFront domain name — use as the CNAME target when configuring DNS. */
@@ -53,21 +53,28 @@ export class FrontendConstruct extends Construct {
     const hasCustomDomain =
       config.domainName !== 'none' && config.certificateArn.startsWith('arn:');
 
-    // Read AuthStack outputs from SSM via synth-time context lookups.
-    // On first synth these return "dummy-value-for-..." strings (AuthStack hasn't
-    // deployed yet). BucketDeployment is skipped on that pass (hasRealEnv guard
-    // below). After the pipeline self-mutates the real values are in context.
-    // valueFromLookup returns plain strings — never CloudFormation tokens —
-    // so Source.jsonData's renderData never encounters unsupported intrinsics.
-    const apiBaseUrl = ssm.StringParameter.valueFromLookup(
+    // Read AuthStack SSM outputs via deploy-time CloudFormation SSM parameters.
+    //
+    // valueForStringParameter creates a CfnParameter of type
+    // AWS::SSM::Parameter::Value<String> in FrontendStack. CloudFormation
+    // resolves it at deploy time by calling ssm:GetParameter within the same
+    // (Dev) account — no synth-time lookup, no CDK lookup role assumption.
+    //
+    // The resulting token is a { Ref: <CfnParamLogicalId> } — which IS in
+    // renderData's accepted intrinsics list (Ref / Fn::GetAtt / Fn::Select),
+    // so Source.jsonData works without errors.
+    //
+    // AuthStack deploys before FrontendStack (addDependency in the stage),
+    // so the SSM params exist by the time CloudFormation resolves them here.
+    const apiBaseUrl = ssm.StringParameter.valueForStringParameter(
       this,
       `/racephotos/env/${config.envName}/api-url`,
     );
-    const cognitoUserPoolId = ssm.StringParameter.valueFromLookup(
+    const cognitoUserPoolId = ssm.StringParameter.valueForStringParameter(
       this,
       `/racephotos/env/${config.envName}/user-pool-id`,
     );
-    const cognitoClientId = ssm.StringParameter.valueFromLookup(
+    const cognitoClientId = ssm.StringParameter.valueForStringParameter(
       this,
       `/racephotos/env/${config.envName}/client-id`,
     );
