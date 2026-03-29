@@ -2,7 +2,7 @@
 
 **ID**: RS-002
 **Epic**: Infrastructure
-**Status**: ready
+**Status**: done
 **Has UI**: no
 
 ## Context
