@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as fs from 'fs';
 import * as cdk from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
@@ -139,12 +140,23 @@ export class FrontendConstruct extends Construct {
     const hasRealEnv =
       !stack.account.startsWith('dummy-value-for-') && !stack.region.startsWith('dummy-value-for-');
 
+    const angularDistPath = path.join(
+      __dirname,
+      '../../../frontend/angular/dist/racephotos/browser',
+    );
+    const hasAngularDist = fs.existsSync(angularDistPath);
+
+    if (hasRealEnv && !hasAngularDist) {
+      throw new Error(
+        `Angular build output not found at ${angularDistPath}.\n` +
+          `Run: cd frontend/angular && npx ng build --configuration=production`,
+      );
+    }
+
     if (hasRealEnv) {
       new s3deploy.BucketDeployment(this, 'DeployFrontend', {
         sources: [
-          s3deploy.Source.asset(
-            path.join(__dirname, '../../../frontend/angular/dist/racephotos/browser'),
-          ),
+          s3deploy.Source.asset(angularDistPath),
           s3deploy.Source.jsonData('assets/config.json', {
             apiBaseUrl,
             region: config.region,
