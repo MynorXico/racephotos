@@ -66,9 +66,7 @@ export class FrontendConstruct extends Construct {
     // certificateArn look like real values; the pipeline self-mutates and the
     // second synth will have the real ARN in context.
     const hasCustomDomain =
-      config.domainName !== 'none' &&
-      config.certificateArn !== 'none' &&
-      config.certificateArn.startsWith('arn:');
+      config.domainName !== 'none' && config.certificateArn.startsWith('arn:');
 
     const apiBaseUrl = props.apiBaseUrl ?? 'https://REPLACE_WITH_API_URL';
     const cognito: CognitoConfig = props.cognitoConfig ?? {
