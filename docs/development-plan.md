@@ -208,15 +208,15 @@ in the target environment after the pipeline run completes.
 
 ---
 
-### PR 8 — Observability standards: CloudWatch alarms + X-Ray base constructs
+### PR 8 — Observability standards: CloudWatch alarms + X-Ray base constructs ✅ Ready to merge
 
 **Deliverables:**
 
 - `infra/cdk/constructs/observability-construct.ts`: reusable L3 construct that
   wraps a Lambda function with: X-Ray tracing, CloudWatch error alarm, log group
-  with retention, and (for SQS Lambdas) DLQ depth alarm
-- All future Lambda constructs must accept and use this construct
-- `docs/adr/0008-observability-strategy.md` (CloudWatch only vs. third-party like Datadog/Sentry)
+  with retention, and (for SQS Lambdas) DLQ depth alarm ✅
+- All future Lambda constructs must accept and use this construct ✅
+- `docs/adr/0008-observability-strategy.md` (CloudWatch only vs. third-party like Datadog/Sentry) ✅
 
 **Why before code:** CLAUDE.md mandates X-Ray on every Lambda and DLQ alarms on
 every SQS consumer. Defining the reusable construct now means agents can wire it
