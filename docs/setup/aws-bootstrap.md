@@ -11,6 +11,7 @@ One-time setup required before you can deploy RaceShots to your own AWS accounts
 - Node.js 20.x (see `.nvmrc`)
 
 Verify your profiles work:
+
 ```bash
 AWS_PROFILE=tools aws sts get-caller-identity
 AWS_PROFILE=dev   aws sts get-caller-identity
@@ -86,6 +87,7 @@ a human to authorize the GitHub OAuth app.
 8. Copy the full **Connection ARN** — you will need it in Step 3
 
 The Connection ARN looks like:
+
 ```
 arn:aws:codeconnections:us-east-1:142755255530:connection/36127ac1-7a16-472c-aaad-b29ba0b21ea4
 ```
@@ -93,6 +95,36 @@ arn:aws:codeconnections:us-east-1:142755255530:connection/36127ac1-7a16-472c-aaa
 > **Note:** The Connection must be in **Available** status (green) before the
 > pipeline can use it. If it shows **Pending**, click into it and complete the
 > authorization step.
+
+---
+
+## Step 2b — Create ACM certificates (optional, custom domain only)
+
+Skip this step if you are using the CloudFront default `*.cloudfront.net` domain
+(enter blank / `none` when `seed-ssm.sh` asks for a domain name).
+
+If you want a custom domain (e.g. `app.dev.example.com`):
+
+1. **Certificates must be in `us-east-1`** regardless of your application region.
+   This is a hard CloudFront requirement.
+
+2. Sign in to the **target account** (DEV, PROD, etc.) in the AWS Console,
+   **switch region to `us-east-1`**.
+
+3. Go to **Certificate Manager → Request certificate → Public certificate**.
+
+4. Enter your domain name (e.g. `app.dev.example.com`), choose **DNS validation**,
+   and follow the CNAME instructions to prove domain ownership.
+
+5. Once the status is **Issued**, copy the **Certificate ARN**.
+
+6. `seed-ssm.sh` (Step 3) will prompt for this ARN when you provide a domain name
+   for that environment.
+
+> **Where the ARN is stored:** `/racephotos/env/{envName}/certificate-arn` in the
+> TOOLS account's SSM. It references a certificate that physically lives in
+> `us-east-1` of the target account — CloudFront resolves it correctly because
+> the FrontendStack is deployed into the target account.
 
 ---
 
@@ -107,20 +139,29 @@ AWS_PROFILE=tools ./scripts/seed-ssm.sh
 
 You will be asked for:
 
-| Parameter | Description |
-|---|---|
-| TOOLS account ID | Your TOOLS AWS account number |
-| TOOLS region | e.g. `us-east-1` |
-| GitHub owner | Your GitHub username or org name |
-| GitHub repo | `racephotos` (or your fork name) |
-| GitHub branch | `main` |
-| CodeStar connection ARN | From Step 2 |
-| DEV account ID + region | Skip if not using DEV |
-| QA account ID + region | Skip if not using QA |
-| STAGING account ID + region | Skip if not using STAGING |
-| PROD account ID + region | Skip if not using PROD |
+| Parameter                   | Description                                                           |
+| --------------------------- | --------------------------------------------------------------------- |
+| TOOLS account ID            | Your TOOLS AWS account number                                         |
+| TOOLS region                | e.g. `us-east-1`                                                      |
+| GitHub owner                | Your GitHub username or org name                                      |
+| GitHub repo                 | `racephotos` (or your fork name)                                      |
+| GitHub branch               | `main`                                                                |
+| CodeStar connection ARN     | From Step 2                                                           |
+| DEV account ID + region     | Skip if not using DEV                                                 |
+| DEV custom domain           | e.g. `app.dev.example.com` — blank → `none` (uses CloudFront default) |
+| DEV certificate ARN         | Only prompted if domain is not blank; must be in `us-east-1`          |
+| QA account ID + region      | Skip if not using QA                                                  |
+| QA custom domain            | Same as DEV                                                           |
+| QA certificate ARN          | Same as DEV                                                           |
+| STAGING account ID + region | Skip if not using STAGING                                             |
+| STAGING custom domain       | Same as DEV                                                           |
+| STAGING certificate ARN     | Same as DEV                                                           |
+| PROD account ID + region    | Skip if not using PROD                                                |
+| PROD custom domain          | Same as DEV                                                           |
+| PROD certificate ARN        | Same as DEV                                                           |
 
 Verify parameters were created:
+
 ```bash
 AWS_PROFILE=tools aws ssm get-parameters-by-path \
   --path "/racephotos" \
@@ -205,6 +246,7 @@ running `cdk init`, update `cdk.json`:
 ```
 
 And delete the generated file:
+
 ```bash
 rm -f infra/cdk/bin/cdk.ts
 ```

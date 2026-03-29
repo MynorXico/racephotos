@@ -6,21 +6,34 @@
  */
 
 export interface EnvConfig {
-    envName: "dev" | "qa" | "staging" | "prod";
-    account: string;
-    region: string;
-    rekognitionConfidenceThreshold: number;
-    watermarkStyle: "text_overlay" | "diagonal_tile" | "bottom_bar";
-    photoRetentionDays: number;
-    enableDeletionProtection: boolean;
+  envName: 'dev' | 'qa' | 'staging' | 'prod';
+  account: string;
+  region: string;
+  rekognitionConfidenceThreshold: number;
+  watermarkStyle: 'text_overlay' | 'diagonal_tile' | 'bottom_bar';
+  photoRetentionDays: number;
+  enableDeletionProtection: boolean;
+  /**
+   * Custom domain name for the CloudFront distribution.
+   * e.g. "app.dev.example.com"
+   * Use "none" when no custom domain is needed — CloudFront default domain is used.
+   * Loaded from SSM: /racephotos/env/{envName}/domain-name
+   */
+  domainName: string;
+  /**
+   * ACM certificate ARN for the custom domain. Must be in us-east-1 (CloudFront requirement).
+   * Use "none" when domainName is "none".
+   * Loaded from SSM: /racephotos/env/{envName}/certificate-arn
+   */
+  certificateArn: string;
 }
 
 export interface PipelineConfig {
-    toolsAccount: string;
-    toolsRegion: string;
-    githubOwner: string;
-    githubRepo: string;
-    githubBranch: string;
-    codestarConnectionArn: string;
-    environments: Partial<Record<EnvConfig["envName"], EnvConfig>>;
+  toolsAccount: string;
+  toolsRegion: string;
+  githubOwner: string;
+  githubRepo: string;
+  githubBranch: string;
+  codestarConnectionArn: string;
+  environments: Partial<Record<EnvConfig['envName'], EnvConfig>>;
 }
