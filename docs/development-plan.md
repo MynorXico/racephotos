@@ -123,7 +123,7 @@ See `docs/setup/runtime-config.md`.
 
 ---
 
-### PR 7 — Frontend deployment: FrontendConstruct CDK via CodePipeline
+### PR 7 — Frontend deployment: FrontendConstruct CDK via CodePipeline ✅ Ready to merge
 
 **Deployment strategy: CodePipeline owns everything — no separate GitHub Actions deploy job.**
 
@@ -139,6 +139,7 @@ environment-specific `config.json` injected at deploy time.
    ```
    nvm install 20 && nvm use 20
    cd frontend/angular && npm ci && npx ng build --configuration=production
+   ./scripts/generate-cdk-context.sh
    cd infra/cdk && npm ci && npm run build && npx cdk synth
    ```
 
@@ -177,21 +178,29 @@ defaulting to `"none"` if left blank. `FrontendConstruct` reads them via
 Note: ACM certificates for CloudFront must be created in `us-east-1` regardless
 of the application region. See `docs/setup/aws-bootstrap.md`.
 
+**`cdk.context.json` is never committed:**
+`valueFromLookup` needs cached SSM values to avoid dummy-value failures at synth time,
+but committing `cdk.context.json` would put account IDs in git. Instead,
+`scripts/generate-cdk-context.sh` fetches all `/racephotos/*` SSM parameters via
+`get-parameters-by-path` and writes the file dynamically before each `cdk synth`.
+The pipeline ShellStep calls it automatically; contributors run it locally before
+their first `cdk synth`.
+
 **Deliverables:**
 
 - `infra/cdk/constructs/frontend-construct.ts` — S3 + CloudFront + BucketDeployment
-  with `Source.jsonData` config injection; optional custom domain + ACM cert ✦
-- `infra/cdk/stages/racephotos-stage.ts` — wires in `FrontendConstruct` ✦
-- `infra/cdk/stacks/pipeline-stack.ts` — Synth ShellStep extended to build Angular
-  first; Node 20 installed via nvm ✦
-- `infra/cdk/config/types.ts` — `EnvConfig` gains `apiBaseUrl: string` ✦
-- `infra/cdk/config/environments.example.ts` — updated with `apiBaseUrl` placeholder ✦
-- `scripts/seed-ssm.sh` — prompts for `domain-name` and `certificate-arn` per env ✦
-- `docs/setup/aws-bootstrap.md` — documents ACM `us-east-1` requirement and
-  the chicken-and-egg note (first pipeline run will fail to deploy frontend until
-  the Cognito construct exists; that's expected and tracked in RS-007) ✦
-
-✦ = to be implemented
+  with `Source.jsonData` config injection; optional custom domain + ACM cert ✅
+- `infra/cdk/stages/racephotos-stage.ts` — wires in `FrontendConstruct` ✅
+- `infra/cdk/stacks/pipeline-stack.ts` — Synth ShellStep calls context script +
+  builds Angular first; `ssm:GetParametersByPath` added to CodeBuild IAM policy ✅
+- `infra/cdk/config/types.ts` — `EnvConfig` gains `domainName` and `certificateArn` ✅
+- `scripts/seed-ssm.sh` — prompts for profile explicitly; prompts for `domain-name`
+  and `certificate-arn` per env ✅
+- `scripts/generate-cdk-context.sh` — generates `cdk.context.json` from SSM at
+  synth time; no account IDs committed to git ✅
+- `docs/setup/aws-bootstrap.md` — documents ACM `us-east-1` requirement, new SSM
+  parameters, and `generate-cdk-context.sh` usage ✅
+- `CONTRIBUTING.md` — documents `generate-cdk-context.sh` for local CDK dev ✅
 
 **Why before code:** frontend features cannot be demoed or user-tested without a
 deployed URL. Wiring this early means every merged feature story is immediately live

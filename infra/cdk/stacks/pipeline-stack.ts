@@ -27,13 +27,18 @@ export class PipelineStack extends cdk.Stack {
       selfMutation: true,
 
       // Grant the synth CodeBuild project permission to read all SSM
-      // parameters used by valueFromLookup during cdk synth.
+      // parameters. GetParameter covers individual valueFromLookup calls;
+      // GetParametersByPath is used by generate-cdk-context.sh to fetch
+      // all /racephotos/* params in one call to build cdk.context.json.
       synthCodeBuildDefaults: {
         rolePolicy: [
           new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
-            actions: ['ssm:GetParameter'],
-            resources: [`arn:aws:ssm:${this.region}:${this.account}:parameter/racephotos/*`],
+            actions: ['ssm:GetParameter', 'ssm:GetParametersByPath'],
+            resources: [
+              `arn:aws:ssm:${this.region}:${this.account}:parameter/racephotos`,
+              `arn:aws:ssm:${this.region}:${this.account}:parameter/racephotos/*`,
+            ],
           }),
         ],
       },
@@ -56,6 +61,10 @@ export class PipelineStack extends cdk.Stack {
           // Build Angular first — FrontendConstruct references dist/browser/
           // as a CDK asset so it must exist before cdk synth runs.
           'cd frontend/angular && npm ci && npx ng build --configuration=production && cd ../..',
+          // Populate cdk.context.json from SSM so valueFromLookup gets real
+          // values on every synth run — no dummy-value failures, no account
+          // IDs committed to git.
+          'chmod +x scripts/generate-cdk-context.sh && ./scripts/generate-cdk-context.sh',
           // CDK synth
           'cd infra/cdk && npm ci && npm run build && npx cdk synth',
         ],

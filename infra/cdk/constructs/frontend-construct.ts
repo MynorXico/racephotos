@@ -129,23 +129,35 @@ export class FrontendConstruct extends Construct {
     // Source 2: Source.jsonData — generates assets/config.json with real
     //   per-environment values, overwriting the placeholder committed to the repo.
     //   This is what makes the single-build, multi-environment pattern work.
-    new s3deploy.BucketDeployment(this, 'DeployFrontend', {
-      sources: [
-        s3deploy.Source.asset(
-          path.join(__dirname, '../../../frontend/angular/dist/racephotos/browser'),
-        ),
-        s3deploy.Source.jsonData('assets/config.json', {
-          apiBaseUrl,
-          region: config.region,
-          cognitoUserPoolId: cognito.userPoolId,
-          cognitoClientId: cognito.clientId,
-          cognitoOauthDomain: cognito.oauthDomain,
-        }),
-      ],
-      destinationBucket: websiteBucket,
-      distribution,
-      distributionPaths: ['/*'],
-    });
+    //
+    // Guard: BucketDeployment constructs the CDK bootstrap bucket name as
+    //   cdk-hnb659fds-assets-{account}-{region}. On the first pipeline synth
+    //   pass, valueFromLookup returns "dummy-value-for-..." for account and
+    //   region, making the bucket name invalid. Skip deployment on that pass;
+    //   the pipeline self-mutates and the second run has real values in context.
+    const stack = cdk.Stack.of(this);
+    const hasRealEnv =
+      !stack.account.startsWith('dummy-value-for-') && !stack.region.startsWith('dummy-value-for-');
+
+    if (hasRealEnv) {
+      new s3deploy.BucketDeployment(this, 'DeployFrontend', {
+        sources: [
+          s3deploy.Source.asset(
+            path.join(__dirname, '../../../frontend/angular/dist/racephotos/browser'),
+          ),
+          s3deploy.Source.jsonData('assets/config.json', {
+            apiBaseUrl,
+            region: config.region,
+            cognitoUserPoolId: cognito.userPoolId,
+            cognitoClientId: cognito.clientId,
+            cognitoOauthDomain: cognito.oauthDomain,
+          }),
+        ],
+        destinationBucket: websiteBucket,
+        distribution,
+        distributionPaths: ['/*'],
+      });
+    }
 
     // ── CloudFormation outputs ─────────────────────────────────────────────
     new cdk.CfnOutput(this, 'FrontendUrl', {

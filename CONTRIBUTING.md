@@ -23,29 +23,43 @@ Thank you for your interest in contributing. This guide covers everything you ne
 git clone https://github.com/<your-fork>/racephotos.git
 cd racephotos
 
-# 2. Fill in CDK environment config (never committed)
-cp infra/cdk/config/environments.example.ts infra/cdk/config/environments.ts
-# Edit environments.ts — replace REPLACE_WITH_* placeholders with your account IDs and region
-
-# 3. Fill in local environment variables
+# 2. Fill in local environment variables
 cp .env.example .env.local
 # Edit .env.local if you need overrides (defaults work for LocalStack)
 
-# 4. Install root dev tooling (husky, commitlint, prettier, lint-staged)
+# 3. Install root dev tooling (husky, commitlint, prettier, lint-staged)
 npm install
 
-# 5. Install CDK dependencies
+# 4. Install CDK dependencies
 cd infra/cdk && npm ci && cd ../..
 
-# 6. Install Angular dependencies
+# 5. Install Angular dependencies
 cd frontend/angular && npm ci && cd ../..
 
-# 7. Start LocalStack
+# 6. Start LocalStack
 docker-compose up -d
 
-# 8. Seed LocalStack with resources matching CDK definitions
+# 7. Seed LocalStack with resources matching CDK definitions
 make seed-local
 ```
+
+### Working with CDK locally
+
+`cdk.context.json` is gitignored — it contains AWS account IDs and must not be
+committed. Before running `cdk synth` locally, generate it from your SSM parameters:
+
+```bash
+# Requires tools-account credentials and all /racephotos/* SSM params to exist.
+# Run scripts/seed-ssm.sh first if you haven't already.
+AWS_PROFILE=tools ./scripts/generate-cdk-context.sh
+
+cd infra/cdk
+AWS_PROFILE=tools npx cdk synth
+```
+
+The pipeline runs `generate-cdk-context.sh` automatically on every synth — no manual
+step needed in CI. See [aws-bootstrap.md](docs/setup/aws-bootstrap.md) for full
+one-time AWS setup instructions.
 
 ---
 

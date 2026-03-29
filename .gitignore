@@ -48,6 +48,9 @@ infra/cdk/**/*.js
 infra/cdk/**/*.d.ts
 
 # CDK assets and staging
+# cdk.context.json is gitignored — account IDs must not be committed.
+# The pipeline generates it at synth time via scripts/generate-cdk-context.sh.
+# Run that script locally before `cdk synth` (requires tools account credentials).
 cdk.context.json
 
 # =============================================================================
