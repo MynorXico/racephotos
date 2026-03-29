@@ -14,7 +14,7 @@ Photographers authenticate via Amazon Cognito (ADR-0007). All photographer-facin
 - [ ] AC1: Given a CDK synth runs, when `CognitoConstruct` is instantiated, then a Cognito User Pool `racephotos-photographers` is created with: email as required attribute, email verification required, self sign-up enabled, password policy (min 8 chars, upper+lower+number+symbol).
 - [ ] AC2: Given a CDK synth runs, then a Cognito User Pool Client `racephotos-photographers-client` is created with no client secret (SPA), auth flows `ALLOW_USER_PASSWORD_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH`.
 - [ ] AC3: Given a CDK synth runs, when `ApiConstruct` is instantiated, then an API Gateway HTTP API `racephotos-api` is created with: a JWT authorizer using the Cognito User Pool, CORS configured to allow the CloudFront frontend domain (from `FrontendConstruct` output), and no routes (routes added per Lambda story).
-- [ ] AC4: Given `CognitoConstruct` outputs are available, when `FrontendConstruct` is updated, then `config.json` injected into the S3 bucket includes `cognitoUserPoolId`, `cognitoClientId`, and `cognitoOauthDomain` with real values (not placeholders).
+- [ ] AC4: Given `CognitoConstruct` outputs are available, when `FrontendConstruct` is updated, then `config.json` injected into the S3 bucket includes `cognitoUserPoolId`, `cognitoClientId`, and `cognitoRegion` with real values (not placeholders).
 - [ ] AC5: Given the API Gateway is deployed, then the API base URL is stored in SSM at `/racephotos/env/{envName}/api-url` and `AppConfig` in Angular reads it from `config.json`.
 - [ ] AC6: Given `cdk synth` passes, then no placeholder strings remain in `FrontendConstruct`'s `config.json` for Cognito fields.
 - [ ] AC7: Given `scripts/seed-local.sh` runs, then a LocalStack Cognito User Pool and client are created idempotently and their IDs are printed for `.env.local` configuration.
@@ -27,21 +27,27 @@ Photographers authenticate via Amazon Cognito (ADR-0007). All photographer-facin
 
 ## Tech notes
 
+- Lambda module path: N/A — infra-only story
+- Interface(s) to implement: N/A — infra-only story
+- DynamoDB access pattern: N/A — infra-only story
+- New env vars: none
 - New construct files:
   - `infra/cdk/constructs/cognito-construct.ts`
   - `infra/cdk/constructs/api-construct.ts`
-- `CognitoConstruct` outputs: `userPoolId`, `userPoolArn`, `clientId`, `oauthDomain`
+- `CognitoConstruct` outputs: `userPoolId`, `userPoolArn`, `clientId`, `region`
 - `ApiConstruct` outputs: `apiUrl`, `httpApi` (IHttpApi for route attachment by Lambda constructs)
 - `ApiConstruct` receives `CognitoConstruct` as a prop to wire the JWT authorizer
 - `FrontendConstruct` receives `CognitoConstruct` outputs — update `FrontendConstructProps.cognitoConfig` to accept real values
 - `EnvConfig` gains no new fields (Cognito outputs are wired via construct outputs, not SSM — they're known at synth time)
-- `AppConfig` in Angular (`src/app/core/config/app-config.model.ts`) must include `cognitoUserPoolId`, `cognitoClientId`, `cognitoOauthDomain`, `apiBaseUrl` — update if not already present
+- `AppConfig` in Angular (`src/app/core/config/app-config.model.ts`) must include `cognitoUserPoolId`, `cognitoClientId`, `cognitoRegion`, `apiBaseUrl` — update if not already present
 - CORS allowed origins: `['https://${config.domainName}']` when custom domain set, else `['https://${distribution.distributionDomainName}']`
 - `seed-local.sh` Cognito setup: already created in PR6; verify it creates a pool + client and prints IDs
 
 ## Definition of Done
 
 ### All stories
+
+> Note: this is a CDK TypeScript story with no Go Lambda code. The first three items apply as CDK unit tests (jest + `@aws-cdk/assertions`), not Go tests. There is no `//go:build integration` test; LocalStack coverage is provided by AC7 via `seed-local.sh`.
 
 - [ ] Interface written before implementation
 - [ ] Table-driven unit tests written before implementation
