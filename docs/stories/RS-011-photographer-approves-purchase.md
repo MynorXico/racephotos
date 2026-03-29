@@ -38,6 +38,7 @@ After a runner submits a payment claim (RS-010), the photographer receives an em
   - `photographerId` is denormalized onto the Purchase at creation time (RS-010); no additional Photo or Event lookups are needed
 - `downloadToken` generation: `uuid.New().String()` from `github.com/google/uuid`
 - Interfaces (approve-purchase — others follow same pattern):
+
   ```go
   type PurchaseStore interface {
       GetPurchase(ctx context.Context, id string) (*models.Purchase, error)
@@ -49,13 +50,14 @@ After a runner submits a payment claim (RS-010), the photographer receives an em
   }
   ```
 
-  - `PhotoStore` and `EventStore` are not needed in approve/reject Lambdas — ownership check uses `Purchase.photographerId` (denormalized in RS-010)
-  - `list-purchases-for-approval` still needs an `EventStore` to filter events by photographer and join event names
+  - `PhotoStore` and `EventStore` are not needed in any of the three Lambdas
+  - `list-purchases-for-approval` queries `photographerId-claimedAt-index` GSI (PK: photographerId = JWT sub, SK: claimedAt, filter: status = "pending") — single query, no N+1; event name is already denormalized on the Purchase (see model below)
+
+- Purchase model gains `eventName` field (denormalized from Event at creation in RS-010, same as `photographerId`)
 - New env vars:
   ```
   RACEPHOTOS_ENV                  required — all three Lambdas
   RACEPHOTOS_PURCHASES_TABLE      required — all three Lambdas
-  RACEPHOTOS_EVENTS_TABLE         required — list-purchases-for-approval only
   RACEPHOTOS_SES_FROM_ADDRESS     required — approve-purchase only
   RACEPHOTOS_APP_BASE_URL         required — approve-purchase only (download link in email)
   ```

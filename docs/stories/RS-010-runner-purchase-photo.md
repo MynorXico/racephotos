@@ -60,13 +60,14 @@ After finding their photo (RS-009), a runner initiates a purchase by entering th
       Status         string `dynamodbav:"status"` // "pending"|"approved"|"rejected"
       DownloadToken  string `dynamodbav:"downloadToken"` // UUID v4, set at approval; empty before approval
       PhotographerID string `dynamodbav:"photographerId"` // denormalized from Photo.EventID → Event.PhotographerID at purchase creation; enables single-lookup ownership check in approve/reject
+      EventName      string `dynamodbav:"eventName"`      // denormalized from Event.Name at purchase creation; enables list-purchases-for-approval to return event name without an EventStore lookup
       ClaimedAt      string `dynamodbav:"claimedAt"`
       ApprovedAt     string `dynamodbav:"approvedAt"`
   }
   ```
 - `paymentRef` generation: `RS-` + 8 characters from `crypto/rand` (uppercase A-Z0-9)
 - Idempotency: query `photoId-runnerEmail-index` GSI (PK: photoId, SK: runnerEmail) on purchases table; if a `pending` or `approved` record exists for the pair, return it without creating a new one (GSI defined in RS-001)
-- `photographerId` denormalization: at purchase creation time, load Photo → Event to resolve `photographerId` and store it on the Purchase; this enables approve/reject Lambdas to check ownership with a single Purchase lookup (no join needed)
+- Denormalization at purchase creation time: load Photo → Event to resolve `photographerId` and `eventName`; store both on the Purchase. This enables approve/reject to check ownership with a single Purchase lookup and list-purchases-for-approval to return event names without any additional queries.
 - New env vars:
   ```
   RACEPHOTOS_ENV                  required
