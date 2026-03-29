@@ -8,13 +8,13 @@ Claude Code agents during auto-validation.
 
 ## Prerequisites
 
-| Tool | Minimum version | Check |
-|---|---|---|
-| Go | 1.22 | `go version` |
-| Node.js | 18 LTS | `node --version` |
-| npm / yarn | npm 9+ or yarn 1.22+ | `npm --version` |
-| Angular CLI | 19 | `ng version` |
-| Docker | 24+ | `docker --version` |
+| Tool        | Minimum version      | Check              |
+| ----------- | -------------------- | ------------------ |
+| Go          | 1.22                 | `go version`       |
+| Node.js     | 18 LTS               | `node --version`   |
+| npm / yarn  | npm 9+ or yarn 1.22+ | `npm --version`    |
+| Angular CLI | 19                   | `ng version`       |
+| Docker      | 24+                  | `docker --version` |
 
 ---
 
@@ -57,6 +57,7 @@ make lint-check      # same, used by git hooks — exits non-zero on any issue
 ```
 
 To lint a single service:
+
 ```bash
 cd lambdas/photo-upload && golangci-lint run ./...
 ```
@@ -86,13 +87,13 @@ cd frontend/angular && npm install
 
 ### Useful scripts
 
-| Command | What it does |
-|---|---|
-| `npm start` | Dev server on `http://localhost:4200` (hot reload) |
-| `npm run build` | Production build to `dist/racephotos` |
-| `npm run test:ci` | Unit tests (Karma/Jasmine), no watch, with coverage |
-| `npm run e2e` | Playwright E2E tests (auto-starts dev server) |
-| `npm run e2e:update-snapshots` | Regenerate visual baseline screenshots |
+| Command                        | What it does                                        |
+| ------------------------------ | --------------------------------------------------- |
+| `npm start`                    | Dev server on `http://localhost:4200` (hot reload)  |
+| `npm run build`                | Production build to `dist/racephotos`               |
+| `npm run test:ci`              | Unit tests (Karma/Jasmine), no watch, with coverage |
+| `npm run e2e`                  | Playwright E2E tests (auto-starts dev server)       |
+| `npm run e2e:update-snapshots` | Regenerate visual baseline screenshots              |
 
 Or via the root Makefile:
 
@@ -107,6 +108,7 @@ make e2e         # Playwright E2E
 ## 3. Playwright (E2E testing)
 
 Playwright is the E2E test framework for the Angular frontend. It provides:
+
 - Full browser automation (Chromium, Mobile Chrome)
 - Visual snapshot comparisons (screenshots committed as baselines)
 - Used by agents to auto-validate UI acceptance criteria
@@ -124,23 +126,25 @@ cd frontend/angular && npx playwright install chromium
 > **Note**: System dependencies (fonts, libs) normally require `sudo`.
 > If `npx playwright install chromium --with-deps` fails due to missing sudo,
 > install the following yourself:
+>
 > ```bash
 > sudo apt-get install -y libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 \
 >   libcups2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 \
 >   libxrandr2 libgbm1 libasound2
 > ```
+>
 > Then re-run `npx playwright install chromium`.
 
 ### Config file
 
 `frontend/angular/playwright.config.ts` — key settings:
 
-| Setting | Value | Meaning |
-|---|---|---|
-| `testDir` | `./e2e` | Test files live in `e2e/**/*.spec.ts` |
-| `baseURL` | `http://localhost:4200` | Angular dev server |
-| `webServer` | `ng serve` | Auto-started before tests run |
-| `projects` | Chromium + Mobile Chrome | Tests run on both viewports |
+| Setting     | Value                    | Meaning                               |
+| ----------- | ------------------------ | ------------------------------------- |
+| `testDir`   | `./e2e`                  | Test files live in `e2e/**/*.spec.ts` |
+| `baseURL`   | `http://localhost:4200`  | Angular dev server                    |
+| `webServer` | `ng serve`               | Auto-started before tests run         |
+| `projects`  | Chromium + Mobile Chrome | Tests run on both viewports           |
 
 ### Writing tests
 
@@ -232,7 +236,61 @@ Start a new Claude Code session and check the available tools — you should see
 
 ---
 
-## 5. Adding a golangci-lint config (recommended)
+## 5. GitHub MCP server (agent GitHub access)
+
+The GitHub MCP server gives Claude Code agents read/write access to the GitHub
+API — opening PRs, reading issues, posting review comments — without leaving
+the agent loop. Used by `/ship-feature` to create pull requests and by
+`/review-story` to cross-reference open issues.
+
+### Prerequisites
+
+A GitHub Personal Access Token (classic or fine-grained) with at minimum:
+
+- `repo` scope (read/write on code and pull requests)
+- `write:discussion` if you want comment posting
+
+Generate one at https://github.com/settings/tokens and store it in your shell
+profile or `.env.local`:
+
+```bash
+export GITHUB_PERSONAL_ACCESS_TOKEN=ghp_xxxxxxxxxxxxxxxxxxxx
+```
+
+### Install (one-time, user scope)
+
+```bash
+claude mcp add github -s user -- npx -y @modelcontextprotocol/server-github
+```
+
+> The `-s user` flag installs the server at user scope so it is available in all
+> projects, not just this one. The token is read from the environment at startup.
+
+### Verify
+
+```bash
+claude mcp list
+# github: npx -y @modelcontextprotocol/server-github  - ✓ Connected
+```
+
+If you see `✗ Failed`, confirm `GITHUB_PERSONAL_ACCESS_TOKEN` is exported in
+your current shell (not just `.env.local` — that is loaded by the Angular dev
+server, not by Claude Code itself).
+
+### Restart Claude Code to pick up MCP config
+
+The MCP server connects at session startup. After running `claude mcp add`,
+start a new Claude Code session.
+
+### What agents use it for
+
+- Creating pull requests from feature branches after `/ship-feature`
+- Posting test plan results as PR comments
+- Reading open issues to understand context before writing a story
+
+---
+
+## 6. Adding a golangci-lint config (recommended)
 
 Create `lambdas/.golangci.yml` (one config shared by all Lambdas via `--config`):
 
@@ -246,15 +304,15 @@ linters:
     - ineffassign
     - staticcheck
     - unused
-    - contextcheck    # enforces ctx propagation
-    - wrapcheck       # enforces error wrapping
+    - contextcheck # enforces ctx propagation
+    - wrapcheck # enforces error wrapping
 
 linters-settings:
   errcheck:
     check-type-assertions: true
   wrapcheck:
     ignorePackageGlobs:
-      - github.com/racephotos/*   # internal errors don't need wrapping
+      - github.com/racephotos/* # internal errors don't need wrapping
 
 issues:
   max-issues-per-linter: 0
@@ -262,6 +320,7 @@ issues:
 ```
 
 Pass it explicitly when needed:
+
 ```bash
 golangci-lint run --config ../../.golangci.yml ./...
 ```
@@ -281,5 +340,7 @@ cd frontend/angular
 ng version | grep "Angular CLI" # 19.x
 npx playwright --version        # 1.x
 playwright-mcp --version        # confirms MCP binary is on PATH
-claude mcp list                 # playwright: playwright-mcp - ✓ Connected
+claude mcp list
+# playwright: playwright-mcp                         - ✓ Connected
+# github:     npx -y @modelcontextprotocol/server-github  - ✓ Connected
 ```
