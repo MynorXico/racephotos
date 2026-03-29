@@ -15,8 +15,8 @@ After finding their photo (RS-009), a runner initiates a purchase by entering th
 - [ ] AC2: Given `POST /purchases` is called for a `(photoId, runnerEmail)` pair that already has a `pending` or `approved` Purchase, then the existing purchase is returned with no new record created (idempotent).
 - [ ] AC3: Given the photo does not have `status=indexed`, then a 422 error is returned: "Photo is not available for purchase."
 - [ ] AC4: Given an invalid email format is provided, then a 400 error is returned.
-- [ ] AC5: Given the purchase is created, then an SES email is sent to the photographer using template `racephotos-photographer-claim-{envName}` with masked runner email (`r***@domain.com`), event name, photo reference, and a link to the approvals dashboard (ADR-0001).
-- [ ] AC6: Given the purchase is created, then an SES email is sent to the runner using template `racephotos-runner-claim-confirmation-{envName}` with event name, `paymentRef`, and expected next steps (ADR-0001, ADR-0002).
+- [ ] AC5: Given the purchase is created, then an SES email is sent to the photographer using template `racephotos-photographer-claim` with masked runner email (`r***@domain.com`), event name, photo reference, and a link to the approvals dashboard (ADR-0001).
+- [ ] AC6: Given the purchase is created, then an SES email is sent to the runner using template `racephotos-runner-claim-confirmation` with event name, `paymentRef`, and expected next steps (ADR-0001, ADR-0002).
 - [ ] AC7: Given a runner clicks "Purchase this photo" on the photo detail view, then a multi-step purchase flow opens at step 1: an email input form that shows a preview `"We'll send updates to r***@domain.com — is this correct?"` before the runner confirms (ADR-0002).
 - [ ] AC8: Given the runner confirms their email and the API call succeeds, then step 2 shows bank transfer instructions: `paymentRef`, price, currency, `bankName`, `bankAccountNumber`, `bankAccountHolder`, `bankInstructions` — formatted clearly for copy-paste.
 - [ ] AC9: Given the runner is on step 2 and clicks "I've made the transfer", then a confirmation screen is shown: "Your payment claim has been submitted. The photographer will review it and you'll receive an email once approved."
@@ -53,18 +53,20 @@ After finding their photo (RS-009), a runner initiates a purchase by entering th
 - New model: `shared/models/purchase.go`
   ```go
   type Purchase struct {
-      ID            string `dynamodbav:"id"`
-      PhotoID       string `dynamodbav:"photoId"`
-      RunnerEmail   string `dynamodbav:"runnerEmail"`
-      PaymentRef    string `dynamodbav:"paymentRef"`
-      Status        string `dynamodbav:"status"` // "pending"|"approved"|"rejected"
-      DownloadToken string `dynamodbav:"downloadToken"` // UUID v4, set at approval; empty before approval
-      ClaimedAt     string `dynamodbav:"claimedAt"`
-      ApprovedAt    string `dynamodbav:"approvedAt"`
+      ID             string `dynamodbav:"id"`
+      PhotoID        string `dynamodbav:"photoId"`
+      RunnerEmail    string `dynamodbav:"runnerEmail"`
+      PaymentRef     string `dynamodbav:"paymentRef"`
+      Status         string `dynamodbav:"status"` // "pending"|"approved"|"rejected"
+      DownloadToken  string `dynamodbav:"downloadToken"` // UUID v4, set at approval; empty before approval
+      PhotographerID string `dynamodbav:"photographerId"` // denormalized from Photo.EventID → Event.PhotographerID at purchase creation; enables single-lookup ownership check in approve/reject
+      ClaimedAt      string `dynamodbav:"claimedAt"`
+      ApprovedAt     string `dynamodbav:"approvedAt"`
   }
   ```
 - `paymentRef` generation: `RS-` + 8 characters from `crypto/rand` (uppercase A-Z0-9)
-- Idempotency: query `photoId-runnerEmail` GSI on purchases table; if a `pending` or `approved` record exists for the pair, return it without creating a new one
+- Idempotency: query `photoId-runnerEmail-index` GSI (PK: photoId, SK: runnerEmail) on purchases table; if a `pending` or `approved` record exists for the pair, return it without creating a new one (GSI defined in RS-001)
+- `photographerId` denormalization: at purchase creation time, load Photo → Event to resolve `photographerId` and store it on the Purchase; this enables approve/reject Lambdas to check ownership with a single Purchase lookup (no join needed)
 - New env vars:
   ```
   RACEPHOTOS_ENV                  required

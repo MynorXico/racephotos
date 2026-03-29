@@ -12,16 +12,17 @@ All Lambda functions need S3 buckets, DynamoDB tables, and SQS queues before any
 ## Acceptance criteria
 
 - [ ] AC1: Given a CDK synth runs for any environment, when `PhotoStorageConstruct` is instantiated, then two S3 buckets are created: `racephotos-raw-{envName}` (private, block all public access) and `racephotos-processed-{envName}` (private, served via CloudFront OAC), each with a lifecycle rule that expires objects after `config.photoRetentionDays` days and removal policy driven by `config.enableDeletionProtection`.
-- [ ] AC2: Given a CDK synth runs, when `DatabaseConstruct` is instantiated, then five DynamoDB tables are created with ON_DEMAND billing, explicit names, and removal policy driven by `config.enableDeletionProtection`:
-  - `racephotos-events-{envName}`: PK=`id`, GSI `photographerId-createdAt-index` (PK: photographerId, SK: createdAt), GSI `status-createdAt-index` (PK: status, SK: createdAt)
-  - `racephotos-photos-{envName}`: PK=`id`, GSI `eventId-uploadedAt-index` (PK: eventId, SK: uploadedAt)
-  - `racephotos-bib-index-{envName}`: PK=`bibKey` (format: `{eventId}#{bibNumber}`), SK=`photoId`, GSI `photoId-index` (PK: photoId) — supports multi-bib lookup and retag cleanup
-  - `racephotos-purchases-{envName}`: PK=`id`, GSI `photoId-claimedAt-index` (PK: photoId, SK: claimedAt), GSI `runnerEmail-claimedAt-index` (PK: runnerEmail, SK: claimedAt), GSI `downloadToken-index` (PK: downloadToken)
-  - `racephotos-photographers-{envName}`: PK=`id`
-- [ ] AC3: Given a CDK synth runs, when `ProcessingPipelineConstruct` is instantiated, then two SQS queues are created each with their own DLQ (maxReceiveCount: 3): `racephotos-processing-{envName}` + `racephotos-processing-dlq-{envName}` and `racephotos-watermark-{envName}` + `racephotos-watermark-dlq-{envName}`. Processing queue visibility timeout is 5 minutes (to allow Rekognition time).
+- [ ] AC2: Given a CDK synth runs, when `DatabaseConstruct` is instantiated, then six DynamoDB tables are created with ON_DEMAND billing, explicit names, and removal policy driven by `config.enableDeletionProtection`:
+  - `racephotos-events`: PK=`id`, GSI `photographerId-createdAt-index` (PK: photographerId, SK: createdAt), GSI `status-createdAt-index` (PK: status, SK: createdAt)
+  - `racephotos-photos`: PK=`id`, GSI `eventId-uploadedAt-index` (PK: eventId, SK: uploadedAt)
+  - `racephotos-bib-index`: PK=`bibKey` (format: `{eventId}#{bibNumber}`), SK=`photoId`, GSI `photoId-index` (PK: photoId) — supports multi-bib lookup and retag cleanup
+  - `racephotos-purchases`: PK=`id`, GSI `photoId-claimedAt-index` (PK: photoId, SK: claimedAt), GSI `runnerEmail-claimedAt-index` (PK: runnerEmail, SK: claimedAt), GSI `downloadToken-index` (PK: downloadToken), GSI `photoId-runnerEmail-index` (PK: photoId, SK: runnerEmail) — for purchase idempotency lookup in create-purchase
+  - `racephotos-photographers`: PK=`id`
+  - `racephotos-rate-limits`: PK=`rateLimitKey` (format: `REDOWNLOAD#{email}`), TTL attribute `expiresAt` — used by redownload-resend Lambda for per-email rate limiting
+- [ ] AC3: Given a CDK synth runs, when `ProcessingPipelineConstruct` is instantiated, then two SQS queues are created each with their own DLQ (maxReceiveCount: 3): `racephotos-processing` + `racephotos-processing-dlq` and `racephotos-watermark` + `racephotos-watermark-dlq`. Processing queue visibility timeout is 5 minutes (to allow Rekognition time).
 - [ ] AC4: Given an object is PUT to the raw S3 bucket, when the S3 ObjectCreated event fires, then a message is delivered to the processing SQS queue.
 - [ ] AC5: Given `cdk synth` runs, then `cdk synth` passes with zero errors and zero warnings.
-- [ ] AC6: Given `scripts/seed-local.sh` runs against LocalStack, then all five DynamoDB tables, both S3 buckets, and all four SQS queues (processing + DLQ + watermark + DLQ) are created idempotently.
+- [ ] AC6: Given `scripts/seed-local.sh` runs against LocalStack, then all six DynamoDB tables, both S3 buckets, and all four SQS queues (processing + DLQ + watermark + DLQ) are created idempotently.
 - [ ] AC7: Given a CDK synth runs, then `PhotoStorageConstruct` creates a CloudFront distribution `racephotos-photos-cdn-{envName}` in front of the processed S3 bucket using OAC. The distribution domain name is exposed as a construct output for Lambda environment variable injection.
 
 ## Out of scope

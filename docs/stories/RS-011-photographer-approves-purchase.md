@@ -12,7 +12,7 @@ After a runner submits a payment claim (RS-010), the photographer receives an em
 ## Acceptance criteria
 
 - [ ] AC1: Given `GET /photographer/me/purchases?status=pending` is called with a valid Cognito JWT, then all pending purchases for events owned by that photographer are returned: `[{ purchaseId, photoId, eventId, eventName, runnerEmail (masked: r***@domain.com), paymentRef, claimedAt, watermarkedUrl }]`.
-- [ ] AC2: Given `PUT /purchases/{id}/approve` is called with a valid Cognito JWT, when the caller owns the photo's event and the purchase has `status=pending`, then: a `downloadToken` (UUID v4) is generated; the Purchase is updated to `status=approved`, `downloadToken`, `approvedAt`; SES template `racephotos-runner-purchase-approved-{envName}` is sent to the runner with the permanent download link `{RACEPHOTOS_APP_BASE_URL}/download/{downloadToken}`. The updated Purchase is returned (ADR-0002).
+- [ ] AC2: Given `PUT /purchases/{id}/approve` is called with a valid Cognito JWT, when the caller owns the purchase and the purchase has `status=pending`, then: a `downloadToken` (UUID v4) is generated; the Purchase is updated to `status=approved`, `downloadToken`, `approvedAt`; SES template `racephotos-runner-purchase-approved` is sent to the runner with the permanent download link `{RACEPHOTOS_APP_BASE_URL}/download/{downloadToken}`. The updated Purchase is returned (ADR-0002).
 - [ ] AC3: Given `PUT /purchases/{id}/approve` is called on a purchase that already has `status=approved`, then the call is a no-op and the existing Purchase is returned (idempotent).
 - [ ] AC4: Given `PUT /purchases/{id}/reject` is called with a valid Cognito JWT, when the caller owns the photo's event and the purchase has `status=pending`, then the Purchase is updated to `status=rejected`. No email is sent to the runner in v1. The updated Purchase is returned.
 - [ ] AC5: Given the caller's Cognito JWT sub does not match the `photographerId` on the photo's event, then 403 is returned for both approve and reject.
@@ -34,9 +34,8 @@ After a runner submits a payment claim (RS-010), the photographer receives an em
   - `lambdas/reject-purchase/` — `PUT /purchases/{id}/reject`, Cognito JWT required
 - Ownership check pattern (apply in approve and reject Lambdas):
   1. Load Purchase by `purchaseId`
-  2. Load Photo by `Purchase.photoId`
-  3. Load Event by `Photo.eventId`
-  4. Assert `Event.photographerId == JWT sub`; return 403 if mismatch
+  2. Assert `Purchase.photographerId == JWT sub`; return 403 if mismatch
+  - `photographerId` is denormalized onto the Purchase at creation time (RS-010); no additional Photo or Event lookups are needed
 - `downloadToken` generation: `uuid.New().String()` from `github.com/google/uuid`
 - Interfaces (approve-purchase — others follow same pattern):
   ```go
@@ -45,22 +44,18 @@ After a runner submits a payment claim (RS-010), the photographer receives an em
       UpdatePurchaseApproved(ctx context.Context, id, downloadToken, approvedAt string) error
       UpdatePurchaseRejected(ctx context.Context, id string) error
   }
-  type PhotoStore interface {
-      GetPhoto(ctx context.Context, id string) (*models.Photo, error)
-  }
-  type EventStore interface {
-      GetEvent(ctx context.Context, id string) (*models.Event, error)
-  }
   type EmailSender interface {
       SendTemplatedEmail(ctx context.Context, to, template string, data map[string]string) error
   }
   ```
+
+  - `PhotoStore` and `EventStore` are not needed in approve/reject Lambdas — ownership check uses `Purchase.photographerId` (denormalized in RS-010)
+  - `list-purchases-for-approval` still needs an `EventStore` to filter events by photographer and join event names
 - New env vars:
   ```
   RACEPHOTOS_ENV                  required — all three Lambdas
   RACEPHOTOS_PURCHASES_TABLE      required — all three Lambdas
-  RACEPHOTOS_PHOTOS_TABLE         required — all three Lambdas
-  RACEPHOTOS_EVENTS_TABLE         required — all three Lambdas
+  RACEPHOTOS_EVENTS_TABLE         required — list-purchases-for-approval only
   RACEPHOTOS_SES_FROM_ADDRESS     required — approve-purchase only
   RACEPHOTOS_APP_BASE_URL         required — approve-purchase only (download link in email)
   ```

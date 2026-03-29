@@ -13,10 +13,10 @@ Two ADRs require SES email sending: ADR-0001 (photographer notified when a purch
 
 - [ ] AC1: Given a CDK synth runs, when `SesConstruct` is instantiated, then a SES email identity is configured for the verified sender address loaded from SSM `/racephotos/env/{envName}/ses-from-address`.
 - [ ] AC2: Given a CDK synth runs, then four SES email templates are created with explicit names:
-  1. `racephotos-photographer-claim-{envName}`: notifies photographer of a new purchase claim; includes runner email (masked), event name, photo reference, and link to the approvals dashboard
-  2. `racephotos-runner-claim-confirmation-{envName}`: informs runner their claim was received; includes event name, photo reference, payment reference (RS-XXXX)
-  3. `racephotos-runner-purchase-approved-{envName}`: informs runner their photo is approved; includes event name, permanent download link (`/download/{downloadToken}`), and a note that the link works indefinitely
-  4. `racephotos-runner-redownload-resend-{envName}`: sent on re-download request; includes all active download links for the runner's approved purchases
+  1. `racephotos-photographer-claim`: notifies photographer of a new purchase claim; includes runner email (masked), event name, photo reference, and link to the approvals dashboard
+  2. `racephotos-runner-claim-confirmation`: informs runner their claim was received; includes event name, photo reference, payment reference (RS-XXXX)
+  3. `racephotos-runner-purchase-approved`: informs runner their photo is approved; includes event name, permanent download link (`/download/{downloadToken}`), and a note that the link works indefinitely
+  4. `racephotos-runner-redownload-resend`: sent on re-download request; includes all active download links for the runner's approved purchases
 - [ ] AC3: Given `SesConstruct` exposes a `grantSendEmail(grantee)` method, when called by a Lambda construct, then `ses:SendEmail` and `ses:SendTemplatedEmail` are granted on the verified identity ARN.
 - [ ] AC4: Given `scripts/seed-ssm.sh` runs, then it prompts for `/racephotos/env/{envName}/ses-from-address` per environment.
 - [ ] AC5: Given `scripts/seed-local.sh` runs, then a LocalStack SES identity is created for the local from-address (from `.env.local`).

@@ -311,9 +311,9 @@ Run `/ship-feature <story-file>` for each, in order. Each story depends on all s
  8.  RS-008  Photographer event photos gallery
  9.  RS-009  Runner photo search
 10.  RS-010  Runner purchases a photo
-11.  RS-011  Photographer approves a purchase
-12.  RS-012  Runner downloads a photo
-13.  RS-013  Photographer tags undetected bibs
+11.  RS-011  Photographer approves or rejects a purchase
+12.  RS-012  Runner downloads a photo via download token
+13.  RS-013  Photographer manually tags bib numbers
 14.  RS-014  Public events listing homepage
 ```
 

@@ -14,7 +14,7 @@ Before a photographer can create events or upload photos, they need to authentic
 - [ ] AC1: Given an unauthenticated user visits any `/photographer/*` route, when the Angular router resolves, then they are redirected to `/login`.
 - [ ] AC2: Given a photographer visits `/login`, when they enter valid Cognito credentials and submit, then they are authenticated via Amplify v6 `signIn`, the NgRx auth state is updated, and they are redirected to `/photographer/events`.
 - [ ] AC3: Given a photographer clicks "Sign out", when the action completes, then Amplify `signOut` is called, NgRx auth state is cleared, and they are redirected to `/login`.
-- [ ] AC4: Given `GET /photographer/me` is called with a valid Cognito JWT, when the photographer has no existing profile record, then a new Photographer record is created with empty fields and returned (first-login onboarding).
+- [ ] AC4: Given `GET /photographer/me` is called with a valid Cognito JWT, when the photographer has no existing profile record, then 404 is returned. The Angular app handles this by immediately calling `PUT /photographer/me` with empty defaults to initialise the profile.
 - [ ] AC5: Given `GET /photographer/me` is called with a valid Cognito JWT, when a profile exists, then the full profile is returned: `{ id, displayName, defaultCurrency, bankName, bankAccountNumber, bankAccountHolder, bankInstructions, createdAt, updatedAt }`.
 - [ ] AC6: Given `PUT /photographer/me` is called with a valid Cognito JWT and a valid body, when the request completes, then the Photographer record is updated and the updated profile is returned.
 - [ ] AC7: Given a photographer visits `/photographer/profile`, when the page loads, then their current profile values are pre-filled in the form fields.
@@ -55,7 +55,8 @@ Before a photographer can create events or upload photos, they need to authentic
   }
   ```
 - DynamoDB access pattern: `GetItem` by PK=photographerID (Cognito `sub` claim from JWT)
-- `get-photographer` uses `UpsertPhotographer` on first login to create an empty record before returning it
+- `get-photographer` returns 404 (`apperrors.ErrNotFound`) when no record exists; it does NOT create one
+- `update-photographer` uses `UpsertPhotographer` (PutItem) — creates the record on first call, updates on subsequent calls; Angular calls this on profile page load if GET returned 404
 - New env vars:
   ```
   RACEPHOTOS_ENV                 required — "local"|"dev"|"qa"|"staging"|"prod"
@@ -63,7 +64,7 @@ Before a photographer can create events or upload photos, they need to authentic
   ```
 - CDK: new `PhotographerConstruct` in `infra/cdk/constructs/photographer-construct.ts`
   - Two Lambda functions, each wrapped with `ObservabilityConstruct`
-  - IAM: photographers table grants `dynamodb:GetItem` + `dynamodb:PutItem` to get-photographer; `dynamodb:PutItem` only to update-photographer
+  - IAM: photographers table grants `dynamodb:GetItem` only to get-photographer; `dynamodb:PutItem` only to update-photographer
   - Routes added to `ApiConstruct.httpApi` using the JWT authorizer from RS-002
 - Angular structure:
   - `src/app/features/photographer/` feature module (lazy-loaded)
@@ -82,7 +83,7 @@ Before a photographer can create events or upload photos, they need to authentic
   - `store/photographer/photographer.reducer.ts`
   - `store/photographer/photographer.selectors.ts`
 - Amplify initialisation follows ADR-0007: configure once in `app.config.ts` using values from `environment.ts`; import only from `aws-amplify/auth`; components never call Amplify directly
-- `.env.example`: add `RACEPHOTOS_PHOTOGRAPHERS_TABLE=racephotos-photographers-local`
+- `.env.example`: add `RACEPHOTOS_PHOTOGRAPHERS_TABLE=racephotos-photographers`
 - `environments.example.ts`: no new keys required
 
 ## Definition of Done

@@ -11,9 +11,9 @@ Photographers authenticate via Amazon Cognito (ADR-0007). All photographer-facin
 
 ## Acceptance criteria
 
-- [ ] AC1: Given a CDK synth runs, when `CognitoConstruct` is instantiated, then a Cognito User Pool `racephotos-photographers-{envName}` is created with: email as required attribute, email verification required, self sign-up enabled, password policy (min 8 chars, upper+lower+number+symbol).
-- [ ] AC2: Given a CDK synth runs, then a Cognito User Pool Client `racephotos-photographers-client-{envName}` is created with no client secret (SPA), auth flows `ALLOW_USER_PASSWORD_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH`.
-- [ ] AC3: Given a CDK synth runs, when `ApiConstruct` is instantiated, then an API Gateway HTTP API `racephotos-api-{envName}` is created with: a JWT authorizer using the Cognito User Pool, CORS configured to allow the CloudFront frontend domain (from `FrontendConstruct` output), and no routes (routes added per Lambda story).
+- [ ] AC1: Given a CDK synth runs, when `CognitoConstruct` is instantiated, then a Cognito User Pool `racephotos-photographers` is created with: email as required attribute, email verification required, self sign-up enabled, password policy (min 8 chars, upper+lower+number+symbol).
+- [ ] AC2: Given a CDK synth runs, then a Cognito User Pool Client `racephotos-photographers-client` is created with no client secret (SPA), auth flows `ALLOW_USER_PASSWORD_AUTH` and `ALLOW_REFRESH_TOKEN_AUTH`.
+- [ ] AC3: Given a CDK synth runs, when `ApiConstruct` is instantiated, then an API Gateway HTTP API `racephotos-api` is created with: a JWT authorizer using the Cognito User Pool, CORS configured to allow the CloudFront frontend domain (from `FrontendConstruct` output), and no routes (routes added per Lambda story).
 - [ ] AC4: Given `CognitoConstruct` outputs are available, when `FrontendConstruct` is updated, then `config.json` injected into the S3 bucket includes `cognitoUserPoolId`, `cognitoClientId`, and `cognitoOauthDomain` with real values (not placeholders).
 - [ ] AC5: Given the API Gateway is deployed, then the API base URL is stored in SSM at `/racephotos/env/{envName}/api-url` and `AppConfig` in Angular reads it from `config.json`.
 - [ ] AC6: Given `cdk synth` passes, then no placeholder strings remain in `FrontendConstruct`'s `config.json` for Cognito fields.
