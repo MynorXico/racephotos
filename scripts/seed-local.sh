@@ -350,6 +350,36 @@ else
   log "app client: ${USER_POOL_CLIENT_NAME} (${CLIENT_ID})"
 fi
 
+# ── SSM parameters ────────────────────────────────────────────────────────────
+# Mirror the SSM parameters written by CDK constructs at deploy time.
+# FrontendConstruct reads these via valueFromLookup during cdk synth.
+# Parameters are written unconditionally so cdk synth works against LocalStack
+# even when Cognito is unavailable (values fall back to NOT_AVAILABLE).
+step "SSM"
+
+$AWS ssm put-parameter \
+  --name "/racephotos/env/${ENV_NAME}/user-pool-id" \
+  --value "${USER_POOL_ID}" \
+  --type String \
+  --overwrite 2>/dev/null || true
+log "param: /racephotos/env/${ENV_NAME}/user-pool-id = ${USER_POOL_ID}"
+
+$AWS ssm put-parameter \
+  --name "/racephotos/env/${ENV_NAME}/client-id" \
+  --value "${CLIENT_ID}" \
+  --type String \
+  --overwrite 2>/dev/null || true
+log "param: /racephotos/env/${ENV_NAME}/client-id = ${CLIENT_ID}"
+
+# api-url: placeholder until API Gateway is seeded (RS-003+).
+# Updated automatically when the photo-upload Lambda stack is seeded.
+$AWS ssm put-parameter \
+  --name "/racephotos/env/${ENV_NAME}/api-url" \
+  --value "http://localhost:4566" \
+  --type String \
+  --overwrite 2>/dev/null || true
+log "param: /racephotos/env/${ENV_NAME}/api-url = http://localhost:4566 (placeholder)"
+
 # ── SES sender identity ───────────────────────────────────────────────────────
 step "SES"
 
@@ -377,10 +407,10 @@ echo "   AWS_ACCESS_KEY_ID=test"
 echo "   AWS_SECRET_ACCESS_KEY=test"
 echo "   AWS_REGION=${REGION}"
 echo ""
-echo " Update frontend/angular/src/assets/config.json with:"
+echo " Cognito + API URL written to SSM (no manual config.json edit needed):"
 echo ""
-echo "   \"cognitoUserPoolId\": \"${USER_POOL_ID}\","
-echo "   \"cognitoClientId\":   \"${CLIENT_ID}\","
-echo "   \"cognitoRegion\":     \"${REGION}\""
+echo "   /racephotos/env/${ENV_NAME}/user-pool-id = ${USER_POOL_ID}"
+echo "   /racephotos/env/${ENV_NAME}/client-id    = ${CLIENT_ID}"
+echo "   /racephotos/env/${ENV_NAME}/api-url      = http://localhost:4566 (placeholder)"
 echo "════════════════════════════════════════════════════════════"
 echo ""
