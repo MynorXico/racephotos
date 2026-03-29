@@ -180,6 +180,36 @@ repo root automatically selects the correct version.
 
 ## CodePipeline / CodeBuild issues
 
+### When you must run `cdk deploy` manually
+
+CDK Pipelines self-mutates by running the new `cdk synth` through the **existing**
+Synth CodeBuild project and then updating the pipeline stack. This only works when
+the current Synth step succeeds. If the Synth step itself is broken or its definition
+changed, the pipeline is stuck and cannot bootstrap itself.
+
+**Run `cdk deploy RacePhotosPipeline --profile tools` manually after any of these:**
+
+| Change                                          | Why manual deploy is needed                                                                        |
+| ----------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Synth step commands modified                    | New commands won't run until pipeline self-mutates, but it can't self-mutate with the old commands |
+| `partialBuildSpec` / runtime changed            | Same — the CodeBuild project config is stale                                                       |
+| `rolePolicyStatements` on Synth step            | IAM changes only apply after CloudFormation update                                                 |
+| Synth step type (`ShellStep` → `CodeBuildStep`) | Pipeline definition changed fundamentally                                                          |
+
+**Not needed** for application construct/stack changes — the pipeline self-mutates normally.
+
+```bash
+# From repo root
+AWS_PROFILE=tools ./scripts/generate-cdk-context.sh
+export CDK_DEFAULT_ACCOUNT=$(AWS_PROFILE=tools aws sts get-caller-identity \
+  --query Account --output text)
+export CDK_DEFAULT_REGION=us-east-1
+cd infra/cdk
+npx cdk deploy RacePhotosPipeline --profile tools
+```
+
+---
+
 ### Pipeline synth step fails: "not authorized to perform: ssm:GetParameter"
 
 **Symptom**
