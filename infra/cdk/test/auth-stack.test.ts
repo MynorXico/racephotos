@@ -346,35 +346,38 @@ describe('ApiConstruct', () => {
     });
   });
 
-  // TC-013: Exactly one SSM parameter per AuthStack — guards against duplicate logical IDs.
-  // Note: CfnOutput exports are not SSM parameters; this count covers only SSM resources.
-  test('AuthStack creates exactly one SSM parameter', () => {
+  // TC-013: AuthStack has exactly 3 SSM parameters — api-url (ApiConstruct) +
+  // user-pool-id + client-id (CognitoConstruct). FrontendConstruct reads all three
+  // via valueFromLookup, avoiding cross-stack CDK tokens in Source.jsonData.
+  test('AuthStack creates exactly three SSM parameters', () => {
     const t = makeTemplate(devConfig);
-    t.resourceCountIs('AWS::SSM::Parameter', 1);
+    t.resourceCountIs('AWS::SSM::Parameter', 3);
   });
 
-  // TC-023: AuthStack exports api-url, user-pool-id, and client-id as CfnOutputs with
-  // export names that include envName. FrontendStack consumes these via Fn.importValue().
-  test('AuthStack has CfnOutput export for api-url with envName in export name', () => {
+  test('CognitoConstruct stores user-pool-id in SSM at correct path', () => {
     const t = makeTemplate(devConfig);
-    t.hasOutput('*', { Export: { Name: 'racephotos-dev-api-url' } });
+    t.hasResourceProperties('AWS::SSM::Parameter', {
+      Name: '/racephotos/env/dev/user-pool-id',
+      Type: 'String',
+    });
   });
 
-  test('AuthStack has CfnOutput export for user-pool-id with envName in export name', () => {
+  test('CognitoConstruct stores client-id in SSM at correct path', () => {
     const t = makeTemplate(devConfig);
-    t.hasOutput('*', { Export: { Name: 'racephotos-dev-user-pool-id' } });
+    t.hasResourceProperties('AWS::SSM::Parameter', {
+      Name: '/racephotos/env/dev/client-id',
+      Type: 'String',
+    });
   });
 
-  test('AuthStack has CfnOutput export for client-id with envName in export name', () => {
-    const t = makeTemplate(devConfig);
-    t.hasOutput('*', { Export: { Name: 'racephotos-dev-client-id' } });
-  });
-
-  test('AuthStack CfnOutput export names use envName from config', () => {
-    const stack = makeStack(devConfig);
-    expect(stack.apiUrlExportName).toBe('racephotos-dev-api-url');
-    expect(stack.userPoolIdExportName).toBe('racephotos-dev-user-pool-id');
-    expect(stack.clientIdExportName).toBe('racephotos-dev-client-id');
+  test('CognitoConstruct SSM parameter paths use envName from config', () => {
+    const t = makeTemplate(prodConfig);
+    t.hasResourceProperties('AWS::SSM::Parameter', {
+      Name: '/racephotos/env/prod/user-pool-id',
+    });
+    t.hasResourceProperties('AWS::SSM::Parameter', {
+      Name: '/racephotos/env/prod/client-id',
+    });
   });
 
   // TC-022: No routes at synth time — AC3 requires "no routes (routes added per Lambda story)".
