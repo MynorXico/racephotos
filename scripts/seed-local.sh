@@ -280,8 +280,7 @@ log "DLQ: ${PROCESSING_DLQ}"
 
 PROCESSING_DLQ_ARN="arn:aws:sqs:${REGION}:${ACCOUNT_ID}:${PROCESSING_DLQ}"
 
-PROCESSING_QUEUE_URL=$($AWS sqs create-queue --queue-name "${PROCESSING_QUEUE}" --query "QueueUrl" --output text 2>/dev/null || \
-  $AWS sqs get-queue-url --queue-name "${PROCESSING_QUEUE}" --query "QueueUrl" --output text)
+PROCESSING_QUEUE_URL=$($AWS sqs create-queue --queue-name "${PROCESSING_QUEUE}" --query "QueueUrl" --output text)
 $AWS sqs set-queue-attributes --queue-url "${PROCESSING_QUEUE_URL}" \
   --attributes "VisibilityTimeout=300,RedrivePolicy={\"deadLetterTargetArn\":\"${PROCESSING_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}"
 log "queue: ${PROCESSING_QUEUE} (redrive → ${PROCESSING_DLQ}, maxReceiveCount=3, visibilityTimeout=300s)"
@@ -294,8 +293,7 @@ log "DLQ: ${WATERMARK_DLQ}"
 
 WATERMARK_DLQ_ARN="arn:aws:sqs:${REGION}:${ACCOUNT_ID}:${WATERMARK_DLQ}"
 
-WATERMARK_QUEUE_URL=$($AWS sqs create-queue --queue-name "${WATERMARK_QUEUE}" --query "QueueUrl" --output text 2>/dev/null || \
-  $AWS sqs get-queue-url --queue-name "${WATERMARK_QUEUE}" --query "QueueUrl" --output text)
+WATERMARK_QUEUE_URL=$($AWS sqs create-queue --queue-name "${WATERMARK_QUEUE}" --query "QueueUrl" --output text)
 $AWS sqs set-queue-attributes --queue-url "${WATERMARK_QUEUE_URL}" \
   --attributes "VisibilityTimeout=120,RedrivePolicy={\"deadLetterTargetArn\":\"${WATERMARK_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}"
 log "queue: ${WATERMARK_QUEUE} (redrive → ${WATERMARK_DLQ}, maxReceiveCount=3, visibilityTimeout=120s)"
