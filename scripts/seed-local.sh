@@ -26,12 +26,24 @@ REGION="us-east-1"
 ENV_NAME="local"
 ACCOUNT_ID="000000000000" # LocalStack fixed account ID
 
-# Resource names must match future CDK constructs (envName in the suffix)
+# S3 bucket names include envName (globally unique namespace)
 RAW_BUCKET="racephotos-raw-${ENV_NAME}"
 PROCESSED_BUCKET="racephotos-processed-${ENV_NAME}"
-TABLE_NAME="racephotos-photos-${ENV_NAME}"
-QUEUE_NAME="racephotos-processing-${ENV_NAME}"
-DLQ_NAME="racephotos-processing-dlq-${ENV_NAME}"
+
+# DynamoDB and SQS names have NO envName suffix — each environment is deployed
+# to an isolated AWS account, so names never collide (matches CDK constructs).
+EVENTS_TABLE="racephotos-events"
+PHOTOS_TABLE="racephotos-photos"
+BIB_INDEX_TABLE="racephotos-bib-index"
+PURCHASES_TABLE="racephotos-purchases"
+PHOTOGRAPHERS_TABLE="racephotos-photographers"
+RATE_LIMITS_TABLE="racephotos-rate-limits"
+
+PROCESSING_QUEUE="racephotos-processing"
+PROCESSING_DLQ="racephotos-processing-dlq"
+WATERMARK_QUEUE="racephotos-watermark"
+WATERMARK_DLQ="racephotos-watermark-dlq"
+
 USER_POOL_NAME="racephotos-users-${ENV_NAME}"
 USER_POOL_CLIENT_NAME="racephotos-app-${ENV_NAME}"
 
@@ -96,51 +108,199 @@ log "public access blocked on both buckets"
 # ── DynamoDB ──────────────────────────────────────────────────────────────────
 step "DynamoDB"
 
+# racephotos-events — PK: id, GSI: photographerId-createdAt-index, status-createdAt-index
 $AWS dynamodb create-table \
-  --table-name "${TABLE_NAME}" \
+  --table-name "${EVENTS_TABLE}" \
   --attribute-definitions \
-    AttributeName=PK,AttributeType=S \
-    AttributeName=SK,AttributeType=S \
-    AttributeName=GSI1PK,AttributeType=S \
-    AttributeName=GSI1SK,AttributeType=S \
+    AttributeName=id,AttributeType=S \
+    AttributeName=photographerId,AttributeType=S \
+    AttributeName=createdAt,AttributeType=S \
+    AttributeName=status,AttributeType=S \
   --key-schema \
-    AttributeName=PK,KeyType=HASH \
-    AttributeName=SK,KeyType=RANGE \
+    AttributeName=id,KeyType=HASH \
   --global-secondary-indexes '[
     {
-      "IndexName": "GSI1",
+      "IndexName": "photographerId-createdAt-index",
       "KeySchema": [
-        {"AttributeName":"GSI1PK","KeyType":"HASH"},
-        {"AttributeName":"GSI1SK","KeyType":"RANGE"}
+        {"AttributeName":"photographerId","KeyType":"HASH"},
+        {"AttributeName":"createdAt","KeyType":"RANGE"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
+    },
+    {
+      "IndexName": "status-createdAt-index",
+      "KeySchema": [
+        {"AttributeName":"status","KeyType":"HASH"},
+        {"AttributeName":"createdAt","KeyType":"RANGE"}
       ],
       "Projection": {"ProjectionType":"ALL"}
     }
   ]' \
   --billing-mode PAY_PER_REQUEST \
   2>/dev/null || true
-log "table: ${TABLE_NAME} (PK/SK + GSI1)"
+log "table: ${EVENTS_TABLE}"
+
+# racephotos-photos — PK: id, GSI: eventId-uploadedAt-index
+$AWS dynamodb create-table \
+  --table-name "${PHOTOS_TABLE}" \
+  --attribute-definitions \
+    AttributeName=id,AttributeType=S \
+    AttributeName=eventId,AttributeType=S \
+    AttributeName=uploadedAt,AttributeType=S \
+  --key-schema \
+    AttributeName=id,KeyType=HASH \
+  --global-secondary-indexes '[
+    {
+      "IndexName": "eventId-uploadedAt-index",
+      "KeySchema": [
+        {"AttributeName":"eventId","KeyType":"HASH"},
+        {"AttributeName":"uploadedAt","KeyType":"RANGE"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
+    }
+  ]' \
+  --billing-mode PAY_PER_REQUEST \
+  2>/dev/null || true
+log "table: ${PHOTOS_TABLE}"
+
+# racephotos-bib-index — PK: bibKey, SK: photoId, GSI: photoId-index (ADR-0003 fan-out)
+$AWS dynamodb create-table \
+  --table-name "${BIB_INDEX_TABLE}" \
+  --attribute-definitions \
+    AttributeName=bibKey,AttributeType=S \
+    AttributeName=photoId,AttributeType=S \
+  --key-schema \
+    AttributeName=bibKey,KeyType=HASH \
+    AttributeName=photoId,KeyType=RANGE \
+  --global-secondary-indexes '[
+    {
+      "IndexName": "photoId-index",
+      "KeySchema": [
+        {"AttributeName":"photoId","KeyType":"HASH"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
+    }
+  ]' \
+  --billing-mode PAY_PER_REQUEST \
+  2>/dev/null || true
+log "table: ${BIB_INDEX_TABLE}"
+
+# racephotos-purchases — PK: id, 5 GSIs
+$AWS dynamodb create-table \
+  --table-name "${PURCHASES_TABLE}" \
+  --attribute-definitions \
+    AttributeName=id,AttributeType=S \
+    AttributeName=photoId,AttributeType=S \
+    AttributeName=claimedAt,AttributeType=S \
+    AttributeName=runnerEmail,AttributeType=S \
+    AttributeName=downloadToken,AttributeType=S \
+    AttributeName=photographerId,AttributeType=S \
+  --key-schema \
+    AttributeName=id,KeyType=HASH \
+  --global-secondary-indexes '[
+    {
+      "IndexName": "photoId-claimedAt-index",
+      "KeySchema": [
+        {"AttributeName":"photoId","KeyType":"HASH"},
+        {"AttributeName":"claimedAt","KeyType":"RANGE"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
+    },
+    {
+      "IndexName": "runnerEmail-claimedAt-index",
+      "KeySchema": [
+        {"AttributeName":"runnerEmail","KeyType":"HASH"},
+        {"AttributeName":"claimedAt","KeyType":"RANGE"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
+    },
+    {
+      "IndexName": "downloadToken-index",
+      "KeySchema": [
+        {"AttributeName":"downloadToken","KeyType":"HASH"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
+    },
+    {
+      "IndexName": "photoId-runnerEmail-index",
+      "KeySchema": [
+        {"AttributeName":"photoId","KeyType":"HASH"},
+        {"AttributeName":"runnerEmail","KeyType":"RANGE"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
+    },
+    {
+      "IndexName": "photographerId-claimedAt-index",
+      "KeySchema": [
+        {"AttributeName":"photographerId","KeyType":"HASH"},
+        {"AttributeName":"claimedAt","KeyType":"RANGE"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
+    }
+  ]' \
+  --billing-mode PAY_PER_REQUEST \
+  2>/dev/null || true
+log "table: ${PURCHASES_TABLE}"
+
+# racephotos-photographers — PK: id (simple profile store)
+$AWS dynamodb create-table \
+  --table-name "${PHOTOGRAPHERS_TABLE}" \
+  --attribute-definitions \
+    AttributeName=id,AttributeType=S \
+  --key-schema \
+    AttributeName=id,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  2>/dev/null || true
+log "table: ${PHOTOGRAPHERS_TABLE}"
+
+# racephotos-rate-limits — PK: rateLimitKey, TTL: expiresAt
+$AWS dynamodb create-table \
+  --table-name "${RATE_LIMITS_TABLE}" \
+  --attribute-definitions \
+    AttributeName=rateLimitKey,AttributeType=S \
+  --key-schema \
+    AttributeName=rateLimitKey,KeyType=HASH \
+  --billing-mode PAY_PER_REQUEST \
+  2>/dev/null || true
+
+$AWS dynamodb update-time-to-live \
+  --table-name "${RATE_LIMITS_TABLE}" \
+  --time-to-live-specification "Enabled=true,AttributeName=expiresAt" \
+  2>/dev/null || true
+log "table: ${RATE_LIMITS_TABLE} (TTL: expiresAt)"
 
 # ── SQS queues ────────────────────────────────────────────────────────────────
 step "SQS"
 
-# Dead-letter queue first
-DLQ_URL=$($AWS sqs create-queue \
-  --queue-name "${DLQ_NAME}" \
-  --query "QueueUrl" --output text 2>/dev/null || \
-  $AWS sqs get-queue-url --queue-name "${DLQ_NAME}" --query "QueueUrl" --output text)
-log "DLQ: ${DLQ_NAME}"
-
-DLQ_ARN="arn:aws:sqs:${REGION}:${ACCOUNT_ID}:${DLQ_NAME}"
-
-# Main processing queue with DLQ redrive (maxReceiveCount: 3 — matches CDK)
+# ── Processing pipeline ───────────────────────────────────────────────────────
 $AWS sqs create-queue \
-  --queue-name "${QUEUE_NAME}" \
-  --attributes "{\"RedrivePolicy\":\"{\\\"deadLetterTargetArn\\\":\\\"${DLQ_ARN}\\\",\\\"maxReceiveCount\\\":\\\"3\\\"}\"}" \
-  2>/dev/null || true
-log "queue: ${QUEUE_NAME} (redrive → ${DLQ_NAME}, maxReceiveCount=3)"
+  --queue-name "${PROCESSING_DLQ}" \
+  --query "QueueUrl" --output text 2>/dev/null || true
+log "DLQ: ${PROCESSING_DLQ}"
 
-QUEUE_URL="http://sqs.${REGION}.localhost.localstack.cloud:4566/${ACCOUNT_ID}/${QUEUE_NAME}"
-log "queue URL: ${QUEUE_URL}"
+PROCESSING_DLQ_ARN="arn:aws:sqs:${REGION}:${ACCOUNT_ID}:${PROCESSING_DLQ}"
+
+$AWS sqs create-queue \
+  --queue-name "${PROCESSING_QUEUE}" \
+  --attributes "VisibilityTimeout=300,RedrivePolicy={\"deadLetterTargetArn\":\"${PROCESSING_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}" \
+  2>/dev/null || true
+log "queue: ${PROCESSING_QUEUE} (redrive → ${PROCESSING_DLQ}, maxReceiveCount=3, visibilityTimeout=300s)"
+
+PROCESSING_QUEUE_URL="http://sqs.${REGION}.localhost.localstack.cloud:4566/${ACCOUNT_ID}/${PROCESSING_QUEUE}"
+
+# ── Watermark pipeline ────────────────────────────────────────────────────────
+$AWS sqs create-queue \
+  --queue-name "${WATERMARK_DLQ}" \
+  --query "QueueUrl" --output text 2>/dev/null || true
+log "DLQ: ${WATERMARK_DLQ}"
+
+WATERMARK_DLQ_ARN="arn:aws:sqs:${REGION}:${ACCOUNT_ID}:${WATERMARK_DLQ}"
+
+$AWS sqs create-queue \
+  --queue-name "${WATERMARK_QUEUE}" \
+  --attributes "RedrivePolicy={\"deadLetterTargetArn\":\"${WATERMARK_DLQ_ARN}\",\"maxReceiveCount\":\"3\"}" \
+  2>/dev/null || true
+log "queue: ${WATERMARK_QUEUE} (redrive → ${WATERMARK_DLQ}, maxReceiveCount=3)"
 
 # ── Cognito User Pool ─────────────────────────────────────────────────────────
 step "Cognito"
@@ -194,8 +354,13 @@ echo ""
 echo "   RACEPHOTOS_ENV=local"
 echo "   RACEPHOTOS_RAW_BUCKET=${RAW_BUCKET}"
 echo "   RACEPHOTOS_PROCESSED_BUCKET=${PROCESSED_BUCKET}"
-echo "   RACEPHOTOS_TABLE_NAME=${TABLE_NAME}"
-echo "   RACEPHOTOS_QUEUE_URL=${QUEUE_URL}"
+echo "   RACEPHOTOS_EVENTS_TABLE=${EVENTS_TABLE}"
+echo "   RACEPHOTOS_PHOTOS_TABLE=${PHOTOS_TABLE}"
+echo "   RACEPHOTOS_BIB_INDEX_TABLE=${BIB_INDEX_TABLE}"
+echo "   RACEPHOTOS_PURCHASES_TABLE=${PURCHASES_TABLE}"
+echo "   RACEPHOTOS_PHOTOGRAPHERS_TABLE=${PHOTOGRAPHERS_TABLE}"
+echo "   RACEPHOTOS_RATE_LIMITS_TABLE=${RATE_LIMITS_TABLE}"
+echo "   RACEPHOTOS_PROCESSING_QUEUE_URL=${PROCESSING_QUEUE_URL}"
 echo "   AWS_ENDPOINT_URL=${ENDPOINT}"
 echo "   AWS_ACCESS_KEY_ID=test"
 echo "   AWS_SECRET_ACCESS_KEY=test"
