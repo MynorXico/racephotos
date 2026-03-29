@@ -41,8 +41,15 @@ export class ApiConstruct extends Construct {
 
     const { config, cognitoConstruct } = props;
 
+    // Mirror the FrontendConstruct guard: treat the CDK dummy-value-for-* string
+    // (returned on first pipeline synth before SSM context is populated) the same
+    // as "no custom domain". Only use config.domainName when both the domain name
+    // and the ACM certificate ARN look like real values.
+    const hasCustomDomain =
+      config.domainName !== 'none' && config.certificateArn.startsWith('arn:');
+
     let corsAllowOrigins: string[];
-    if (config.domainName !== 'none') {
+    if (hasCustomDomain) {
       corsAllowOrigins = [`https://${config.domainName}`];
     } else {
       // Read FrontendConstruct's CloudFront domain from SSM context. The
@@ -68,6 +75,13 @@ export class ApiConstruct extends Construct {
         allowMethods: [apigatewayv2.CorsHttpMethod.ANY],
         allowHeaders: ['Content-Type', 'Authorization'],
       },
+      // ⚠️  defaultAuthorizer applies to EVERY route added to this API.
+      // Routes that must be UNAUTHENTICATED (runner-facing) must explicitly
+      // override this with `authorizationType: HttpNoneAuthorizer`:
+      //   - GET  /events/{eventId}/photos?bib={bib}  (bib search — RS-006)
+      //   - POST /purchases                          (purchase claim — RS-007)
+      //   - GET  /purchases/{id}/download            (download link — RS-007)
+      // All photographer-facing routes (upload, event mgmt) rely on the default.
       defaultAuthorizer: new authorizers.HttpJwtAuthorizer('CognitoAuthorizer', jwtIssuer, {
         jwtAudience: [cognitoConstruct.clientId],
       }),

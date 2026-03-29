@@ -123,10 +123,22 @@ describe('CognitoConstruct', () => {
     });
   });
 
-  test('User Pool Client allows USER_PASSWORD_AUTH and REFRESH_TOKEN_AUTH for local env', () => {
+  test('User Pool Client allows USER_PASSWORD_AUTH, USER_SRP_AUTH, and REFRESH_TOKEN_AUTH for local env', () => {
     const t = makeTemplate(localConfig);
+    // CDK emits flows in alphabetical order within ExplicitAuthFlows.
     t.hasResourceProperties('AWS::Cognito::UserPoolClient', {
-      ExplicitAuthFlows: Match.arrayWith(['ALLOW_USER_PASSWORD_AUTH', 'ALLOW_REFRESH_TOKEN_AUTH']),
+      ExplicitAuthFlows: Match.arrayWith([
+        'ALLOW_USER_PASSWORD_AUTH',
+        'ALLOW_USER_SRP_AUTH',
+        'ALLOW_REFRESH_TOKEN_AUTH',
+      ]),
+    });
+  });
+
+  test('User Pool Client allows USER_SRP_AUTH and REFRESH_TOKEN_AUTH for deployed env', () => {
+    const t = makeTemplate(devConfig);
+    t.hasResourceProperties('AWS::Cognito::UserPoolClient', {
+      ExplicitAuthFlows: Match.arrayWith(['ALLOW_USER_SRP_AUTH', 'ALLOW_REFRESH_TOKEN_AUTH']),
     });
   });
 

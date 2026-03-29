@@ -304,7 +304,7 @@ log "queue: ${WATERMARK_QUEUE} (redrive → ${WATERMARK_DLQ}, maxReceiveCount=3,
 step "Cognito"
 
 # Create user pool (or get existing)
-EXISTING_POOL_ID=$($AWS cognito-idp list-user-pools --max-results 10 \
+EXISTING_POOL_ID=$($AWS cognito-idp list-user-pools --max-results 60 \
   --query "UserPools[?Name=='${USER_POOL_NAME}'].Id | [0]" --output text 2>/dev/null || echo "None")
 
 if [[ -z "${EXISTING_POOL_ID}" || "${EXISTING_POOL_ID}" == "None" ]]; then

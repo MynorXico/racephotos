@@ -7,7 +7,7 @@ interface FrontendStackProps extends cdk.StackProps {
   config: EnvConfig;
   /** Injected by ApiConstruct (RS-002). Placeholder until then. */
   apiBaseUrl?: string;
-  /** Injected by CognitoConstruct (RS-007). Placeholder until then. */
+  /** Injected by CognitoConstruct (RS-002). Placeholder until then. */
   cognitoConfig?: CognitoConfig;
 }
 
