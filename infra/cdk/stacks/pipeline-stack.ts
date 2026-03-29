@@ -1,8 +1,9 @@
 import * as cdk from 'aws-cdk-lib';
+import * as codebuild from 'aws-cdk-lib/aws-codebuild';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
-import { CodePipeline, CodePipelineSource, ShellStep } from 'aws-cdk-lib/pipelines';
+import { CodePipeline, CodePipelineSource, CodeBuildStep } from 'aws-cdk-lib/pipelines';
 import { PipelineConfig } from '../config/types';
 import { RacePhotosStage } from '../stages/racephotos-stage';
 
@@ -12,8 +13,10 @@ import { RacePhotosStage } from '../stages/racephotos-stage';
  * All /racephotos/* SSM parameters must exist in the TOOLS account before
  * running cdk synth. Run scripts/seed-ssm.sh to create them.
  *
- * The Synth ShellStep builds the Angular app before running cdk synth so that
- * the dist/ directory is available as a CDK asset for BucketDeployment.
+ * The Synth CodeBuildStep builds the Angular app before running cdk synth so
+ * that the dist/ directory is available as a CDK asset for BucketDeployment.
+ * Node 20 is selected via CodeBuild runtime-versions (not nvm) so that the
+ * step works under /bin/sh as well as /bin/bash.
  */
 export class PipelineStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: cdk.StackProps) {
@@ -26,12 +29,33 @@ export class PipelineStack extends cdk.Stack {
       crossAccountKeys: true,
       selfMutation: true,
 
-      // Grant the synth CodeBuild project permission to read all SSM
-      // parameters. GetParameter covers individual valueFromLookup calls;
-      // GetParametersByPath is used by generate-cdk-context.sh to fetch
-      // all /racephotos/* params in one call to build cdk.context.json.
-      synthCodeBuildDefaults: {
-        rolePolicy: [
+      synth: new CodeBuildStep('Synth', {
+        input: CodePipelineSource.connection(
+          `${config.githubOwner}/${config.githubRepo}`,
+          config.githubBranch,
+          {
+            connectionArn: config.codestarConnectionArn,
+            triggerOnPush: true,
+          },
+        ),
+
+        // Node 20 via CodeBuild runtime-versions — no nvm, no bash dependency.
+        // partialBuildSpec is merged with the CDK-generated buildspec; the
+        // install phase sets the runtime before any build commands run.
+        partialBuildSpec: codebuild.BuildSpec.fromObject({
+          version: '0.2',
+          phases: {
+            install: {
+              'runtime-versions': { nodejs: '20' },
+            },
+          },
+        }),
+
+        // Grant the synth CodeBuild project permission to read all SSM
+        // parameters. GetParameter covers individual valueFromLookup calls;
+        // GetParametersByPath is used by generate-cdk-context.sh to fetch
+        // all /racephotos/* params in one call to build cdk.context.json.
+        rolePolicyStatements: [
           new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
             actions: ['ssm:GetParameter', 'ssm:GetParametersByPath'],
@@ -41,23 +65,8 @@ export class PipelineStack extends cdk.Stack {
             ],
           }),
         ],
-      },
 
-      synth: new ShellStep('Synth', {
-        input: CodePipelineSource.connection(
-          `${config.githubOwner}/${config.githubRepo}`,
-          config.githubBranch,
-          {
-            connectionArn: config.codestarConnectionArn,
-            triggerOnPush: true,
-          },
-        ),
         commands: [
-          // Ensure Node 20 is active. CodeBuild standard images ship
-          // with nvm pre-installed; nvm install is a no-op if already present.
-          'source /root/.nvm/nvm.sh',
-          'nvm install 20',
-          'nvm use 20',
           // Build Angular first — FrontendConstruct references dist/browser/
           // as a CDK asset so it must exist before cdk synth runs.
           'cd frontend/angular && npm ci && npx ng build --configuration=production && cd ../..',
