@@ -19,7 +19,7 @@ Journey 3 (Runner pays and downloads) depends on two SES notification flows: the
   4. `racephotos-runner-redownload-resend`: sent on re-download request; includes all active download links for the runner's approved purchases
 - [ ] AC3: Given `SesConstruct` exposes a `grantSendEmail(grantee)` method, when called by a Lambda construct, then `ses:SendEmail` and `ses:SendTemplatedEmail` are granted on the verified identity ARN.
 - [ ] AC4: Given `scripts/seed-ssm.sh` runs, then it prompts for `/racephotos/env/{envName}/ses-from-address` per environment.
-- [ ] AC5: Given `scripts/seed-local.sh` runs, then a LocalStack SES identity is created for the local from-address (from `.env.local`) and all four SES email templates (`racephotos-photographer-claim`, `racephotos-runner-claim-confirmation`, `racephotos-runner-purchase-approved`, `racephotos-runner-redownload-resend`) are created idempotently via `aws ses create-template --endpoint-url=http://localhost:4566`.
+- [ ] AC5: Given `scripts/seed-local.sh` runs, then a LocalStack SES identity is created for the local from-address (from `.env.local`) and all four SES email templates (`racephotos-photographer-claim`, `racephotos-runner-claim-confirmation`, `racephotos-runner-purchase-approved`, `racephotos-runner-redownload-resend`) are created idempotently using `aws ses create-template --endpoint-url=http://localhost:4566`, with the script handling cases where templates already exist.
 
 ## Out of scope
 
