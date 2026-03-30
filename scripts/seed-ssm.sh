@@ -45,6 +45,7 @@ echo ""
 # Returns the current value of an SSM parameter, or empty string if not set.
 current() {
   aws ssm get-parameter \
+    --profile "$AWS_PROFILE" \
     --name "$1" \
     --region "$REGION" \
     --query "Parameter.Value" \
@@ -74,6 +75,7 @@ put() {
   local name=$1
   local value=$2
   aws ssm put-parameter \
+    --profile "$AWS_PROFILE" \
     --name "$name" \
     --value "$value" \
     --type "String" \
