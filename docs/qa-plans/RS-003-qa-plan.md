@@ -40,8 +40,9 @@ fixed in PR #45 — confirmed recurring across PRs #40, #41, and #45.
 ### TC-002: Empty string from-address does not silently create a broken identity
 
 **Category**: Boundary
-**Setup**: Inject CDK context key for `ses-from-address` with value `""` (empty
-string). Construct `SesStack`.
+**Setup**: Set the SSM parameter `/racephotos/env/dev/ses-from-address` to an
+empty string (`aws ssm put-parameter --value ""`). Deploy the stack to a dev
+account. Construct `SesStack` locally with `Template.fromStack()`.
 **Action**: Call `Template.fromStack(stack)` and inspect the `AWS::SES::EmailIdentity`
 resource.
 **Expected**: Either CloudFormation validation rejects the empty value during
@@ -58,9 +59,10 @@ grant scoped to it.
 ### TC-003: Maximum-length email address in SSM
 
 **Category**: Boundary
-**Setup**: Inject CDK context with a 254-character email address
-(`a...a@b.com` where the local part fills the RFC 5321 limit).
-**Action**: Construct `SesStack` with this address. Run `Template.fromStack()`.
+**Setup**: Set the SSM parameter `/racephotos/env/dev/ses-from-address` to a
+254-character email address (`a...a@b.com` where the local part fills the RFC 5321 limit).
+**Action**: Deploy `SesStack` targeting that SSM value. Run `cdk synth` and inspect
+the resulting CloudFormation template.
 **Expected**: The `AWS::SES::EmailIdentity` resource is created with the full
 address. CDK and CloudFormation must not truncate or reject it at synth time.
 **Why it matters**: Photographers choosing long business email addresses must
@@ -305,10 +307,12 @@ developer is warned, not that the call silently succeeded-but-did-nothing.
 ### TC-018: SesStack does not produce any resource with a hardcoded email address
 
 **Category**: Input validation
-**Setup**: Synthesize `SesStack` without injecting the SSM context key (so
-CDK uses its dummy value).
+**Setup**: Synthesize `SesStack` with no special overrides (`cdk synth`). Because
+`valueForStringParameter` is used, the email address is never embedded in the
+synthesized template — only a `AWS::SSM::Parameter::Value<String>` CloudFormation
+parameter reference appears.
 **Action**: Serialize the synthesized CloudFormation template to JSON. Search
-for any string matching `@` that is not the CDK dummy placeholder pattern.
+for any string matching `@`.
 **Expected**: No hardcoded email addresses appear anywhere in the synthesized
 template — not in resource properties, metadata, tags, or outputs.
 **Why it matters**: A committed email address in the CDK construct would
@@ -320,7 +324,9 @@ privacy requirement stated in `CLAUDE.md`.
 ### TC-019: addArnOutput produces a CfnOutput with a non-empty Value
 
 **Category**: Boundary
-**Setup**: Synthesize `SesStack` with the SSM email context injected.
+**Setup**: Synthesize `SesStack` (`cdk synth`). No context injection is needed —
+`valueForStringParameter` emits a CloudFormation parameter reference that is
+resolved at deploy time.
 **Action**: Inspect the `Outputs` section of the synthesized CloudFormation
 template for `SesIdentityArn`.
 **Expected**: One `CfnOutput` named `SesIdentityArn` exists with a non-empty
