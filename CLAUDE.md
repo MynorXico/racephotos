@@ -406,3 +406,34 @@ AWS_REGION=us-east-1
 - Log presigned URLs, payment references, or runner PII
 - Modify `environments.ts` without being explicitly asked
 - Add a dependency without checking if an existing library already covers it
+- Use `CronCreate` or `/loop` for pipeline monitoring — use a bash polling loop
+  instead (see "Pipeline monitoring" below)
+
+---
+
+## Pipeline monitoring
+
+When monitoring `racephotos-pipeline` after a PR merge, **always use a bash
+polling loop**. Never use `CronCreate` or `/loop` — those create indefinite
+recurring jobs that must be manually cancelled.
+
+```bash
+for i in $(seq 1 30); do
+  STATUS=$(aws codepipeline get-pipeline-state \
+    --name racephotos-pipeline \
+    --profile tools_readonly \
+    --query 'stageStates[*].{Stage:stageName,Status:latestExecution.status}' \
+    --output json)
+  echo "$STATUS"
+  # break when all stages Succeeded, or on Failed requiring intervention
+  sleep 180
+done
+```
+
+Key facts:
+
+- Pipeline name: `racephotos-pipeline` (not `RacePhotosPipeline`)
+- Read profile: `tools_readonly` — write operations require `tools`
+- `UpdatePipeline = Cancelled` while `Build = InProgress` is **normal
+  self-mutation** — find the new execution and monitor that one
+- Never auto-merge a fix PR; always present the URL and wait for user approval
