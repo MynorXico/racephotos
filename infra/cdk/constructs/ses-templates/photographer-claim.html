@@ -1,0 +1,29 @@
+<html>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+  <h2>New Purchase Claim</h2>
+  <p>A runner has submitted a payment claim for one of your photos.</p>
+  <table style="border-collapse:collapse;width:100%">
+    <tr>
+      <td style="padding:8px;font-weight:bold">Runner</td>
+      <td style="padding:8px">{{runnerEmailMasked}}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;font-weight:bold">Event</td>
+      <td style="padding:8px">{{eventName}}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;font-weight:bold">Photo reference</td>
+      <td style="padding:8px">{{photoReference}}</td>
+    </tr>
+  </table>
+  <p style="margin-top:24px">
+    <a href="{{dashboardUrl}}"
+       style="background:#1a73e8;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;display:inline-block">
+      Review claim in dashboard
+    </a>
+  </p>
+  <p style="color:#666;font-size:12px;margin-top:32px">
+    Approve or reject the claim after verifying the payment on your bank statement.
+  </p>
+</body>
+</html>

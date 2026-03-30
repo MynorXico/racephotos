@@ -1,0 +1,24 @@
+<html>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+  <h2>Your Photo is Ready</h2>
+  <p>Your payment has been approved. You can now download your photo.</p>
+  <table style="border-collapse:collapse;width:100%;margin-bottom:24px">
+    <tr>
+      <td style="padding:8px;font-weight:bold">Event</td>
+      <td style="padding:8px">{{eventName}}</td>
+    </tr>
+  </table>
+  <p>
+    <!-- downloadUrl must be the permanent platform route /download/{downloadToken},
+         never a short-lived S3 presigned URL. The token does not expire. -->
+    <a href="{{downloadUrl}}"
+       style="background:#1a73e8;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;display:inline-block">
+      Download photo
+    </a>
+  </p>
+  <p style="color:#666;font-size:13px;margin-top:16px">
+    This link works indefinitely. Bookmark it or keep this email.
+    If you lose it, visit the platform and use the re-download option.
+  </p>
+</body>
+</html>

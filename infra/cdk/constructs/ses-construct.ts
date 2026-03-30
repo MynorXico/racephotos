@@ -1,3 +1,5 @@
+import * as fs from 'fs';
+import * as path from 'path';
 import * as cdk from 'aws-cdk-lib';
 import * as ses from 'aws-cdk-lib/aws-ses';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -39,6 +41,9 @@ interface SesConstructProps {
  *   runner-redownload-resend:  downloads (array) — each item: { url, eventName, photoReference }
  *                             Passed as JSON array to SendTemplatedEmail TemplateData.
  *                             Use Handlebars {{#each downloads}} iteration; never pass raw HTML.
+ *
+ * Template HTML and plain-text sources live in ./ses-templates/ alongside this file.
+ * Edit them there — the construct reads them at synth time with fs.readFileSync.
  */
 export class SesConstruct extends Construct {
   /** ARN of the verified SES sender identity — used for IAM grant scoping. */
@@ -50,6 +55,7 @@ export class SesConstruct extends Construct {
     super(scope, id);
 
     const { sesFromAddress } = props;
+    const tmplDir = path.join(__dirname, 'ses-templates');
 
     // ── Verified sender identity ────────────────────────────────────────────
     //
@@ -67,49 +73,17 @@ export class SesConstruct extends Construct {
     // All four templates are defined here so they exist before any Lambda
     // story (RS-006, RS-011) calls ses:SendTemplatedEmail. Plain text
     // alternatives are required for all templates (RFC 1341, accessibility).
+    //
+    // HTML and text sources are in ./ses-templates/ — edit there for syntax
+    // highlighting, linting, and preview support.
 
     // Template 1 — Photographer: new purchase claim (ADR-0001)
     new ses.CfnTemplate(this, 'PhotographerClaimTemplate', {
       template: {
         templateName: 'racephotos-photographer-claim',
         subjectPart: 'New purchase claim — {{eventName}}',
-        htmlPart: [
-          '<html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">',
-          '<h2>New Purchase Claim</h2>',
-          '<p>A runner has submitted a payment claim for one of your photos.</p>',
-          '<table style="border-collapse:collapse;width:100%">',
-          '  <tr><td style="padding:8px;font-weight:bold">Runner</td>',
-          '      <td style="padding:8px">{{runnerEmailMasked}}</td></tr>',
-          '  <tr><td style="padding:8px;font-weight:bold">Event</td>',
-          '      <td style="padding:8px">{{eventName}}</td></tr>',
-          '  <tr><td style="padding:8px;font-weight:bold">Photo reference</td>',
-          '      <td style="padding:8px">{{photoReference}}</td></tr>',
-          '</table>',
-          '<p style="margin-top:24px">',
-          '  <a href="{{dashboardUrl}}" style="background:#1a73e8;color:#fff;padding:12px 24px;',
-          '     text-decoration:none;border-radius:4px;display:inline-block">',
-          '    Review claim in dashboard',
-          '  </a>',
-          '</p>',
-          '<p style="color:#666;font-size:12px;margin-top:32px">',
-          '  Approve or reject the claim after verifying the payment on your bank statement.',
-          '</p>',
-          '</body></html>',
-        ].join(''),
-        textPart: [
-          'New Purchase Claim — {{eventName}}',
-          '',
-          'A runner has submitted a payment claim.',
-          '',
-          'Runner:          {{runnerEmailMasked}}',
-          'Event:           {{eventName}}',
-          'Photo reference: {{photoReference}}',
-          '',
-          'Review the claim in your dashboard:',
-          '{{dashboardUrl}}',
-          '',
-          'Approve or reject the claim after verifying the payment on your bank statement.',
-        ].join('\n'),
+        htmlPart: fs.readFileSync(path.join(tmplDir, 'photographer-claim.html'), 'utf8'),
+        textPart: fs.readFileSync(path.join(tmplDir, 'photographer-claim.txt'), 'utf8'),
       },
     });
 
@@ -118,77 +92,21 @@ export class SesConstruct extends Construct {
       template: {
         templateName: 'racephotos-runner-claim-confirmation',
         subjectPart: 'Payment claim received — {{eventName}}',
-        htmlPart: [
-          '<html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">',
-          '<h2>Payment Claim Received</h2>',
-          '<p>We received your payment claim. The photographer will verify and approve it.</p>',
-          '<table style="border-collapse:collapse;width:100%">',
-          '  <tr><td style="padding:8px;font-weight:bold">Event</td>',
-          '      <td style="padding:8px">{{eventName}}</td></tr>',
-          '  <tr><td style="padding:8px;font-weight:bold">Photo reference</td>',
-          '      <td style="padding:8px">{{photoReference}}</td></tr>',
-          '  <tr><td style="padding:8px;font-weight:bold">Your payment reference</td>',
-          '      <td style="padding:8px"><strong>{{paymentReference}}</strong></td></tr>',
-          '</table>',
-          '<p style="margin-top:16px">',
-          '  Keep your payment reference for your records. You will receive another email',
-          '  once the photographer approves your claim.',
-          '</p>',
-          '</body></html>',
-        ].join(''),
-        textPart: [
-          'Payment Claim Received — {{eventName}}',
-          '',
-          'We received your payment claim. The photographer will verify and approve it.',
-          '',
-          'Event:                  {{eventName}}',
-          'Photo reference:        {{photoReference}}',
-          'Your payment reference: {{paymentReference}}',
-          '',
-          'Keep your payment reference for your records.',
-          'You will receive another email once the photographer approves your claim.',
-        ].join('\n'),
+        htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-claim-confirmation.html'), 'utf8'),
+        textPart: fs.readFileSync(path.join(tmplDir, 'runner-claim-confirmation.txt'), 'utf8'),
       },
     });
 
     // Template 3 — Runner: purchase approved + permanent download link (ADR-0002)
+    //
+    // downloadUrl must be the permanent platform route /download/{downloadToken},
+    // never a short-lived S3 presigned URL. The token does not expire.
     new ses.CfnTemplate(this, 'RunnerPurchaseApprovedTemplate', {
       template: {
         templateName: 'racephotos-runner-purchase-approved',
         subjectPart: 'Your photo is ready to download — {{eventName}}',
-        htmlPart: [
-          '<html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">',
-          '<h2>Your Photo is Ready</h2>',
-          '<p>Your payment has been approved. You can now download your photo.</p>',
-          '<table style="border-collapse:collapse;width:100%;margin-bottom:24px">',
-          '  <tr><td style="padding:8px;font-weight:bold">Event</td>',
-          '      <td style="padding:8px">{{eventName}}</td></tr>',
-          '</table>',
-          '<p>',
-          '  <a href="{{downloadUrl}}" style="background:#1a73e8;color:#fff;padding:12px 24px;',
-          '     text-decoration:none;border-radius:4px;display:inline-block">',
-          '    Download photo',
-          '  </a>',
-          '</p>',
-          '<p style="color:#666;font-size:13px;margin-top:16px">',
-          '  This link works indefinitely. Bookmark it or keep this email.',
-          '  If you lose it, visit the platform and use the re-download option.',
-          '</p>',
-          '</body></html>',
-        ].join(''),
-        textPart: [
-          'Your Photo is Ready — {{eventName}}',
-          '',
-          'Your payment has been approved. You can now download your photo.',
-          '',
-          'Event: {{eventName}}',
-          '',
-          'Download your photo:',
-          '{{downloadUrl}}',
-          '',
-          'This link works indefinitely. Bookmark it or keep this email.',
-          'If you lose it, visit the platform and use the re-download option.',
-        ].join('\n'),
+        htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-purchase-approved.html'), 'utf8'),
+        textPart: fs.readFileSync(path.join(tmplDir, 'runner-purchase-approved.txt'), 'utf8'),
       },
     });
 
@@ -204,31 +122,8 @@ export class SesConstruct extends Construct {
       template: {
         templateName: 'racephotos-runner-redownload-resend',
         subjectPart: 'Your RaceShots download links',
-        htmlPart: [
-          '<html><body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">',
-          '<h2>Your Download Links</h2>',
-          '<p>Here are your active download links for approved purchases:</p>',
-          '<ul>',
-          '{{#each downloads}}',
-          '  <li><a href="{{url}}">{{eventName}} — {{photoReference}}</a></li>',
-          '{{/each}}',
-          '</ul>',
-          '<p style="color:#666;font-size:13px;margin-top:24px">',
-          '  Each link works indefinitely. Bookmark them or keep this email.',
-          '</p>',
-          '</body></html>',
-        ].join(''),
-        textPart: [
-          'Your RaceShots Download Links',
-          '',
-          'Here are your active download links for approved purchases:',
-          '',
-          '{{#each downloads}}',
-          '- {{eventName}} ({{photoReference}}): {{url}}',
-          '{{/each}}',
-          '',
-          'Each link works indefinitely. Bookmark them or keep this email.',
-        ].join('\n'),
+        htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-redownload-resend.html'), 'utf8'),
+        textPart: fs.readFileSync(path.join(tmplDir, 'runner-redownload-resend.txt'), 'utf8'),
       },
     });
   }
