@@ -191,13 +191,16 @@ for ENV_NAME in dev qa staging prod; do
         --value "$SES_FROM" \
         --type "String" \
         --overwrite \
-        --region "$REGION" \
+        --region "$REG" \
         --query "Version" \
         --output text
       echo "  set /racephotos/env/$ENV_NAME/ses-from-address (in $ENV_NAME account)"
     fi
   else
-    echo "  Skipped. Run 'AWS_PROFILE=<$ENV_NAME-profile> ./scripts/seed-ssm.sh' later to populate the $ENV_NAME account."
+    echo "  Skipped. To set this parameter later, run:"
+    echo "    aws ssm put-parameter --profile <$ENV_NAME-profile> \\"
+    echo "      --name \"/racephotos/env/$ENV_NAME/ses-from-address\" \\"
+    echo "      --value \"$SES_FROM\" --region \"$REG\" --type String --overwrite"
   fi
 done
 
