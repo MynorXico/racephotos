@@ -24,24 +24,19 @@ const prodConfig: EnvConfig = {
   enableDeletionProtection: true,
 };
 
-// SES from-address is loaded from SSM at synth time. In tests the SSM param is
-// not present, so CDK returns the predictable dummy string. We inject the key
-// explicitly for tests that need a real email address in the template output.
-const SES_CONTEXT_KEY =
-  'ssm:account=000000000000:parameterName=/racephotos/env/dev/ses-from-address:region=us-east-1';
-const TEST_EMAIL = 'noreply@example.com';
-
-function makeStack(config: EnvConfig, injectEmail = false): SesStack {
-  const context = injectEmail ? { [SES_CONTEXT_KEY]: TEST_EMAIL } : {};
-  const app = new cdk.App({ context });
+// SES from-address is loaded from SSM at deploy time via a CloudFormation
+// dynamic reference ({{resolve:ssm:...}}). No CDK context injection is needed —
+// the token is resolved by CloudFormation during stack deployment, not at synth.
+function makeStack(config: EnvConfig): SesStack {
+  const app = new cdk.App();
   return new SesStack(app, 'TestSesStack', {
     config,
     env: { account: config.account, region: config.region },
   });
 }
 
-function makeTemplate(config: EnvConfig, injectEmail = false): Template {
-  return Template.fromStack(makeStack(config, injectEmail));
+function makeTemplate(config: EnvConfig): Template {
+  return Template.fromStack(makeStack(config));
 }
 
 // ── AC1 — SES email identity ──────────────────────────────────────────────────
@@ -52,36 +47,34 @@ describe('SesConstruct — email identity (AC1)', () => {
     t.resourceCountIs('AWS::SES::EmailIdentity', 1);
   });
 
-  test('email identity uses the address from SSM ses-from-address', () => {
-    const t = makeTemplate(devConfig, /* injectEmail */ true);
+  // sesFromAddress uses valueForStringParameter — CDK emits exactly one
+  // AWS::SSM::Parameter::Value<String> CloudFormation parameter whose Default
+  // is the SSM path, resolved by CloudFormation at deploy time. The
+  // EmailIdentity resource must Ref that specific parameter (not a hardcoded
+  // string and not the BootstrapVersion parameter also present in the stack).
+  test('email identity is backed by exactly one SSM parameter for the correct dev path', () => {
+    const t = makeTemplate(devConfig);
+    const params = t.findParameters('*', {
+      Type: 'AWS::SSM::Parameter::Value<String>',
+      Default: '/racephotos/env/dev/ses-from-address',
+    });
+    const paramNames = Object.keys(params);
+    expect(paramNames).toHaveLength(1);
     t.hasResourceProperties('AWS::SES::EmailIdentity', {
-      EmailIdentity: TEST_EMAIL,
+      EmailIdentity: { Ref: paramNames[0] },
     });
   });
 
-  // Guard against the sesFromAddress SSM path changing — the parameter name
-  // must embed the envName so each environment has an isolated sender identity.
-  test('SSM lookup path embeds envName for dev', () => {
-    const stack = makeStack(devConfig);
-    // CDK dummy value contains the SSM path — assert envName is in the path.
-    const identity = stack.ses.emailIdentityArn;
-    // ARN is constructed from the ref of the CfnEmailIdentity, which contains
-    // the SSM dummy. A real value would be: ...identity/noreply@example.com.
-    // We just assert it is a non-empty string (CDK token or real ARN).
-    expect(identity).toBeTruthy();
-  });
-
-  test('email identity SSM lookup uses prod envName for prod config', () => {
-    const prodContextKey =
-      'ssm:account=000000000000:parameterName=/racephotos/env/prod/ses-from-address:region=us-east-1';
-    const app = new cdk.App({ context: { [prodContextKey]: 'noreply-prod@example.com' } });
-    const stack = new SesStack(app, 'ProdSesStack', {
-      config: prodConfig,
-      env: { account: prodConfig.account, region: prodConfig.region },
+  test('email identity SSM parameter path uses prod envName for prod config', () => {
+    const t = makeTemplate(prodConfig);
+    const params = t.findParameters('*', {
+      Type: 'AWS::SSM::Parameter::Value<String>',
+      Default: '/racephotos/env/prod/ses-from-address',
     });
-    const t = Template.fromStack(stack);
+    const paramNames = Object.keys(params);
+    expect(paramNames).toHaveLength(1);
     t.hasResourceProperties('AWS::SES::EmailIdentity', {
-      EmailIdentity: 'noreply-prod@example.com',
+      EmailIdentity: { Ref: paramNames[0] },
     });
   });
 });

@@ -108,6 +108,11 @@ Wait for all agents to complete. For each one:
 
 Do not proceed to Step 8 until all agents return `APPROVED`.
 
+If any human or bot reviewer (e.g. `@gemini-code-assist`, a teammate) has also
+left comments on the PR, run `/address-review $PR_NUMBER` to handle them before
+proceeding. Always end the response comment with `@<reviewer-handle> please
+review again.` so they are notified.
+
 ---
 
 ## Step 8 — Execute the test plan
