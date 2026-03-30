@@ -33,11 +33,12 @@ export class SesStack extends cdk.Stack {
 
     const { config } = props;
 
-    // Resolve the verified sender address from SSM at synth time.
-    // generate-cdk-context.sh populates cdk.context.json from SSM before each
-    // synth, so a dummy value is only seen on the very first local synth before
-    // seed-ssm.sh has been run.
-    const sesFromAddress = ssm.StringParameter.valueFromLookup(
+    // Resolve the verified sender address from SSM at deploy time using a
+    // CloudFormation dynamic reference ({{resolve:ssm:...}}). This avoids the
+    // cross-account CDK lookup role assumption that valueFromLookup requires
+    // at synth time — consistent with the pattern used for other SSM parameters
+    // in this pipeline (see PR #41).
+    const sesFromAddress = ssm.StringParameter.valueForStringParameter(
       this,
       `/racephotos/env/${config.envName}/ses-from-address`,
     );
