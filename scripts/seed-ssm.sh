@@ -170,6 +170,35 @@ for ENV_NAME in dev qa staging prod; do
     exit 1
   fi
   put "/racephotos/env/$ENV_NAME/ses-from-address" "$SES_FROM"
+
+  # Write env-specific parameters to the target environment account.
+  # CloudFormation resolves valueForStringParameter at deploy time in the
+  # account where the stack is deployed — not in the tools account.
+  # Providing the env profile here avoids having to run a separate script.
+  echo ""
+  echo "  Some parameters must also exist in the $ENV_NAME account itself"
+  echo "  (CloudFormation resolves them there at deploy time)."
+  read -rp "  $ENV_NAME AWS profile (leave blank to skip — you can set these later): " ENV_PROFILE
+  if [[ -n "$ENV_PROFILE" ]]; then
+    ENV_ACCOUNT=$(aws sts get-caller-identity --profile "$ENV_PROFILE" --query Account --output text 2>/dev/null || true)
+    if [[ -z "$ENV_ACCOUNT" ]]; then
+      echo "  WARNING: could not authenticate with profile '$ENV_PROFILE'. Skipping $ENV_NAME account writes."
+    else
+      echo "  Writing to $ENV_NAME account: $ENV_ACCOUNT (profile: $ENV_PROFILE)"
+      aws ssm put-parameter \
+        --profile "$ENV_PROFILE" \
+        --name "/racephotos/env/$ENV_NAME/ses-from-address" \
+        --value "$SES_FROM" \
+        --type "String" \
+        --overwrite \
+        --region "$REGION" \
+        --query "Version" \
+        --output text
+      echo "  set /racephotos/env/$ENV_NAME/ses-from-address (in $ENV_NAME account)"
+    fi
+  else
+    echo "  Skipped. Run 'AWS_PROFILE=<$ENV_NAME-profile> ./scripts/seed-ssm.sh' later to populate the $ENV_NAME account."
+  fi
 done
 
 echo ""
