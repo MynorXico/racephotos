@@ -403,51 +403,57 @@ log "param: /racephotos/env/${ENV_NAME}/ses-from-address = ${SES_FROM_ADDRESS}"
 # SES email templates — aws ses create-template is NOT idempotent; it errors
 # if the template already exists. The script deletes-then-creates to ensure
 # the latest template content is always applied on re-runs.
+#
+# Template content is read from the same source files used by the CDK construct
+# (infra/cdk/constructs/ses-templates/) to guarantee local and deployed
+# environments always use identical template bodies.
+TMPL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/infra/cdk/constructs/ses-templates"
+
 seed_ses_template() {
-  local template_json="$1"
-  local template_name
-  template_name=$(echo "$template_json" | python3 -c "import sys,json; print(json.load(sys.stdin)['Template']['TemplateName'])")
+  local template_name="$1"
+  local subject_part="$2"
+  local html_file="${TMPL_DIR}/$3"
+  local text_file="${TMPL_DIR}/$4"
+
+  local payload
+  payload=$(python3 - <<PYEOF
+import json
+with open('${html_file}', 'r') as f:
+    html = f.read()
+with open('${text_file}', 'r') as f:
+    text = f.read()
+print(json.dumps({'Template': {'TemplateName': '${template_name}', 'SubjectPart': '${subject_part}', 'HtmlPart': html, 'TextPart': text}}))
+PYEOF
+)
 
   $AWS ses delete-template --template-name "${template_name}" 2>/dev/null || true
-  $AWS ses create-template --cli-input-json "$template_json" 2>/dev/null || true
+  $AWS ses create-template --cli-input-json "${payload}" 2>/dev/null || true
   log "SES template: ${template_name}"
 }
 
-seed_ses_template '{
-  "Template": {
-    "TemplateName": "racephotos-photographer-claim",
-    "SubjectPart": "New purchase claim — {{eventName}}",
-    "HtmlPart": "<p>Runner: {{runnerEmailMasked}}<br>Event: {{eventName}}<br>Photo: {{photoReference}}<br><a href=\"{{dashboardUrl}}\">Review in dashboard</a></p>",
-    "TextPart": "New purchase claim.\nRunner: {{runnerEmailMasked}}\nEvent: {{eventName}}\nPhoto: {{photoReference}}\nDashboard: {{dashboardUrl}}"
-  }
-}'
+seed_ses_template \
+  "racephotos-photographer-claim" \
+  "New purchase claim — {{eventName}}" \
+  "photographer-claim.html" \
+  "photographer-claim.txt"
 
-seed_ses_template '{
-  "Template": {
-    "TemplateName": "racephotos-runner-claim-confirmation",
-    "SubjectPart": "Payment claim received — {{eventName}}",
-    "HtmlPart": "<p>Event: {{eventName}}<br>Photo: {{photoReference}}<br>Payment reference: <strong>{{paymentReference}}</strong></p>",
-    "TextPart": "Payment claim received.\nEvent: {{eventName}}\nPhoto: {{photoReference}}\nPayment reference: {{paymentReference}}"
-  }
-}'
+seed_ses_template \
+  "racephotos-runner-claim-confirmation" \
+  "Payment claim received — {{eventName}}" \
+  "runner-claim-confirmation.html" \
+  "runner-claim-confirmation.txt"
 
-seed_ses_template '{
-  "Template": {
-    "TemplateName": "racephotos-runner-purchase-approved",
-    "SubjectPart": "Your photo is ready to download — {{eventName}}",
-    "HtmlPart": "<p>Event: {{eventName}}<br><a href=\"{{downloadUrl}}\">Download photo</a><br>This link works indefinitely.</p>",
-    "TextPart": "Your photo is ready.\nEvent: {{eventName}}\nDownload: {{downloadUrl}}\nThis link works indefinitely."
-  }
-}'
+seed_ses_template \
+  "racephotos-runner-purchase-approved" \
+  "Your photo is ready to download — {{eventName}}" \
+  "runner-purchase-approved.html" \
+  "runner-purchase-approved.txt"
 
-seed_ses_template '{
-  "Template": {
-    "TemplateName": "racephotos-runner-redownload-resend",
-    "SubjectPart": "Your RaceShots download links",
-    "HtmlPart": "<ul>{{#each downloads}}<li><a href=\"{{url}}\">{{eventName}} - {{photoReference}}</a></li>{{/each}}</ul>",
-    "TextPart": "{{#each downloads}}- {{eventName}} ({{photoReference}}): {{url}}\n{{/each}}"
-  }
-}'
+seed_ses_template \
+  "racephotos-runner-redownload-resend" \
+  "Your RaceShots download links" \
+  "runner-redownload-resend.html" \
+  "runner-redownload-resend.txt"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""

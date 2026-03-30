@@ -52,7 +52,9 @@ export class RacePhotosStage extends cdk.Stage {
     // SES verified sender identity + four email templates.
     // Must deploy before payment and download Lambda stacks (RS-006, RS-011)
     // that call ses:SendTemplatedEmail.
-    new SesStack(this, 'Ses', { env: props.env, config });
+    // Assigned to a variable so future Lambda stacks can call
+    // ses.ses.grantSendEmail(lambdaRole) from this stage.
+    const ses = new SesStack(this, 'Ses', { env: props.env, config });
 
     // FrontendStack — Angular SPA on S3 + CloudFront.
     // FrontendConstruct reads apiBaseUrl, userPoolId, and clientId from SSM via
