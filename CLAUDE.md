@@ -408,6 +408,8 @@ AWS_REGION=us-east-1
 - Add a dependency without checking if an existing library already covers it
 - Use `CronCreate` or `/loop` for pipeline monitoring — use a bash polling loop
   instead (see "Pipeline monitoring" below)
+- Push directly to `main` — `main` is a protected branch; always create a
+  feature or fix branch and open a PR, even for docs-only changes
 
 ---
 
