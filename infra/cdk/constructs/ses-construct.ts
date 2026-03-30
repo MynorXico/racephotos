@@ -2,10 +2,8 @@ import * as cdk from 'aws-cdk-lib';
 import * as ses from 'aws-cdk-lib/aws-ses';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Construct } from 'constructs';
-import { EnvConfig } from '../config/types';
 
 interface SesConstructProps {
-  config: EnvConfig;
   /**
    * Verified SES sender email address.
    * Loaded via ssm.StringParameter.valueFromLookup in the parent stack:
