@@ -19,20 +19,21 @@ environment target either the jest CDK assertion suite or LocalStack.
 
 ## Test cases
 
-### TC-001: SSM dummy value produces a non-crashing CDK synth
+### TC-001: CDK synth succeeds without the SSM parameter pre-existing
 
 **Category**: Boundary
-**Setup**: No CDK context injected (simulate a developer's first `cdk synth`
-before running `seed-ssm.sh`).
-**Action**: Construct `SesStack` without seeding the SSM context key for
-`/racephotos/env/dev/ses-from-address`. Run `cdk synth`.
-**Expected**: Synth completes without throwing. The `EmailIdentity` resource
-in the produced template contains the CDK dummy string
-`dummy-value-for-/racephotos/env/dev/ses-from-address` (or equivalent). No
-crash or unhandled exception.
-**Why it matters**: CDK `valueFromLookup` returns a dummy string on the first
-synth before context is populated. If `SesConstruct` validates the string as
-a real email address it will throw during synth, blocking first-time contributors.
+**Setup**: No SSM parameter `/racephotos/env/dev/ses-from-address` seeded.
+Run `cdk synth` (simulates a developer's first synth or a pipeline Synth step).
+**Action**: Construct `SesStack` and synthesize.
+**Expected**: Synth completes without error. The produced CloudFormation template
+contains an `AWS::SSM::Parameter::Value<String>` parameter with
+`Default: /racephotos/env/dev/ses-from-address`, and the `AWS::SES::EmailIdentity`
+resource references it via `{"Ref": "..."}`. No cross-account role assumption
+occurs at synth time — the SSM value is resolved by CloudFormation at deploy time.
+**Why it matters**: `ssm.StringParameter.valueForStringParameter` is used (not
+`valueFromLookup`) so the pipeline build role never needs to assume the CDK lookup
+role in the target account. This was the root cause of the pipeline Synth failure
+fixed in PR #45 — confirmed recurring across PRs #40, #41, and #45.
 
 ---
 

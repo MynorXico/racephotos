@@ -47,22 +47,34 @@ describe('SesConstruct — email identity (AC1)', () => {
     t.resourceCountIs('AWS::SES::EmailIdentity', 1);
   });
 
-  // sesFromAddress uses valueForStringParameter — CDK emits an
+  // sesFromAddress uses valueForStringParameter — CDK emits exactly one
   // AWS::SSM::Parameter::Value<String> CloudFormation parameter whose Default
-  // is the SSM path, resolved by CloudFormation at deploy time.
-  test('email identity is backed by an SSM parameter for the correct dev path', () => {
+  // is the SSM path, resolved by CloudFormation at deploy time. The
+  // EmailIdentity resource must Ref that specific parameter (not a hardcoded
+  // string and not the BootstrapVersion parameter also present in the stack).
+  test('email identity is backed by exactly one SSM parameter for the correct dev path', () => {
     const t = makeTemplate(devConfig);
-    t.hasParameter('*', {
+    const params = t.findParameters('*', {
       Type: 'AWS::SSM::Parameter::Value<String>',
       Default: '/racephotos/env/dev/ses-from-address',
+    });
+    const paramNames = Object.keys(params);
+    expect(paramNames).toHaveLength(1);
+    t.hasResourceProperties('AWS::SES::EmailIdentity', {
+      EmailIdentity: { Ref: paramNames[0] },
     });
   });
 
   test('email identity SSM parameter path uses prod envName for prod config', () => {
     const t = makeTemplate(prodConfig);
-    t.hasParameter('*', {
+    const params = t.findParameters('*', {
       Type: 'AWS::SSM::Parameter::Value<String>',
       Default: '/racephotos/env/prod/ses-from-address',
+    });
+    const paramNames = Object.keys(params);
+    expect(paramNames).toHaveLength(1);
+    t.hasResourceProperties('AWS::SES::EmailIdentity', {
+      EmailIdentity: { Ref: paramNames[0] },
     });
   });
 });
