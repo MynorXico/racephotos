@@ -96,6 +96,7 @@ race-photos/
 ## Go conventions
 
 ### Module and package structure
+
 - Each Lambda is a self-contained Go module with its own `go.mod`
 - Shared packages live in `shared/` as a local module
 - Each Lambda references shared via a `replace` directive — no remote import path needed:
@@ -108,12 +109,14 @@ race-photos/
 - `main.go` per Lambda contains only handler wiring and config loading — no business logic
 
 ### Error handling
+
 - All errors wrapped with context: `fmt.Errorf("processBib: %w", err)`
 - Sentinel errors in `shared/apperrors/`: e.g. `ErrBibNotFound`, `ErrPhotoLocked`
 - Lambda handlers return structured error responses — never raw Go error strings
 - Log the full error with request context before returning to the caller
 
 ### Naming
+
 - Exported: `PascalCase` — `ProcessPhoto`, `GeneratePresignedURL`
 - Unexported: `camelCase` — `extractBibNumber`, `buildS3Key`
 - Environment variable names: `RACEPHOTOS_` prefix for all project-specific vars
@@ -121,6 +124,7 @@ race-photos/
 - DynamoDB attribute names: `PascalCase` matching the model struct field name
 
 ### Interfaces for all external dependencies
+
 Every AWS SDK call must sit behind an interface. Never call SDK constructors
 directly in business logic — always inject via interface.
 
@@ -143,6 +147,7 @@ type Processor struct {
 ```
 
 ### Context propagation
+
 - Every function doing I/O accepts `ctx context.Context` as its first parameter
 - Pass the Lambda request context all the way down
 - Never use `context.Background()` inside a handler or anything it calls
@@ -152,27 +157,32 @@ type Processor struct {
 ## Testing conventions
 
 ### Order of operations (non-negotiable)
+
 1. Write the interface
 2. Write table-driven tests using mocks
 3. Write the implementation
 4. Run tests — all must pass before moving on
 
 ### Libraries
+
 - Assertions: `github.com/stretchr/testify` (`assert` and `require`)
 - Mocking: `github.com/golang/mock/gomock` — generate mocks from interfaces
 - No additional test libraries without an ADR
 
 ### Test file layout
+
 - Unit tests: `foo_test.go` alongside `foo.go`
 - Integration tests: `lambdas/<name>/test/integration/integration_test.go`
 - Integration tests require build tag: `//go:build integration`
 
 ### Coverage expectations
+
 - Business logic packages: >80% line coverage
 - `main.go` handler: covered by integration tests only
 - Generated mocks: excluded from coverage
 
 ### Running tests
+
 ```bash
 make test-unit          # unit tests — no AWS, no LocalStack
 make test-integration   # integration tests — requires LocalStack running
@@ -180,6 +190,7 @@ make test               # both
 ```
 
 ### Rekognition in local and test environments
+
 Rekognition is not available in LocalStack. All code uses the `TextDetector`
 interface. When `RACEPHOTOS_ENV=local`, the Lambda init wires in a file-backed
 mock that reads from `testdata/rekognition-responses/`. This lets the full
@@ -190,9 +201,11 @@ async pipeline run locally without real Rekognition calls.
 ## CDK conventions
 
 ### Language
+
 TypeScript, strict mode. No `any`. All constructs fully typed.
 
 ### One Stage class, multiple instantiations
+
 Never duplicate stacks per environment. `RacePhotosStage` accepts `EnvConfig`.
 All environment-specific values live in `environments.ts` (gitignored).
 
@@ -203,7 +216,7 @@ export const environments: Record<string, EnvConfig> = {
     envName: 'dev',
     account: 'REPLACE_WITH_DEV_ACCOUNT_ID',
     region: 'REPLACE_WITH_REGION',
-    rekognitionConfidenceThreshold: 0.70,
+    rekognitionConfidenceThreshold: 0.7,
     watermarkStyle: 'text_overlay',
     photoRetentionDays: 90,
     enableDeletionProtection: false,
@@ -212,7 +225,7 @@ export const environments: Record<string, EnvConfig> = {
     envName: 'prod',
     account: 'REPLACE_WITH_PROD_ACCOUNT_ID',
     region: 'REPLACE_WITH_REGION',
-    rekognitionConfidenceThreshold: 0.90,
+    rekognitionConfidenceThreshold: 0.9,
     watermarkStyle: 'text_overlay',
     photoRetentionDays: 365,
     enableDeletionProtection: true,
@@ -221,6 +234,7 @@ export const environments: Record<string, EnvConfig> = {
 ```
 
 ### EnvConfig shape
+
 ```typescript
 export interface EnvConfig {
   envName: 'local' | 'dev' | 'qa' | 'staging' | 'prod';
@@ -234,18 +248,58 @@ export interface EnvConfig {
 ```
 
 ### Resource naming
+
 All resource names must include `envName` to avoid clashes across contributors:
+
 ```typescript
-tableName: `racephotos-photos-${config.envName}`
+tableName: `racephotos-photos-${config.envName}`;
 ```
 
 ### Removal policies
+
 Driven by `config.enableDeletionProtection` — never by a hardcoded env name check:
+
 - `false` → `RemovalPolicy.DESTROY`
 - `true` → `RemovalPolicy.RETAIN`
 
+### SSM parameter lookups — deploy-time only (critical)
+
+**Always use `valueForStringParameter`. Never use `valueFromLookup`.**
+
+`valueFromLookup` requires the pipeline build role to assume the CDK lookup role
+(`cdk-hnb659fds-lookup-role-*`) in the target account at synth time. The pipeline
+build role does not have that cross-account permission — the Synth step will fail with:
+
+> Could not assume role in target account … is not authorized to perform: sts:AssumeRole
+> on resource: arn:aws:iam::{account}:role/cdk-hnb659fds-lookup-role-{account}-{region}
+
+Use `valueForStringParameter` instead — it emits an `AWS::SSM::Parameter::Value<String>`
+CloudFormation parameter that CloudFormation resolves at deploy time:
+
+```typescript
+// ✅ correct — resolved at deploy time by CloudFormation
+const value = ssm.StringParameter.valueForStringParameter(this, '/racephotos/env/...');
+
+// ❌ wrong — requires cross-account lookup role at synth time; breaks the pipeline
+const value = ssm.StringParameter.valueFromLookup(this, '/racephotos/env/...');
+```
+
+In CDK unit tests, assert the CloudFormation parameter rather than injecting context:
+
+```typescript
+template.hasParameter('*', {
+  Type: 'AWS::SSM::Parameter::Value<String>',
+  Default: '/racephotos/env/dev/the-param',
+});
+```
+
+This issue has recurred on every new stack that introduced a `valueFromLookup` call
+(PRs #40, #41, RS-003 hotfix PR #45).
+
 ### Construct granularity
+
 One construct file per logical service:
+
 - `PhotoStorageConstruct` — S3 buckets + lifecycle rules
 - `ProcessingPipelineConstruct` — SQS, DLQ, processor Lambda
 - `WatermarkConstruct` — watermark Lambda + S3 trigger
@@ -258,6 +312,7 @@ One construct file per logical service:
 ## Lambda conventions
 
 ### Environment variable contract
+
 Every Lambda must have a comment block at the top of `main.go`:
 
 ```go
@@ -272,15 +327,19 @@ CDK constructs inject these from `EnvConfig`. Never read `os.Getenv` outside
 of `main.go` — pass config as a typed struct into business logic.
 
 ### X-Ray tracing
+
 Enable on every Lambda CDK construct. Wrap all outbound SDK calls in named subsegments.
 
 ### SQS + DLQ pattern
+
 Every SQS-triggered Lambda must have:
+
 - DLQ with `maxReceiveCount: 3`
 - CloudWatch alarm: DLQ `ApproximateNumberOfMessagesVisible > 0`
 - Partial batch failure response — return `batchItemFailures`, not a top-level error
 
 ### Logging
+
 - Structured JSON with `log/slog` (Go 1.21+)
 - Every entry includes: `requestId`, `service`, `env`, `level`
 - Never log presigned URLs, payment references, or runner email addresses
@@ -290,6 +349,7 @@ Every SQS-triggered Lambda must have:
 ## Local development
 
 ### First-time setup (new contributor)
+
 ```bash
 git clone <repo>
 cp infra/cdk/config/environments.example.ts infra/cdk/config/environments.ts
@@ -301,6 +361,7 @@ make seed-local
 ```
 
 ### Local env vars (live in .env.local, never committed)
+
 ```bash
 RACEPHOTOS_ENV=local
 AWS_ENDPOINT_URL=http://localhost:4566
