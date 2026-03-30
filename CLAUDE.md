@@ -410,6 +410,8 @@ AWS_REGION=us-east-1
   instead (see "Pipeline monitoring" below)
 - Push directly to `main` — `main` is a protected branch; always create a
   feature or fix branch and open a PR, even for docs-only changes
+- Merge a PR without explicit user approval — always present the PR URL and
+  wait; "no need to review" means skip code review, not permission to merge
 
 ---
 
