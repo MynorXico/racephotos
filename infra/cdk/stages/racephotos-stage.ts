@@ -5,6 +5,7 @@ import { PlaceholderStack } from '../stacks/placeholder-stack';
 import { FrontendStack } from '../stacks/frontend-stack';
 import { StorageStack } from '../stacks/storage-stack';
 import { AuthStack } from '../stacks/auth-stack';
+import { SesStack } from '../stacks/ses-stack';
 
 interface RacePhotosStageProps extends cdk.StageProps {
   config: EnvConfig;
@@ -19,11 +20,12 @@ interface RacePhotosStageProps extends cdk.StageProps {
  * Stacks are added here incrementally as features are built:
  *   RS-001  → StorageStack (S3 + DynamoDB + SQS)
  *   RS-002  → AuthStack (Cognito + API Gateway) — also wires cognitoConfig + apiBaseUrl into FrontendStack
- *   RS-003  → PhotoUploadStack (Lambda + API Gateway route)
- *   RS-004  → PhotoProcessorStack (Lambda + SQS consumer)
- *   RS-005  → WatermarkStack (Lambda + S3 trigger)
- *   RS-006  → SearchStack (Lambda + API Gateway route)
- *   RS-007  → PaymentStack (Lambda + DynamoDB purchase table)
+ *   RS-003  → SesStack (SES verified identity + email templates)
+ *   RS-004  → PhotoUploadStack (Lambda + API Gateway route)
+ *   RS-005  → PhotoProcessorStack (Lambda + SQS consumer)
+ *   RS-006  → WatermarkStack (Lambda + S3 trigger)
+ *   RS-007  → SearchStack (Lambda + API Gateway route)
+ *   RS-008  → PaymentStack (Lambda + DynamoDB purchase table)
  */
 export class RacePhotosStage extends cdk.Stage {
   constructor(scope: Construct, id: string, props: RacePhotosStageProps) {
@@ -45,6 +47,14 @@ export class RacePhotosStage extends cdk.Stage {
     // so its outputs (userPoolId, clientId, region, apiUrl) can be wired into
     // FrontendConstruct's config.json.
     const auth = new AuthStack(this, 'Auth', { env: props.env, config });
+
+    // SesStack — RS-003
+    // SES verified sender identity + four email templates.
+    // Must deploy before payment and download Lambda stacks (RS-006, RS-011)
+    // that call ses:SendTemplatedEmail.
+    // Assigned to a variable so future Lambda stacks can call
+    // ses.ses.grantSendEmail(lambdaRole) from this stage.
+    const ses = new SesStack(this, 'Ses', { env: props.env, config });
 
     // FrontendStack — Angular SPA on S3 + CloudFront.
     // FrontendConstruct reads apiBaseUrl, userPoolId, and clientId from SSM via

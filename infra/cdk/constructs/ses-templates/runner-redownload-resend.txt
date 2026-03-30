@@ -1,0 +1,9 @@
+Your RaceShots Download Links
+
+Here are your active download links for approved purchases:
+
+{{#each downloads}}
+- {{eventName}} ({{photoReference}}): {{url}}
+{{/each}}
+
+Each link works indefinitely. Bookmark them or keep this email.

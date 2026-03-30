@@ -380,12 +380,80 @@ $AWS ssm put-parameter \
   --overwrite 2>/dev/null || true
 log "param: /racephotos/env/${ENV_NAME}/api-url = http://localhost:4566 (placeholder)"
 
-# ── SES sender identity ───────────────────────────────────────────────────────
+# ── SES sender identity + templates ──────────────────────────────────────────
 step "SES"
 
+# Read local from-address from .env.local; fall back to example placeholder.
+SES_FROM_ADDRESS="${RACEPHOTOS_SES_FROM_ADDRESS:-noreply@example.com}"
+
 $AWS ses verify-email-identity \
-  --email-address "noreply@example.com" 2>/dev/null || true
-log "verified sender: noreply@example.com"
+  --email-address "${SES_FROM_ADDRESS}" 2>/dev/null || true
+log "verified sender: ${SES_FROM_ADDRESS}"
+
+# Seed the SSM parameter that SesStack reads via valueFromLookup.
+# This allows cdk synth against LocalStack to resolve a real (dummy) value
+# instead of the CDK dummy placeholder.
+$AWS ssm put-parameter \
+  --name "/racephotos/env/${ENV_NAME}/ses-from-address" \
+  --value "${SES_FROM_ADDRESS}" \
+  --type String \
+  --overwrite 2>/dev/null || true
+log "param: /racephotos/env/${ENV_NAME}/ses-from-address = ${SES_FROM_ADDRESS}"
+
+# SES email templates — aws ses create-template is NOT idempotent; it errors
+# if the template already exists. The script deletes-then-creates to ensure
+# the latest template content is always applied on re-runs.
+#
+# Template content is read from the same source files used by the CDK construct
+# (infra/cdk/constructs/ses-templates/) to guarantee local and deployed
+# environments always use identical template bodies.
+TMPL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/infra/cdk/constructs/ses-templates"
+
+seed_ses_template() {
+  local template_name="$1"
+  local subject_part="$2"
+  local html_file="${TMPL_DIR}/$3"
+  local text_file="${TMPL_DIR}/$4"
+
+  local payload
+  payload=$(python3 - <<PYEOF
+import json
+with open('${html_file}', 'r') as f:
+    html = f.read()
+with open('${text_file}', 'r') as f:
+    text = f.read()
+print(json.dumps({'Template': {'TemplateName': '${template_name}', 'SubjectPart': '${subject_part}', 'HtmlPart': html, 'TextPart': text}}))
+PYEOF
+)
+
+  $AWS ses delete-template --template-name "${template_name}" 2>/dev/null || true
+  $AWS ses create-template --cli-input-json "${payload}" 2>/dev/null || true
+  log "SES template: ${template_name}"
+}
+
+seed_ses_template \
+  "racephotos-photographer-claim" \
+  "New purchase claim — {{eventName}}" \
+  "photographer-claim.html" \
+  "photographer-claim.txt"
+
+seed_ses_template \
+  "racephotos-runner-claim-confirmation" \
+  "Payment claim received — {{eventName}}" \
+  "runner-claim-confirmation.html" \
+  "runner-claim-confirmation.txt"
+
+seed_ses_template \
+  "racephotos-runner-purchase-approved" \
+  "Your photo is ready to download — {{eventName}}" \
+  "runner-purchase-approved.html" \
+  "runner-purchase-approved.txt"
+
+seed_ses_template \
+  "racephotos-runner-redownload-resend" \
+  "Your RaceShots download links" \
+  "runner-redownload-resend.html" \
+  "runner-redownload-resend.txt"
 
 # ── Summary ───────────────────────────────────────────────────────────────────
 echo ""
