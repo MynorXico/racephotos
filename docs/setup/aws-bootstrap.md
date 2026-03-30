@@ -248,6 +248,29 @@ runner addresses you want to send to in the SES console.
 > must always be a verified identity in SES for that environment's account.
 > Run `scripts/seed-ssm.sh` to set this value before the first `cdk deploy`.
 
+> **Important — delete any manually-created SES identity before first deploy:**
+> When verifying your sender address to satisfy the sandbox lift request (or any
+> other manual setup step), AWS creates the identity outside of CloudFormation.
+> The `SesStack` creates the same identity via `AWS::SES::EmailIdentity` — if it
+> already exists, CloudFormation's early validation fails with:
+>
+> ```
+> AWS::EarlyValidation::ResourceExistenceCheck — Failed to create change set.
+> ```
+>
+> **Before triggering the first pipeline deploy of the SES stack**, delete the
+> manually-created identity so CloudFormation can take ownership of it:
+>
+> ```bash
+> aws sesv2 delete-email-identity \
+>   --email-identity "your-sender@yourdomain.com" \
+>   --profile dev   # or prod / qa / staging
+> ```
+>
+> The pipeline will recreate it and manage it going forward. The identity will
+> need to be re-verified by CloudFormation after creation — SES sends a
+> verification email automatically.
+
 ---
 
 ## Adding a new environment stage
