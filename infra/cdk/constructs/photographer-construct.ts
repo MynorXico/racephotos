@@ -24,9 +24,9 @@ interface PhotographerConstructProps {
  *   - update-photographer Lambda → PUT  /photographer/me (Cognito JWT required)
  *
  * IAM:
- *   - get-photographer    : dynamodb:GetItem on photographersTable
- *   - update-photographer : dynamodb:PutItem  on photographersTable
- *                         + dynamodb:GetItem  (needed to preserve CreatedAt)
+ *   - get-photographer    : dynamodb:GetItem   on photographersTable
+ *   - update-photographer : dynamodb:UpdateItem on photographersTable
+ *                           (if_not_exists(createdAt) preserves CreatedAt — no pre-fetch needed)
  *
  * Both Lambdas inherit the HTTP API's default JWT authorizer automatically —
  * no explicit authorizer override is needed.
@@ -48,6 +48,7 @@ export class PhotographerConstruct extends Construct {
       runtime: lambda.Runtime.PROVIDED_AL2023,
       architecture: lambda.Architecture.X86_64,
       handler: 'bootstrap',
+      memorySize: 256,
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/get-photographer')),
       environment: {
         RACEPHOTOS_ENV: config.envName,
@@ -78,6 +79,7 @@ export class PhotographerConstruct extends Construct {
       runtime: lambda.Runtime.PROVIDED_AL2023,
       architecture: lambda.Architecture.X86_64,
       handler: 'bootstrap',
+      memorySize: 256,
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/update-photographer')),
       environment: {
         RACEPHOTOS_ENV: config.envName,
@@ -85,8 +87,8 @@ export class PhotographerConstruct extends Construct {
       },
     });
 
-    // update-photographer needs GetItem (to preserve CreatedAt) + PutItem
-    photographersTable.grant(this.updatePhotographerFn, 'dynamodb:GetItem', 'dynamodb:PutItem');
+    // update-photographer uses UpdateItem with if_not_exists(createdAt) — single round-trip.
+    photographersTable.grant(this.updatePhotographerFn, 'dynamodb:UpdateItem');
 
     new ObservabilityConstruct(this, 'UpdatePhotographerObs', {
       lambda: this.updatePhotographerFn,

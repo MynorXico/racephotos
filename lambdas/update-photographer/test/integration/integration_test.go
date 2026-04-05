@@ -45,16 +45,16 @@ func TestIntegration_UpsertPhotographer_Create(t *testing.T) {
 		ID:              id,
 		DisplayName:     "Integration Create User",
 		DefaultCurrency: "USD",
-		CreatedAt:       "2024-01-01T00:00:00Z",
 		UpdatedAt:       "2024-01-01T00:00:00Z",
 	}
 
-	require.NoError(t, store.UpsertPhotographer(ctx, p))
-
-	got, err := store.GetPhotographer(ctx, id)
+	result, err := store.UpsertPhotographer(ctx, p)
 	require.NoError(t, err)
-	assert.Equal(t, id, got.ID)
-	assert.Equal(t, "USD", got.DefaultCurrency)
+	require.NotNil(t, result)
+	assert.Equal(t, id, result.ID)
+	assert.Equal(t, "USD", result.DefaultCurrency)
+	// createdAt is set by if_not_exists to UpdatedAt value on first write
+	assert.Equal(t, p.UpdatedAt, result.CreatedAt)
 }
 
 func TestIntegration_UpsertPhotographer_Update(t *testing.T) {
@@ -66,18 +66,21 @@ func TestIntegration_UpsertPhotographer_Update(t *testing.T) {
 
 	original := models.Photographer{
 		ID:        id,
-		CreatedAt: "2024-01-01T00:00:00Z",
 		UpdatedAt: "2024-01-01T00:00:00Z",
 	}
-	require.NoError(t, store.UpsertPhotographer(ctx, original))
-
-	updated := original
-	updated.DisplayName = "Updated Name"
-	updated.UpdatedAt = "2024-06-01T00:00:00Z"
-	require.NoError(t, store.UpsertPhotographer(ctx, updated))
-
-	got, err := store.GetPhotographer(ctx, id)
+	first, err := store.UpsertPhotographer(ctx, original)
 	require.NoError(t, err)
-	assert.Equal(t, "Updated Name", got.DisplayName)
-	assert.Equal(t, "2024-01-01T00:00:00Z", got.CreatedAt) // preserved
+	require.NotNil(t, first)
+	originalCreatedAt := first.CreatedAt
+
+	updated := models.Photographer{
+		ID:          id,
+		DisplayName: "Updated Name",
+		UpdatedAt:   "2024-06-01T00:00:00Z",
+	}
+	second, err := store.UpsertPhotographer(ctx, updated)
+	require.NoError(t, err)
+	require.NotNil(t, second)
+	assert.Equal(t, "Updated Name", second.DisplayName)
+	assert.Equal(t, originalCreatedAt, second.CreatedAt) // if_not_exists preserves it
 }

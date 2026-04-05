@@ -110,18 +110,30 @@ describe('PhotographerConstruct', () => {
     });
   });
 
-  test('update-photographer IAM policy grants dynamodb:GetItem and PutItem', () => {
+  test('update-photographer IAM policy grants dynamodb:UpdateItem only', () => {
     const { photographerTemplate } = makeStacks(devConfig);
     photographerTemplate.hasResourceProperties('AWS::IAM::Policy', {
       PolicyDocument: {
         Statement: Match.arrayWith([
           Match.objectLike({
-            Action: Match.arrayWith(['dynamodb:GetItem', 'dynamodb:PutItem']),
+            Action: 'dynamodb:UpdateItem',
             Effect: 'Allow',
           }),
         ]),
       },
       PolicyName: Match.stringLikeRegexp('UpdatePhotographerFn'),
+    });
+  });
+
+  test('both Lambdas are configured with 256 MB memory', () => {
+    const { photographerTemplate } = makeStacks(devConfig);
+    photographerTemplate.hasResourceProperties('AWS::Lambda::Function', {
+      FunctionName: 'racephotos-get-photographer-dev',
+      MemorySize: 256,
+    });
+    photographerTemplate.hasResourceProperties('AWS::Lambda::Function', {
+      FunctionName: 'racephotos-update-photographer-dev',
+      MemorySize: 256,
     });
   });
 
