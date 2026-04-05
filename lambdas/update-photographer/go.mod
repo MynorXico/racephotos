@@ -33,4 +33,4 @@ require (
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
-replace github.com/racephotos/shared => ../../shared
+replace github.com/racephotos/shared => ../shared

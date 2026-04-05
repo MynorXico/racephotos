@@ -13,9 +13,9 @@ test-unit:
 			cd lambdas/$$lambda && go test ./... -count=1 && cd ../..; \
 		fi \
 	done
-	@if [ -d shared ]; then \
+	@if [ -d lambdas/shared ]; then \
 		echo "==> unit tests: shared"; \
-		cd shared && go test ./... -count=1 && cd ..; \
+		cd lambdas/shared && go test ./... -count=1 && cd ../..; \
 	fi
 
 # Integration tests — requires LocalStack running (docker-compose up -d)
@@ -44,9 +44,9 @@ lint:
 			cd lambdas/$$lambda && go vet ./... && golangci-lint run ./... && cd ../..; \
 		fi \
 	done
-	@if [ -d shared ]; then \
+	@if [ -d lambdas/shared ]; then \
 		echo "==> lint: shared"; \
-		cd shared && go vet ./... && golangci-lint run ./... && cd ..; \
+		cd lambdas/shared && go vet ./... && golangci-lint run ./... && cd ../..; \
 	fi
 
 # Non-zero exit on any lint issue (used by hooks)
