@@ -2,7 +2,7 @@
 
 **ID**: RS-004
 **Epic**: Infrastructure / Frontend
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
