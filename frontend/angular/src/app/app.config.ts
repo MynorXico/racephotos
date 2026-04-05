@@ -5,6 +5,8 @@ import {
   provideZoneChangeDetection,
 } from '@angular/core';
 import { provideRouter } from '@angular/router';
+import { provideHttpClient, withInterceptors } from '@angular/common/http';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideStore } from '@ngrx/store';
 import { provideEffects } from '@ngrx/effects';
 import { provideRouterStore } from '@ngrx/router-store';
@@ -13,12 +15,15 @@ import { Amplify } from 'aws-amplify';
 
 import { routes } from './app.routes';
 import { AppConfigService } from './core/config/app-config.service';
+import { authInterceptor } from './core/auth/auth.interceptor';
 import { authReducer } from './store/auth/auth.reducer';
 import { AuthEffects } from './store/auth/auth.effects';
+import { photographerReducer } from './store/photographer/photographer.reducer';
+import { PhotographerEffects } from './store/photographer/photographer.effects';
 
 /**
  * Loads /assets/config.json and configures AWS Amplify before the app renders.
- * Called once via APP_INITIALIZER — no environment.ts involved.
+ * Called once via APP_INITIALIZER — no environment.ts involved (ADR-0007).
  */
 function initializeApp(configService: AppConfigService): () => Promise<void> {
   return async () => {
@@ -42,6 +47,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
+    provideAnimationsAsync(),
+    provideHttpClient(withInterceptors([authInterceptor])),
 
     // Bootstrap: load runtime config + configure Amplify before first render
     {
@@ -52,8 +59,8 @@ export const appConfig: ApplicationConfig = {
     },
 
     // NgRx root store
-    provideStore({ auth: authReducer }),
-    provideEffects(AuthEffects),
+    provideStore({ auth: authReducer, photographer: photographerReducer }),
+    provideEffects(AuthEffects, PhotographerEffects),
     provideRouterStore(),
     provideStoreDevtools({ maxAge: 25, logOnly: !isDevMode() }),
   ],

@@ -1,0 +1,65 @@
+:host {
+  display: block;
+}
+
+.profile-page {
+  padding: 24px;
+  max-width: 720px;
+}
+
+.welcome-banner {
+  margin-bottom: 24px;
+  background-color: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+
+  .banner-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+  }
+}
+
+.section-heading {
+  margin: 0 0 24px;
+}
+
+.full-width {
+  width: 100%;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.section-divider {
+  margin: 16px 0 24px;
+}
+
+.bank-card {
+  margin-bottom: 8px;
+
+  mat-card-content {
+    padding-top: 16px;
+  }
+}
+
+.action-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+@media (max-width: 599px) {
+  .profile-page {
+    padding: 16px 0;
+    max-width: 100%;
+  }
+
+  .action-row {
+    flex-direction: column-reverse;
+
+    button {
+      width: 100%;
+    }
+  }
+}

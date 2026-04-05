@@ -1,0 +1,17 @@
+package models
+
+// Photographer represents a photographer's account profile stored in DynamoDB.
+//
+// BankAccountNumber, BankAccountHolder, and BankInstructions are financial PII
+// and must never appear in log output.
+type Photographer struct {
+	ID                string `dynamodbav:"id"                json:"id"`
+	DisplayName       string `dynamodbav:"displayName"       json:"displayName"`
+	DefaultCurrency   string `dynamodbav:"defaultCurrency"   json:"defaultCurrency"` // ISO 4217
+	BankName          string `dynamodbav:"bankName"          json:"bankName"`
+	BankAccountNumber string `dynamodbav:"bankAccountNumber" json:"bankAccountNumber"`
+	BankAccountHolder string `dynamodbav:"bankAccountHolder" json:"bankAccountHolder"`
+	BankInstructions  string `dynamodbav:"bankInstructions"  json:"bankInstructions"`
+	CreatedAt         string `dynamodbav:"createdAt"         json:"createdAt"`
+	UpdatedAt         string `dynamodbav:"updatedAt"         json:"updatedAt"`
+}

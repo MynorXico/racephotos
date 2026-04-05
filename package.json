@@ -17,7 +17,7 @@
   "lint-staged": {
     "frontend/angular/src/**/*.{ts,html}": [
       "prettier --write",
-      "eslint --fix --max-warnings=0 --config frontend/angular/eslint.config.js"
+      "frontend/angular/node_modules/.bin/eslint --fix --max-warnings=0 --config frontend/angular/eslint.config.js"
     ],
     "infra/cdk/**/*.ts": [
       "prettier --write"

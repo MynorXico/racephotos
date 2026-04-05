@@ -1,1 +1,69 @@
-/* You can add global styles to this file, and also import other style files */
+@use '@angular/material' as mat;
+
+// ── RaceShots M3 custom theme ─────────────────────────────────────────────────
+// Uses the M3 theming API introduced in Angular Material 17+.
+// All component colours and typography derive from this single definition.
+// Never hardcode hex values in component SCSS files — use the CSS custom
+// properties defined here (e.g. var(--mat-sys-primary)).
+
+// System font stack — avoids a Google Fonts network dependency.
+$font-family: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
+
+:root {
+  @include mat.theme((
+    color: (
+      primary: mat.$azure-palette,
+      tertiary: mat.$blue-palette,
+    ),
+    typography: $font-family,
+    density: 0,
+  ));
+}
+
+// ── Global resets ─────────────────────────────────────────────────────────────
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: #{$font-family};
+  background-color: var(--mat-sys-background);
+  color: var(--mat-sys-on-background);
+}
+
+// ── Utility: visually hidden (for skip links and screen-reader-only content) ──
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+// ── Loading shimmer animation (used by profile page loading state) ────────────
+@keyframes pulse {
+  0%,
+  100% {
+    background-color: var(--mat-sys-surface-variant);
+  }
+  50% {
+    background-color: var(--mat-sys-surface-container);
+  }
+}
+
+.loading-shimmer {
+  animation: pulse 1.5s ease-in-out infinite;
+}

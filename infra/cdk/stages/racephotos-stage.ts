@@ -6,6 +6,7 @@ import { FrontendStack } from '../stacks/frontend-stack';
 import { StorageStack } from '../stacks/storage-stack';
 import { AuthStack } from '../stacks/auth-stack';
 import { SesStack } from '../stacks/ses-stack';
+import { PhotographerStack } from '../stacks/photographer-stack';
 
 interface RacePhotosStageProps extends cdk.StageProps {
   config: EnvConfig;
@@ -21,7 +22,7 @@ interface RacePhotosStageProps extends cdk.StageProps {
  *   RS-001  → StorageStack (S3 + DynamoDB + SQS)
  *   RS-002  → AuthStack (Cognito + API Gateway) — also wires cognitoConfig + apiBaseUrl into FrontendStack
  *   RS-003  → SesStack (SES verified identity + email templates)
- *   RS-004  → PhotoUploadStack (Lambda + API Gateway route)
+ *   RS-004  → PhotographerStack (GET + PUT /photographer/me)
  *   RS-005  → PhotoProcessorStack (Lambda + SQS consumer)
  *   RS-006  → WatermarkStack (Lambda + S3 trigger)
  *   RS-007  → SearchStack (Lambda + API Gateway route)
@@ -40,7 +41,7 @@ export class RacePhotosStage extends cdk.Stage {
 
     // StorageStack — RS-001
     // S3 buckets, DynamoDB tables, SQS queues. All Lambda stacks depend on this.
-    new StorageStack(this, 'Storage', { env: props.env, config });
+    const storage = new StorageStack(this, 'Storage', { env: props.env, config });
 
     // AuthStack — RS-002
     // Cognito User Pool + HTTP API Gateway. Must be created before FrontendStack
@@ -55,6 +56,21 @@ export class RacePhotosStage extends cdk.Stage {
     // Assigned to a variable so future Lambda stacks can call
     // ses.ses.grantSendEmail(lambdaRole) from this stage.
     const ses = new SesStack(this, 'Ses', { env: props.env, config });
+
+    // FrontendStack — Angular SPA on S3 + CloudFront.
+    // FrontendConstruct reads apiBaseUrl, userPoolId, and clientId from SSM via
+    // valueFromLookup — no cross-stack CDK token references. addDependency()
+    // ensures AuthStack (which writes those SSM params) deploys first.
+    // PhotographerStack — RS-004
+    // GET + PUT /photographer/me. Depends on StorageStack (table) and AuthStack (API).
+    const photographerStack = new PhotographerStack(this, 'Photographer', {
+      env: props.env,
+      config,
+      db: storage.db,
+      api: auth.api,
+    });
+    photographerStack.addDependency(storage);
+    photographerStack.addDependency(auth);
 
     // FrontendStack — Angular SPA on S3 + CloudFront.
     // FrontendConstruct reads apiBaseUrl, userPoolId, and clientId from SSM via
