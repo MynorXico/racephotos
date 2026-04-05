@@ -143,25 +143,15 @@ export class ProfileComponent implements OnInit, OnDestroy {
         });
       });
 
-    // Update profile success.
+    // Hide welcome banner once a saved profile (with updatedAt) is present.
     this.store
-      .select(selectProfileSaving)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe((saving) => {
-        if (!saving) {
-          // Check if a profile exists — means save completed.
-          this.store
-            .select(selectProfile)
-            .pipe(
-              filter((p): p is Photographer => p !== null),
-              takeUntil(this.destroy$),
-            )
-            .subscribe((profile) => {
-              if (profile.updatedAt) {
-                this.showWelcomeBanner.set(false);
-              }
-            });
-        }
+      .select(selectProfile)
+      .pipe(
+        filter((p): p is Photographer => p !== null && !!p.updatedAt),
+        takeUntil(this.destroy$),
+      )
+      .subscribe(() => {
+        this.showWelcomeBanner.set(false);
       });
   }
 

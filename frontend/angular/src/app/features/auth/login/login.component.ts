@@ -6,7 +6,7 @@ import {
   signal,
   ChangeDetectionStrategy,
 } from '@angular/core';
-import { Router } from '@angular/router';
+import { Router, ActivatedRoute } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
 import { Store } from '@ngrx/store';
 import { MatCardModule } from '@angular/material/card';
@@ -41,6 +41,7 @@ import { selectAuthStatus, selectAuthError } from '../../../store/auth/auth.sele
 export class LoginComponent implements OnInit, OnDestroy {
   private readonly store = inject(Store);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly fb = inject(FormBuilder);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroy$ = new Subject<void>();
@@ -54,21 +55,7 @@ export class LoginComponent implements OnInit, OnDestroy {
   readonly submitting = signal(false);
 
   ngOnInit(): void {
-    // If already authenticated, redirect immediately.
-    this.store
-      .select(selectAuthStatus)
-      .pipe(
-        filter((status) => status === 'authenticated'),
-        takeUntil(this.destroy$),
-      )
-      .subscribe(() => {
-        const raw = new URLSearchParams(window.location.search).get('returnUrl') ?? '';
-        // Only allow same-origin relative paths to prevent open-redirect attacks.
-        const url = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/photographer/events';
-        void this.router.navigateByUrl(url);
-      });
-
-    // Listen for sign-in success to redirect.
+    // On authenticated: clear submitting flag and redirect to returnUrl (or default).
     this.store
       .select(selectAuthStatus)
       .pipe(
@@ -77,6 +64,10 @@ export class LoginComponent implements OnInit, OnDestroy {
       )
       .subscribe(() => {
         this.submitting.set(false);
+        const raw = this.route.snapshot.queryParamMap.get('returnUrl') ?? '';
+        // Only allow same-origin relative paths to prevent open-redirect attacks.
+        const url = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/photographer/events';
+        void this.router.navigateByUrl(url);
       });
 
     // Listen for sign-in failure to show snackbar.
