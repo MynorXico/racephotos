@@ -13,12 +13,12 @@ import (
 )
 
 // DynamoAPI is the minimal DynamoDB API surface used by DynamoStore.
-// DeleteItem is included for integration-test cleanup only (see store_helpers.go).
 // The production IAM policy grants only GetItem and UpdateItem.
+// DeleteItem is intentionally excluded — see store_helpers.go for the
+// test-only interface that adds it for integration-test cleanup.
 type DynamoAPI interface {
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
-	DeleteItem(ctx context.Context, params *dynamodb.DeleteItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.DeleteItemOutput, error)
 }
 
 // DynamoStore implements PhotographerUpserter using DynamoDB.
@@ -79,14 +79,28 @@ func (s *DynamoStore) UpsertPhotographer(ctx context.Context, p models.Photograp
 		return nil, fmt.Errorf("UpsertPhotographer: marshal values: %w", err)
 	}
 
+	// ExpressionAttributeNames aliases each attribute to guard against DynamoDB
+	// reserved-word collisions on future renames. if_not_exists(createdAt, :ca)
+	// is used here because the Go SDK expression.Builder does not support
+	// if_not_exists in a SET clause — a raw expression string is required.
 	out, err := s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.TableName),
 		Key:       key,
 		UpdateExpression: aws.String(
-			"SET displayName = :dn, defaultCurrency = :dc, bankName = :bn, " +
-				"bankAccountNumber = :ban, bankAccountHolder = :bah, bankInstructions = :bi, " +
-				"updatedAt = :ua, createdAt = if_not_exists(createdAt, :ca)",
+			"SET #dn = :dn, #dc = :dc, #bn = :bn, " +
+				"#ban = :ban, #bah = :bah, #bi = :bi, " +
+				"#ua = :ua, #ca = if_not_exists(#ca, :ca)",
 		),
+		ExpressionAttributeNames: map[string]string{
+			"#dn":  "displayName",
+			"#dc":  "defaultCurrency",
+			"#bn":  "bankName",
+			"#ban": "bankAccountNumber",
+			"#bah": "bankAccountHolder",
+			"#bi":  "bankInstructions",
+			"#ua":  "updatedAt",
+			"#ca":  "createdAt",
+		},
 		ExpressionAttributeValues: values,
 		ReturnValues:              ddbtypes.ReturnValueAllNew,
 	})

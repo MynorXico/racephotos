@@ -5,7 +5,6 @@
 package integration
 
 import (
-	"context"
 	"os"
 	"testing"
 
@@ -24,7 +23,7 @@ func newStore(t *testing.T) *handler.DynamoStore {
 	if tbl == "" {
 		tbl = "racephotos-photographers"
 	}
-	cfg, err := awsconfig.LoadDefaultConfig(context.Background(),
+	cfg, err := awsconfig.LoadDefaultConfig(t.Context(),
 		awsconfig.WithRegion("us-east-1"),
 	)
 	require.NoError(t, err)
@@ -35,7 +34,7 @@ func newStore(t *testing.T) *handler.DynamoStore {
 }
 
 func TestIntegration_UpsertPhotographer_Create(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	store := newStore(t)
 	id := "integration-test-upsert-create"
 
@@ -58,7 +57,7 @@ func TestIntegration_UpsertPhotographer_Create(t *testing.T) {
 }
 
 func TestIntegration_UpsertPhotographer_Update(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	store := newStore(t)
 	id := "integration-test-upsert-update"
 

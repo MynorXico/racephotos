@@ -36,7 +36,6 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 			return errResponse(404, "photographer not found"), nil
 		}
 		slog.ErrorContext(ctx, "GetPhotographer failed",
-			slog.String("photographerID", photographerID),
 			slog.String("error", err.Error()),
 		)
 		return errResponse(500, "internal server error"), nil

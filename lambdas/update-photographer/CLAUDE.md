@@ -17,19 +17,19 @@ RACEPHOTOS_PHOTOGRAPHERS_TABLE required — DynamoDB table name (e.g. racephotos
 ## Interfaces
 
 ```go
-// PhotographerUpserter — DynamoDB photographers table (read + write)
+// PhotographerUpserter — DynamoDB photographers table (write, single round-trip)
 type PhotographerUpserter interface {
-    GetPhotographer(ctx context.Context, id string) (*models.Photographer, error)
-    UpsertPhotographer(ctx context.Context, p models.Photographer) error
+    UpsertPhotographer(ctx context.Context, p models.Photographer) (*models.Photographer, error)
 }
 ```
 
 ## DynamoDB access patterns
 
-| Operation | Table                      | Key / Index | Condition             |
-| --------- | -------------------------- | ----------- | --------------------- |
-| GetItem   | `racephotos-photographers` | PK=`id`     | to preserve CreatedAt |
-| PutItem   | `racephotos-photographers` | PK=`id`     | full replace (upsert) |
+| Operation  | Table                      | Key / Index | Notes                                                                                                                                                     |
+| ---------- | -------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| UpdateItem | `racephotos-photographers` | PK=`id`     | `SET ... createdAt = if_not_exists(createdAt, :ca)` preserves original timestamp; `ReturnValues: ALL_NEW` returns the full updated item in one round-trip |
+
+IAM grant: `dynamodb:UpdateItem` only (no GetItem, no PutItem).
 
 ## Error handling
 

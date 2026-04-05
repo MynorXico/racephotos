@@ -62,8 +62,10 @@ export class LoginComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$),
       )
       .subscribe(() => {
-        const url = new URLSearchParams(window.location.search).get('returnUrl');
-        void this.router.navigateByUrl(url ?? '/photographer/events');
+        const raw = new URLSearchParams(window.location.search).get('returnUrl') ?? '';
+        // Only allow same-origin relative paths to prevent open-redirect attacks.
+        const url = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/photographer/events';
+        void this.router.navigateByUrl(url);
       });
 
     // Listen for sign-in success to redirect.

@@ -31,8 +31,9 @@ func (s *DynamoStore) GetPhotographer(ctx context.Context, id string) (*models.P
 	}
 
 	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(s.TableName),
-		Key:       key,
+		TableName:      aws.String(s.TableName),
+		Key:            key,
+		ConsistentRead: aws.Bool(true),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("GetPhotographer: dynamodb.GetItem: %w", err)
