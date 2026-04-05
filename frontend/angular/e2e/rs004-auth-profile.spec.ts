@@ -15,7 +15,7 @@ test.describe('RS-004 — Login page', () => {
   test('AC2 — login page renders with email and password fields', async ({ page }) => {
     await page.goto('/login');
     await expect(page.getByLabel('Email address')).toBeVisible();
-    await expect(page.getByLabel('Password')).toBeVisible();
+    await expect(page.locator('input[autocomplete="current-password"]')).toBeVisible();
     await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
   });
 
@@ -33,7 +33,7 @@ test.describe('RS-004 — Login page', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
     // Touch fields to trigger errors
     await page.getByLabel('Email address').click();
-    await page.getByLabel('Password').click();
+    await page.locator('input[autocomplete="current-password"]').click();
     await page.getByRole('button', { name: /sign in/i }).focus();
     // Check form is still present (did not navigate)
     await expect(page.getByLabel('Email address')).toBeVisible();
