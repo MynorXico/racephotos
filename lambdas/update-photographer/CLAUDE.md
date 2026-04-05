@@ -29,7 +29,7 @@ type PhotographerUpserter interface {
 | ---------- | -------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | UpdateItem | `racephotos-photographers` | PK=`id`     | `SET ... createdAt = if_not_exists(createdAt, :ca)` preserves original timestamp; `ReturnValues: ALL_NEW` returns the full updated item in one round-trip |
 
-IAM grant: `dynamodb:UpdateItem` only (no GetItem, no PutItem).
+IAM grant: `dynamodb:UpdateItem` only. No `GetItem` — the `if_not_exists` expression eliminates any read-before-write.
 
 ## Error handling
 
