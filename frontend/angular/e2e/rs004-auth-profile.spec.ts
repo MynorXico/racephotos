@@ -67,3 +67,48 @@ test.describe('RS-004 — Login page — responsive', () => {
     await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
   });
 });
+
+test.describe('RS-004 — Login page — icon rendering', () => {
+  // Material Icons uses font ligatures: the text content of <mat-icon> is the icon
+  // name (e.g. "visibility"). If the font fails to load the ligature text is rendered
+  // as plain characters. "vis" visible in the DOM means the icon text is overflowing
+  // its container (truncated) rather than being replaced by the icon glyph.
+  let icon: import('@playwright/test').Locator;
+
+  test.beforeEach(async ({ page }) => {
+    await page.goto('/login');
+    icon = page.getByRole('button', { name: /toggle password visibility/i }).locator('mat-icon');
+    await expect(icon).toBeVisible();
+  });
+
+  test('password toggle icon is rendered as a glyph (font loaded and applied)', async () => {
+    // 1. Verify the ligature text is correct in the DOM.
+    const text = await icon.textContent();
+    expect(text?.trim()).toMatch(/^(visibility|visibility_off)$/);
+
+    // 2. Verify the Material Icons font-family is applied via CSS.
+    const fontFamily = await icon.evaluate((el) => window.getComputedStyle(el).fontFamily);
+    expect(fontFamily.toLowerCase()).toContain('material icons');
+
+    // 3. Verify the font file was actually downloaded and is ready.
+    // Await document.fonts.ready first so all font loads (including async CDN
+    // fetches) are settled before calling check(). Without this, mobile browsers
+    // may still be fetching the font when check() is called and return false.
+    // document.fonts.check() returns false if the font is declared in CSS but
+    // the file failed to load (404, network error, or missing <link> tag).
+    const fontLoaded = await icon.evaluate(async () => {
+      await document.fonts.ready;
+      return document.fonts.check('1em "Material Icons"');
+    });
+    expect(fontLoaded).toBe(true);
+  });
+
+  test('password toggle icon button has visible icon after toggle', async ({ page }) => {
+    // Initial state: visibility_off
+    await expect(icon).toHaveText('visibility_off');
+
+    // After toggle: visibility
+    await page.getByRole('button', { name: /toggle password visibility/i }).click();
+    await expect(icon).toHaveText('visibility');
+  });
+});
