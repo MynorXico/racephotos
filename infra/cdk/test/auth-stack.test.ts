@@ -346,12 +346,13 @@ describe('ApiConstruct', () => {
     });
   });
 
-  // TC-013: AuthStack has exactly 3 SSM parameters — api-url (ApiConstruct) +
-  // user-pool-id + client-id (CognitoConstruct). FrontendConstruct reads all three
-  // via valueFromLookup, avoiding cross-stack CDK tokens in Source.jsonData.
-  test('AuthStack creates exactly three SSM parameters', () => {
+  // TC-013: AuthStack has exactly 4 SSM parameters — api-url + api-id (ApiConstruct) +
+  // user-pool-id + client-id (CognitoConstruct). FrontendConstruct reads three of these
+  // via valueFromLookup; PhotographerStack reads api-id via valueForStringParameter to
+  // avoid a cross-stack cyclic dependency (RS-004 fix).
+  test('AuthStack creates exactly four SSM parameters', () => {
     const t = makeTemplate(devConfig);
-    t.resourceCountIs('AWS::SSM::Parameter', 3);
+    t.resourceCountIs('AWS::SSM::Parameter', 4);
   });
 
   test('CognitoConstruct stores user-pool-id in SSM at correct path', () => {

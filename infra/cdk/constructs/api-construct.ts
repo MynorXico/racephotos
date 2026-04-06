@@ -101,5 +101,14 @@ export class ApiConstruct extends Construct {
       stringValue: this.apiUrl,
       description: `RaceShots API Gateway base URL — ${config.envName}`,
     });
+
+    // Store API ID in SSM so downstream stacks (e.g. PhotographerStack) can
+    // import the HTTP API by ID via valueForStringParameter — avoiding a direct
+    // CDK object reference that would create a cross-stack cyclic dependency.
+    new ssm.StringParameter(this, 'ApiIdParameter', {
+      parameterName: `/racephotos/env/${config.envName}/api-id`,
+      stringValue: this.httpApi.apiId,
+      description: `RaceShots API Gateway ID — ${config.envName}`,
+    });
   }
 }
