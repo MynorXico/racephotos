@@ -3,10 +3,8 @@ import {
   OnInit,
   OnDestroy,
   inject,
-  signal,
+  ElementRef,
   ChangeDetectionStrategy,
-  ViewChildren,
-  QueryList,
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
@@ -14,7 +12,7 @@ import { Store } from '@ngrx/store';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Subject, takeUntil, filter } from 'rxjs';
 import { MatCardModule } from '@angular/material/card';
-import { MatFormFieldModule, MatFormField } from '@angular/material/form-field';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatButtonModule } from '@angular/material/button';
@@ -32,6 +30,8 @@ import {
   selectProfileLoading,
   selectProfileSaving,
   selectProfileError,
+  selectProfileSaveError,
+  selectWasAutoInitialized,
 } from '../../../store/photographer/photographer.selectors';
 import { Photographer } from '../../../store/photographer/photographer.state';
 
@@ -72,13 +72,12 @@ export const SUPPORTED_CURRENCIES: readonly CurrencyOption[] = [
   styleUrl: './profile.component.scss',
 })
 export class ProfileComponent implements OnInit, OnDestroy {
-  @ViewChildren(MatFormField) formFields!: QueryList<MatFormField>;
-
   private readonly store = inject(Store);
   private readonly router = inject(Router);
   private readonly fb = inject(FormBuilder);
   private readonly snackBar = inject(MatSnackBar);
   private readonly titleService = inject(NavigationTitleService);
+  private readonly elementRef = inject(ElementRef);
   private readonly destroy$ = new Subject<void>();
 
   readonly currencies = SUPPORTED_CURRENCIES;
@@ -94,9 +93,10 @@ export class ProfileComponent implements OnInit, OnDestroy {
 
   readonly loading = toSignal(this.store.select(selectProfileLoading), { initialValue: false });
   readonly saving = toSignal(this.store.select(selectProfileSaving), { initialValue: false });
-
-  /** Local signal — shown when profile was just initialised from a 404. */
-  readonly showWelcomeBanner = signal(false);
+  /** True after a 404 auto-init; cleared when the user manually saves. */
+  readonly showWelcomeBanner = toSignal(this.store.select(selectWasAutoInitialized), {
+    initialValue: false,
+  });
 
   /** Last saved values — used by Cancel to reset the form. */
   private lastSavedValues = this.form.getRawValue();
@@ -143,15 +143,15 @@ export class ProfileComponent implements OnInit, OnDestroy {
         });
       });
 
-    // Hide welcome banner once a saved profile (with updatedAt) is present.
+    // Save failure — show snackbar; user can correct the form and retry manually.
     this.store
-      .select(selectProfile)
+      .select(selectProfileSaveError)
       .pipe(
-        filter((p): p is Photographer => p !== null && !!p.updatedAt),
+        filter((error): error is string => error !== null),
         takeUntil(this.destroy$),
       )
-      .subscribe(() => {
-        this.showWelcomeBanner.set(false);
+      .subscribe((error) => {
+        this.snackBar.open(error, 'Dismiss', { duration: 8000 });
       });
   }
 
@@ -187,12 +187,12 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
 
   private focusFirstInvalidField(): void {
-    const firstInvalid = this.formFields.find((field) => !!field._control?.ngControl?.invalid);
-    if (firstInvalid) {
-      const el = (firstInvalid._elementRef.nativeElement as HTMLElement).querySelector(
-        'input, select, textarea',
-      ) as HTMLElement | null;
-      el?.focus();
-    }
+    const el = this.elementRef.nativeElement.querySelector(
+      '.mat-mdc-form-field.ng-invalid input:not([type="hidden"]), ' +
+        '.mat-mdc-form-field.ng-invalid textarea, ' +
+        '.mat-mdc-form-field.ng-invalid mat-select, ' +
+        '.mat-mdc-form-field.ng-invalid [role="combobox"]',
+    ) as HTMLElement | null;
+    el?.focus();
   }
 }

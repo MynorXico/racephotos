@@ -9,6 +9,7 @@ export const photographerReducer = createReducer<PhotographerState>(
     ...state,
     loading: true,
     error: null,
+    saveError: null,
   })),
 
   on(PhotographerActions.loadProfileSuccess, (state, { profile }) => ({
@@ -24,22 +25,39 @@ export const photographerReducer = createReducer<PhotographerState>(
     error,
   })),
 
+  // Auto-init path: GET returned 404; PUT with empty defaults will follow.
+  // Sets loading: false (GET phase done) and wasAutoInitialized: true so the
+  // welcome banner appears once the PUT completes.
+  on(PhotographerActions.initProfile, (state) => ({
+    ...state,
+    loading: false,
+    saving: true,
+    wasAutoInitialized: true,
+    error: null,
+    saveError: null,
+  })),
+
+  // User-initiated save: clear the auto-init flag so the welcome banner hides.
   on(PhotographerActions.updateProfile, (state) => ({
     ...state,
+    loading: false,
     saving: true,
-    error: null,
+    wasAutoInitialized: false,
+    saveError: null,
   })),
 
   on(PhotographerActions.updateProfileSuccess, (state, { profile }) => ({
     ...state,
+    loading: false,
     saving: false,
     profile,
-    error: null,
+    saveError: null,
   })),
 
   on(PhotographerActions.updateProfileFailure, (state, { error }) => ({
     ...state,
+    loading: false,
     saving: false,
-    error,
+    saveError: error,
   })),
 );

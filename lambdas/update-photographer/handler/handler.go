@@ -83,6 +83,12 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 
 // validate returns an error for invalid fields.
 func validate(req updateRequest) error {
+	if req.DisplayName == "" {
+		return fmt.Errorf("displayName is required")
+	}
+	if len(req.DisplayName) > 100 {
+		return fmt.Errorf("displayName must not exceed 100 characters")
+	}
 	if req.DefaultCurrency == "" {
 		return fmt.Errorf("defaultCurrency is required")
 	}

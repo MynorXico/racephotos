@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -33,6 +34,14 @@ func makeEvent(sub, body string) events.APIGatewayV2HTTPRequest {
 func validBody(currency string) string {
 	b, _ := json.Marshal(map[string]string{
 		"displayName":     "Test Photographer",
+		"defaultCurrency": currency,
+	})
+	return string(b)
+}
+
+func bodyWithDisplayName(displayName, currency string) string {
+	b, _ := json.Marshal(map[string]string{
+		"displayName":     displayName,
 		"defaultCurrency": currency,
 	})
 	return string(b)
@@ -84,20 +93,32 @@ func TestHandler_Handle(t *testing.T) {
 			wantCode: 400,
 		},
 		{
+			name:     "empty display name — returns 400",
+			event:    makeEvent("user-4", bodyWithDisplayName("", "USD")),
+			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
+			wantCode: 400,
+		},
+		{
+			name:     "display name exceeds 100 chars — returns 400",
+			event:    makeEvent("user-5", bodyWithDisplayName(strings.Repeat("a", 101), "USD")),
+			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
+			wantCode: 400,
+		},
+		{
 			name:     "empty currency code — returns 400",
-			event:    makeEvent("user-4", validBody("")),
+			event:    makeEvent("user-6", validBody("")),
 			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
 			wantCode: 400,
 		},
 		{
 			name:     "invalid currency code — returns 400",
-			event:    makeEvent("user-5", validBody("XYZ")),
+			event:    makeEvent("user-7", validBody("XYZ")),
 			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
 			wantCode: 400,
 		},
 		{
 			name:  "store UpsertPhotographer fails — returns 500",
-			event: makeEvent("user-6", validBody("GBP")),
+			event: makeEvent("user-8", validBody("GBP")),
 			mockFn: func(m *mocks.MockPhotographerUpserter) {
 				m.EXPECT().UpsertPhotographer(gomock.Any(), gomock.Any()).Return(nil, errors.New("write failure"))
 			},

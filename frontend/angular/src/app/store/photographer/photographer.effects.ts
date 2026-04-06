@@ -20,7 +20,7 @@ export class PhotographerEffects {
 
   /**
    * Loads GET /photographer/me.
-   * On 404: dispatches updateProfile with empty defaults to initialise the profile (AC4).
+   * On 404: dispatches initProfile with empty defaults to auto-initialise the profile (AC4).
    * On other errors: dispatches loadProfileFailure.
    */
   loadProfile$ = createEffect(() =>
@@ -31,7 +31,7 @@ export class PhotographerEffects {
           map((profile) => PhotographerActions.loadProfileSuccess({ profile })),
           catchError((err: HttpErrorResponse) => {
             if (err.status === 404) {
-              return of(PhotographerActions.updateProfile({ profile: emptyPhotographerDefaults }));
+              return of(PhotographerActions.initProfile({ profile: emptyPhotographerDefaults }));
             }
             return of(
               PhotographerActions.loadProfileFailure({
@@ -45,13 +45,14 @@ export class PhotographerEffects {
   );
 
   /**
-   * Sends PUT /photographer/me.
+   * Sends PUT /photographer/me for both user-initiated saves (updateProfile) and
+   * the first-time auto-init (initProfile).
    * On success: dispatches updateProfileSuccess with the returned profile.
    * On failure: includes the server error message for AC9 (invalid currency → 400).
    */
   updateProfile$ = createEffect(() =>
     this.actions$.pipe(
-      ofType(PhotographerActions.updateProfile),
+      ofType(PhotographerActions.updateProfile, PhotographerActions.initProfile),
       switchMap(({ profile }) =>
         this.http.put<Photographer>(`${this.apiBase}/photographer/me`, profile).pipe(
           map((updated) => PhotographerActions.updateProfileSuccess({ profile: updated })),

@@ -16,7 +16,12 @@ export interface PhotographerState {
   loading: boolean;
   /** True while PUT /photographer/me is in flight. */
   saving: boolean;
+  /** Error from GET /photographer/me. */
   error: string | null;
+  /** Error from PUT /photographer/me. */
+  saveError: string | null;
+  /** True after a 404 auto-init PUT succeeds; cleared when the user manually saves. */
+  wasAutoInitialized: boolean;
 }
 
 export const initialPhotographerState: PhotographerState = {
@@ -24,6 +29,8 @@ export const initialPhotographerState: PhotographerState = {
   loading: false,
   saving: false,
   error: null,
+  saveError: null,
+  wasAutoInitialized: false,
 };
 
 /** Empty defaults sent to PUT /photographer/me when GET returns 404. */
