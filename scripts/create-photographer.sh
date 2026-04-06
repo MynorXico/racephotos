@@ -60,12 +60,14 @@ echo "User Pool: ${USER_POOL_ID}"
 # ── Check if user already exists ─────────────────────────────────────────────
 
 USER_EXISTS=false
-if aws cognito-idp admin-get-user \
+if USER_CHECK=$(aws cognito-idp admin-get-user \
      --user-pool-id "$USER_POOL_ID" \
      --username "$EMAIL" \
-     --profile "$PROFILE" \
-     > /dev/null 2>&1; then
+     --profile "$PROFILE" 2>&1); then
   USER_EXISTS=true
+elif [[ "$USER_CHECK" != *"UserNotFoundException"* ]]; then
+  echo "Error checking user existence: $USER_CHECK"
+  exit 1
 fi
 
 if $USER_EXISTS; then
