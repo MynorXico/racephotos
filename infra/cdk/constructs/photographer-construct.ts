@@ -23,6 +23,15 @@ interface PhotographerConstructProps {
    * integration resources are created inside PhotographerStack.
    */
   httpApiId: string;
+  /**
+   * The Cognito JWT authorizer ID.
+   *
+   * Passed as a plain string (from SSM valueForStringParameter) to avoid the
+   * same cross-stack cyclic dependency. The authorizer is imported via
+   * HttpAuthorizer.fromHttpAuthorizerAttributes() and attached to every route
+   * to ensure requests require a valid Cognito JWT.
+   */
+  httpAuthorizerId: string;
 }
 
 /**
@@ -49,13 +58,22 @@ export class PhotographerConstruct extends Construct {
   constructor(scope: Construct, id: string, props: PhotographerConstructProps) {
     super(scope, id);
 
-    const { config, photographersTable, httpApiId } = props;
+    const { config, photographersTable, httpApiId, httpAuthorizerId } = props;
 
     // Import the HTTP API by ID so that HttpRoute/HttpIntegration resources are
     // owned by this stack (PhotographerStack) rather than AuthStack. This avoids
     // the cross-stack cycle: PhotographerStack→AuthStack (via httpApi object ref)
     // and AuthStack→PhotographerStack (via route integration Lambda ARN).
     const httpApi = apigatewayv2.HttpApi.fromHttpApiAttributes(this, 'HttpApi', { httpApiId });
+
+    // Import the Cognito JWT authorizer by ID so every route is explicitly
+    // protected. Without this, HttpRoute defaults to AuthorizationType: NONE
+    // (public access). The authorizer ID was stored in SSM by ApiConstruct.
+    const jwtAuthorizer = apigatewayv2.HttpAuthorizer.fromHttpAuthorizerAttributes(
+      this,
+      'JwtAuthorizer',
+      { authorizerId: httpAuthorizerId, authorizerType: 'JWT' },
+    );
 
     // ── get-photographer Lambda ───────────────────────────────────────────────
     this.getPhotographerFn = new lambda.Function(this, 'GetPhotographerFn', {
@@ -86,6 +104,7 @@ export class PhotographerConstruct extends Construct {
         'GetPhotographerIntegration',
         this.getPhotographerFn,
       ),
+      authorizer: jwtAuthorizer,
     });
 
     // ── update-photographer Lambda ────────────────────────────────────────────
@@ -117,6 +136,7 @@ export class PhotographerConstruct extends Construct {
         'UpdatePhotographerIntegration',
         this.updatePhotographerFn,
       ),
+      authorizer: jwtAuthorizer,
     });
   }
 }

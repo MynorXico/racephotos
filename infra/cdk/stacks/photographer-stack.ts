@@ -35,18 +35,23 @@ export class PhotographerStack extends cdk.Stack {
 
     const { config, db } = props;
 
-    // Read the HTTP API ID from SSM at CloudFormation deploy time.
-    // valueForStringParameter emits an AWS::SSM::Parameter::Value<String> CFN
-    // parameter — no CDK cross-stack export/import dependency is created.
+    // Read the HTTP API ID and JWT authorizer ID from SSM at CloudFormation deploy
+    // time. valueForStringParameter emits AWS::SSM::Parameter::Value<String> CFN
+    // parameters — no CDK cross-stack export/import dependency is created.
     const httpApiId = ssm.StringParameter.valueForStringParameter(
       this,
       `/racephotos/env/${config.envName}/api-id`,
+    );
+    const httpAuthorizerId = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/racephotos/env/${config.envName}/api-authorizer-id`,
     );
 
     this.photographer = new PhotographerConstruct(this, 'Photographer', {
       config,
       photographersTable: db.photographersTable,
       httpApiId,
+      httpAuthorizerId,
     });
   }
 }
