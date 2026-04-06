@@ -84,14 +84,20 @@ func TestHandler_Handle(t *testing.T) {
 			wantCode: 400,
 		},
 		{
+			name:     "empty currency code — returns 400",
+			event:    makeEvent("user-4", validBody("")),
+			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
+			wantCode: 400,
+		},
+		{
 			name:     "invalid currency code — returns 400",
-			event:    makeEvent("user-4", validBody("XYZ")),
+			event:    makeEvent("user-5", validBody("XYZ")),
 			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
 			wantCode: 400,
 		},
 		{
 			name:  "store UpsertPhotographer fails — returns 500",
-			event: makeEvent("user-5", validBody("GBP")),
+			event: makeEvent("user-6", validBody("GBP")),
 			mockFn: func(m *mocks.MockPhotographerUpserter) {
 				m.EXPECT().UpsertPhotographer(gomock.Any(), gomock.Any()).Return(nil, errors.New("write failure"))
 			},
