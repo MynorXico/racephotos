@@ -66,14 +66,17 @@ export class PhotographerConstruct extends Construct {
     // and AuthStack→PhotographerStack (via route integration Lambda ARN).
     const httpApi = apigatewayv2.HttpApi.fromHttpApiAttributes(this, 'HttpApi', { httpApiId });
 
-    // Import the Cognito JWT authorizer by ID so every route is explicitly
-    // protected. Without this, HttpRoute defaults to AuthorizationType: NONE
-    // (public access). The authorizer ID was stored in SSM by ApiConstruct.
-    const jwtAuthorizer = apigatewayv2.HttpAuthorizer.fromHttpAuthorizerAttributes(
-      this,
-      'JwtAuthorizer',
-      { authorizerId: httpAuthorizerId, authorizerType: 'JWT' },
-    );
+    // Build an IHttpRouteAuthorizer from the stored authorizer ID. Without an
+    // explicit authorizer, HttpRoute defaults to AuthorizationType: NONE (public).
+    // An inline implementation is simpler than creating a CDK construct solely to
+    // wrap a string — HttpAuthorizer.fromHttpAuthorizerAttributes() requires a
+    // scope+id and creates a dummy construct with no extra benefit here.
+    const jwtAuthorizer: apigatewayv2.IHttpRouteAuthorizer = {
+      bind: () => ({
+        authorizerId: httpAuthorizerId,
+        authorizationType: apigatewayv2.HttpAuthorizerType.JWT,
+      }),
+    };
 
     // ── get-photographer Lambda ───────────────────────────────────────────────
     this.getPhotographerFn = new lambda.Function(this, 'GetPhotographerFn', {
