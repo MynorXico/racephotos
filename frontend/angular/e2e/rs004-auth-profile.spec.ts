@@ -91,11 +91,15 @@ test.describe('RS-004 — Login page — icon rendering', () => {
     expect(fontFamily.toLowerCase()).toContain('material icons');
 
     // 3. Verify the font file was actually downloaded and is ready.
+    // Await document.fonts.ready first so all font loads (including async CDN
+    // fetches) are settled before calling check(). Without this, mobile browsers
+    // may still be fetching the font when check() is called and return false.
     // document.fonts.check() returns false if the font is declared in CSS but
     // the file failed to load (404, network error, or missing <link> tag).
-    // Note: scrollWidth > clientWidth is not reliable here because mat-icon's
-    // overflow:hidden layout means scrollWidth stays large regardless of font state.
-    const fontLoaded = await icon.evaluate(() => document.fonts.check('1em "Material Icons"'));
+    const fontLoaded = await icon.evaluate(async () => {
+      await document.fonts.ready;
+      return document.fonts.check('1em "Material Icons"');
+    });
     expect(fontLoaded).toBe(true);
   });
 
