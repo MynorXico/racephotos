@@ -12,6 +12,8 @@ import (
 	"github.com/racephotos/shared/models"
 )
 
+const maxDisplayNameLength = 100
+
 // validCurrencies is the curated list of supported ISO 4217 currency codes.
 var validCurrencies = map[string]bool{
 	"USD": true, "EUR": true, "GBP": true, "GTQ": true,
@@ -86,8 +88,8 @@ func validate(req updateRequest) error {
 	if req.DisplayName == "" {
 		return fmt.Errorf("displayName is required")
 	}
-	if len(req.DisplayName) > 100 {
-		return fmt.Errorf("displayName must not exceed 100 characters")
+	if len(req.DisplayName) > maxDisplayNameLength {
+		return fmt.Errorf("displayName must not exceed %d characters", maxDisplayNameLength)
 	}
 	if req.DefaultCurrency == "" {
 		return fmt.Errorf("defaultCurrency is required")
