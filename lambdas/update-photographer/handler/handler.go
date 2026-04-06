@@ -69,6 +69,12 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(401, "unauthorized"), nil
 	}
 
+	// Reject null or empty body before attempting to parse; json.Unmarshal
+	// accepts "null" without error, leaving req at zero values.
+	if event.Body == "" || event.Body == "null" {
+		return errResponse(400, "invalid request body"), nil
+	}
+
 	var req updateRequest
 	if err := json.Unmarshal([]byte(event.Body), &req); err != nil {
 		return errResponse(400, "invalid request body"), nil
@@ -76,7 +82,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 
 	// Normalise before validation so the canonical values are stored.
 	req.DisplayName = strings.TrimSpace(req.DisplayName)
-	req.DefaultCurrency = strings.ToUpper(req.DefaultCurrency)
+	req.DefaultCurrency = strings.ToUpper(strings.TrimSpace(req.DefaultCurrency))
 
 	if err := validate(req); err != nil {
 		return errResponse(400, err.Error()), nil

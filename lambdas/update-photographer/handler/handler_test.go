@@ -107,6 +107,18 @@ func TestHandler_Handle(t *testing.T) {
 			wantCode: 401,
 		},
 		{
+			name:     "null body — returns 400",
+			event:    makeEvent("user-3a", "null"),
+			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
+			wantCode: 400,
+		},
+		{
+			name:     "empty body — returns 400",
+			event:    makeEvent("user-3b", ""),
+			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
+			wantCode: 400,
+		},
+		{
 			name:     "invalid JSON body — returns 400",
 			event:    makeEvent("user-3", "{bad json}"),
 			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
