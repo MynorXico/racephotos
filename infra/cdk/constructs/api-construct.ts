@@ -117,39 +117,29 @@ export class ApiConstruct extends Construct {
     });
     this.authorizerId = jwtAuthorizer.authorizerId;
 
-    // All three SSM parameters are consumed by downstream stacks (FrontendStack,
-    // PhotographerStack, and future feature stacks). In production environments
-    // they must be retained on stack deletion to prevent breaking those stacks.
-    const ssmRemovalPolicy = config.enableDeletionProtection
-      ? cdk.RemovalPolicy.RETAIN
-      : cdk.RemovalPolicy.DESTROY;
-
     // Store API URL in SSM so the pipeline can inject it into config.json
     // without creating a circular dependency between AuthStack and FrontendStack.
-    const apiUrlParam = new ssm.StringParameter(this, 'ApiUrlParameter', {
+    new ssm.StringParameter(this, 'ApiUrlParameter', {
       parameterName: `/racephotos/env/${config.envName}/api-url`,
       stringValue: this.apiUrl,
       description: `RaceShots API Gateway base URL — ${config.envName}`,
     });
-    apiUrlParam.applyRemovalPolicy(ssmRemovalPolicy);
 
     // Store API ID in SSM so downstream stacks (e.g. PhotographerStack) can
     // import the HTTP API by ID via valueForStringParameter — avoiding a direct
     // CDK object reference that would create a cross-stack cyclic dependency.
-    const apiIdParam = new ssm.StringParameter(this, 'ApiIdParameter', {
+    new ssm.StringParameter(this, 'ApiIdParameter', {
       parameterName: `/racephotos/env/${config.envName}/api-id`,
       stringValue: this.httpApi.apiId,
       description: `RaceShots API Gateway ID — ${config.envName}`,
     });
-    apiIdParam.applyRemovalPolicy(ssmRemovalPolicy);
 
     // Store the JWT authorizer ID in SSM so downstream stacks can attach it to
     // routes without a CDK cross-stack token (which would recreate the cyclic dep).
-    const apiAuthorizerIdParam = new ssm.StringParameter(this, 'ApiAuthorizerIdParameter', {
+    new ssm.StringParameter(this, 'ApiAuthorizerIdParameter', {
       parameterName: `/racephotos/env/${config.envName}/api-authorizer-id`,
       stringValue: this.authorizerId,
       description: `RaceShots API Gateway Cognito JWT authorizer ID — ${config.envName}`,
     });
-    apiAuthorizerIdParam.applyRemovalPolicy(ssmRemovalPolicy);
   }
 }
