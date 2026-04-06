@@ -1,8 +1,8 @@
 import { HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { fetchAuthSession } from 'aws-amplify/auth';
-import { from, throwError } from 'rxjs';
-import { catchError, switchMap } from 'rxjs/operators';
+import { from } from 'rxjs';
+import { switchMap } from 'rxjs/operators';
 
 import { AppConfigService } from '../config/app-config.service';
 
@@ -29,6 +29,5 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
       if (!token) return next(req);
       return next(req.clone({ headers: req.headers.set('Authorization', `Bearer ${token}`) }));
     }),
-    catchError((error: unknown) => throwError(() => error)),
   );
 };
