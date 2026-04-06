@@ -20,7 +20,8 @@
       <mat-label>Display name</mat-label>
       <input matInput type="text" autocomplete="off" formControlName="displayName" [readonly]="loading() || saving()" />
       <mat-hint>Shown to runners on your event pages.</mat-hint>
-      @if (form.get('displayName')?.hasError('required') && form.get('displayName')?.touched) {
+      @if ((form.get('displayName')?.hasError('required') || form.get('displayName')?.hasError('whitespace')) &&
+      form.get('displayName')?.touched) {
       <mat-error>Display name is required.</mat-error>
       } @else if (form.get('displayName')?.hasError('maxlength') && form.get('displayName')?.touched) {
       <mat-error>Display name must be 100 characters or fewer.</mat-error>

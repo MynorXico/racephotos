@@ -7,7 +7,13 @@ import {
   ChangeDetectionStrategy,
 } from '@angular/core';
 import { Router } from '@angular/router';
-import { ReactiveFormsModule, FormBuilder, Validators } from '@angular/forms';
+import {
+  AbstractControl,
+  ReactiveFormsModule,
+  FormBuilder,
+  ValidationErrors,
+  Validators,
+} from '@angular/forms';
 import { Store } from '@ngrx/store';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Subject, takeUntil, filter } from 'rxjs';
@@ -51,6 +57,13 @@ export const SUPPORTED_CURRENCIES: readonly CurrencyOption[] = [
   { code: 'BRL', name: 'Brazilian Real' },
 ] as const;
 
+/** Rejects strings that are non-empty but contain only whitespace. */
+function noWhitespaceOnly(control: AbstractControl): ValidationErrors | null {
+  return typeof control.value === 'string' && control.value.trim() === ''
+    ? { whitespace: true }
+    : null;
+}
+
 @Component({
   selector: 'app-profile',
   standalone: true,
@@ -83,7 +96,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   readonly currencies = SUPPORTED_CURRENCIES;
 
   readonly form = this.fb.group({
-    displayName: ['', [Validators.required, Validators.maxLength(100)]],
+    displayName: ['', [Validators.required, noWhitespaceOnly, Validators.maxLength(100)]],
     defaultCurrency: ['USD', [Validators.required]],
     bankName: ['', [Validators.maxLength(100)]],
     bankAccountHolder: ['', [Validators.maxLength(100)]],
