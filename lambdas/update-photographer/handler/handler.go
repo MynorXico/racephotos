@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -53,6 +54,10 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	if err := json.Unmarshal([]byte(event.Body), &req); err != nil {
 		return errResponse(400, "invalid request body"), nil
 	}
+
+	// Normalise before validation so the canonical values are stored.
+	req.DisplayName = strings.TrimSpace(req.DisplayName)
+	req.DefaultCurrency = strings.ToUpper(req.DefaultCurrency)
 
 	if err := validate(req); err != nil {
 		return errResponse(400, err.Error()), nil

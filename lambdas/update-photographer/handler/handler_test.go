@@ -73,6 +73,14 @@ func TestHandler_Handle(t *testing.T) {
 			wantCode: 200,
 		},
 		{
+			name:  "happy path — lowercase currency normalised",
+			event: makeEvent("user-2a", validBody("eur")),
+			mockFn: func(m *mocks.MockPhotographerUpserter) {
+				m.EXPECT().UpsertPhotographer(gomock.Any(), gomock.Any()).Return(stubProfile("user-2a"), nil)
+			},
+			wantCode: 200,
+		},
+		{
 			name:  "happy path — updates existing profile",
 			event: makeEvent("user-2", validBody("EUR")),
 			mockFn: func(m *mocks.MockPhotographerUpserter) {
@@ -95,6 +103,12 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:     "empty display name — returns 400",
 			event:    makeEvent("user-4", bodyWithDisplayName("", "USD")),
+			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
+			wantCode: 400,
+		},
+		{
+			name:     "whitespace-only display name — returns 400",
+			event:    makeEvent("user-4b", bodyWithDisplayName("   ", "USD")),
 			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
 			wantCode: 400,
 		},
