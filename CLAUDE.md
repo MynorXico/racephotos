@@ -67,6 +67,11 @@ race-photos/
 │           ├── environments.example.ts  ← committed template
 │           └── environments.ts          ← gitignored — contributor fills this in
 ├── lambdas/
+│   ├── shared/                      ← shared Go packages (local module, Lambda-only)
+│   │   ├── go.mod
+│   │   ├── models/
+│   │   ├── apperrors/
+│   │   └── awsclients/
 │   ├── photo-upload/                ← presigned URL generator
 │   │   ├── CLAUDE.md               ← service-level overrides
 │   │   ├── main.go
@@ -76,11 +81,6 @@ race-photos/
 │   ├── watermark/                   ← apply watermark to processed photos
 │   ├── search/                      ← bib number search
 │   └── payment/                     ← unlock + signed download URL
-├── shared/                          ← shared Go packages (local module)
-│   ├── go.mod
-│   ├── models/
-│   ├── apperrors/
-│   └── awsclients/
 ├── frontend/
 │   └── angular/
 ├── scripts/
@@ -98,10 +98,11 @@ race-photos/
 ### Module and package structure
 
 - Each Lambda is a self-contained Go module with its own `go.mod`
-- Shared packages live in `shared/` as a local module
+- Shared packages live in `lambdas/shared/` as a local module (co-located with
+  their only consumers — no other part of the project uses these packages)
 - Each Lambda references shared via a `replace` directive — no remote import path needed:
   ```
-  replace github.com/racephotos/shared => ../../shared
+  replace github.com/racephotos/shared => ../shared
   ```
 - The module path prefix `github.com/racephotos/` is a placeholder. Forks may
   rename it — it has no runtime effect
@@ -111,7 +112,7 @@ race-photos/
 ### Error handling
 
 - All errors wrapped with context: `fmt.Errorf("processBib: %w", err)`
-- Sentinel errors in `shared/apperrors/`: e.g. `ErrBibNotFound`, `ErrPhotoLocked`
+- Sentinel errors in `lambdas/shared/apperrors/`: e.g. `ErrBibNotFound`, `ErrPhotoLocked`
 - Lambda handlers return structured error responses — never raw Go error strings
 - Log the full error with request context before returning to the caller
 

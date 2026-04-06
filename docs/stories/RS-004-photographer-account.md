@@ -2,7 +2,7 @@
 
 **ID**: RS-004
 **Epic**: Infrastructure / Frontend
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
@@ -19,7 +19,8 @@ Before a photographer can create events or upload photos, they need to authentic
 - [ ] AC6: Given `PUT /photographer/me` is called with a valid Cognito JWT and a valid body, when the request completes, then the Photographer record is updated and the updated profile is returned.
 - [ ] AC7: Given a photographer visits `/photographer/profile`, when the page loads, then their current profile values are pre-filled in the form fields.
 - [ ] AC8: Given a photographer fills in their bank details and saves, when `PUT /photographer/me` succeeds, then a success toast is shown and the NgRx profile state is updated.
-- [ ] AC9: Given `PUT /photographer/me` is called with an invalid currency code, then a 400 error is returned with a descriptive message.
+- [ ] AC9: Given `PUT /photographer/me` is called with an invalid currency code, when the Lambda validates the request body, then a 400 error is returned with a descriptive message.
+- [ ] AC10: Given `GET /photographer/me` or `PUT /photographer/me` is called without a valid Cognito JWT, when API Gateway evaluates the JWT authorizer, then 401 Unauthorized is returned.
 
 ## Out of scope
 
@@ -57,6 +58,7 @@ Before a photographer can create events or upload photos, they need to authentic
 - DynamoDB access pattern: `GetItem` by PK=photographerID (Cognito `sub` claim from JWT)
 - `get-photographer` returns 404 (`apperrors.ErrNotFound`) when no record exists; it does NOT create one
 - `update-photographer` uses `UpsertPhotographer` (PutItem) — creates the record on first call, updates on subsequent calls; Angular calls this on profile page load if GET returned 404
+- Never log `BankAccountNumber`, `BankAccountHolder`, or `BankInstructions` fields — treat as financial PII
 - New env vars:
   ```
   RACEPHOTOS_ENV                 required — "local"|"dev"|"qa"|"staging"|"prod"
@@ -76,13 +78,13 @@ Before a photographer can create events or upload photos, they need to authentic
 - NgRx:
   - `store/auth/auth.actions.ts` — `signIn`, `signInSuccess`, `signInFailure`, `signOut`, `signOutSuccess`, `loadSession`, `loadSessionSuccess`
   - `store/auth/auth.effects.ts` — wraps `signIn`, `signOut`, `fetchAuthSession` from `aws-amplify/auth`
-  - `store/auth/auth.reducer.ts` — state shape: `{ user: CognitoUser | null, loading: boolean, error: string | null }`
+  - `store/auth/auth.reducer.ts` — state shape: `{ user: AuthUser | null, loading: boolean, error: string | null }` (`AuthUser` from `aws-amplify/auth`)
   - `store/auth/auth.selectors.ts`
   - `store/photographer/photographer.actions.ts` — `loadProfile`, `loadProfileSuccess`, `loadProfileFailure`, `updateProfile`, `updateProfileSuccess`, `updateProfileFailure`
   - `store/photographer/photographer.effects.ts` — calls API via `AppConfigService.apiBaseUrl`
   - `store/photographer/photographer.reducer.ts`
   - `store/photographer/photographer.selectors.ts`
-- Amplify initialisation follows ADR-0007: configure once in `app.config.ts` using values from `environment.ts`; import only from `aws-amplify/auth`; components never call Amplify directly
+- Amplify initialisation follows ADR-0007: configure once in `app.config.ts` using values from `config.json` (fetched at app startup via `AppConfigService`); import only from `aws-amplify/auth`; components never call Amplify directly
 - `.env.example`: add `RACEPHOTOS_PHOTOGRAPHERS_TABLE=racephotos-photographers`
 - `environments.example.ts`: no new keys required
 

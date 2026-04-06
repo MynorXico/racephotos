@@ -3,7 +3,7 @@ import { createActionGroup, emptyProps, props } from '@ngrx/store';
 export const AuthActions = createActionGroup({
   source: 'Auth',
   events: {
-    'Sign In': emptyProps(),
+    'Sign In': props<{ username: string; password: string }>(),
     'Sign In Success': props<{ email: string }>(),
     'Sign In Failure': props<{ error: string }>(),
     'Sign Out': emptyProps(),

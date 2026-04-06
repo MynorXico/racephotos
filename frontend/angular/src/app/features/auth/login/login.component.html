@@ -1,0 +1,53 @@
+<div class="login-page" role="main">
+  <mat-card class="login-card">
+    <mat-card-content>
+      <p class="wordmark mat-headline-medium">RaceShots</p>
+      <h1 class="mat-title-large">Sign in to your account</h1>
+
+      <form [formGroup]="form" (ngSubmit)="onSubmit()" aria-label="Sign in form" novalidate>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Email address</mat-label>
+          <input matInput type="email" autocomplete="email" formControlName="email" cdkFocusInitial />
+          @if (form.get('email')?.hasError('required') && form.get('email')?.touched) {
+          <mat-error>Email address is required.</mat-error>
+          } @else if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
+          <mat-error>Enter a valid email address.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Password</mat-label>
+          <input
+            matInput
+            [type]="showPassword() ? 'text' : 'password'"
+            autocomplete="current-password"
+            formControlName="password"
+          />
+          <button
+            mat-icon-button
+            matSuffix
+            type="button"
+            aria-label="Toggle password visibility"
+            [attr.aria-pressed]="showPassword()"
+            (click)="togglePasswordVisibility()"
+          >
+            <mat-icon>{{ showPassword() ? 'visibility' : 'visibility_off' }}</mat-icon>
+          </button>
+          @if (form.get('password')?.hasError('required') && form.get('password')?.touched) {
+          <mat-error>Password is required.</mat-error>
+          } @else if (form.get('password')?.hasError('minlength') && form.get('password')?.touched) {
+          <mat-error>Password must be at least 8 characters.</mat-error>
+          }
+        </mat-form-field>
+
+        <button mat-flat-button type="submit" class="full-width submit-btn" [disabled]="submitting()">
+          @if (submitting()) {
+          <mat-progress-spinner mode="indeterminate" diameter="20" />
+          } @else { Sign in }
+        </button>
+      </form>
+
+      <p class="supporting-text mat-body-small">Need an account? Contact your administrator.</p>
+    </mat-card-content>
+  </mat-card>
+</div>

@@ -1,13 +1,15 @@
 import { inject, Injectable } from '@angular/core';
+import { Router } from '@angular/router';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
-import { fetchAuthSession, getCurrentUser, signOut } from 'aws-amplify/auth';
+import { fetchAuthSession, getCurrentUser, signIn, signOut } from 'aws-amplify/auth';
 import { from, of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, map, switchMap, tap } from 'rxjs/operators';
 import { AuthActions } from './auth.actions';
 
 @Injectable()
 export class AuthEffects {
   private readonly actions$ = inject(Actions);
+  private readonly router = inject(Router);
 
   loadSession$ = createEffect(() =>
     this.actions$.pipe(
@@ -16,6 +18,20 @@ export class AuthEffects {
         from(getCurrentUser()).pipe(
           map((user) => AuthActions.sessionLoaded({ email: user.signInDetails?.loginId ?? '' })),
           catchError(() => of(AuthActions.sessionEmpty())),
+        ),
+      ),
+    ),
+  );
+
+  signIn$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(AuthActions.signIn),
+      switchMap(({ username, password }) =>
+        from(signIn({ username, password })).pipe(
+          map(() => AuthActions.signInSuccess({ email: username })),
+          catchError((err: Error) =>
+            of(AuthActions.signInFailure({ error: err.message ?? 'Sign-in failed' })),
+          ),
         ),
       ),
     ),
@@ -31,6 +47,16 @@ export class AuthEffects {
         ),
       ),
     ),
+  );
+
+  /** Navigate to /login after sign-out completes. */
+  signOutNavigate$ = createEffect(
+    () =>
+      this.actions$.pipe(
+        ofType(AuthActions.signOutSuccess),
+        tap(() => void this.router.navigate(['/login'])),
+      ),
+    { dispatch: false },
   );
 
   /** Ensure a valid token exists — called before API requests via AuthInterceptor. */

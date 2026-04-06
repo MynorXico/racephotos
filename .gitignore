@@ -21,7 +21,6 @@ infra/cdk/config/environments.ts
 # =============================================================================
 # Binaries (Lambda/shared build output only — does not apply to infra/cdk/bin/)
 lambdas/**/bin/
-shared/**/bin/
 **/*.exe
 **/*.exe~
 **/*.dll
@@ -73,7 +72,8 @@ playwright-report/
 # Lambda build artifacts
 # =============================================================================
 lambdas/**/bootstrap
-lambdas/**/handler
+# Note: 'lambdas/**/handler' intentionally omitted — it matches the handler/ package
+# directories as well as binaries. Binary output is 'bootstrap' for provided.al2023.
 lambdas/**/*.zip
 
 # =============================================================================

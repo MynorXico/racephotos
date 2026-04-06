@@ -1,0 +1,113 @@
+<div class="profile-page">
+  @if (showWelcomeBanner()) {
+  <mat-card appearance="outlined" class="welcome-banner" role="status" aria-live="polite">
+    <mat-card-content class="banner-content">
+      <mat-icon>info</mat-icon>
+      <span>Welcome to RaceShots. Fill in your bank details so runners can pay you directly.</span>
+    </mat-card-content>
+  </mat-card>
+  }
+
+  <h2 class="mat-headline-small section-heading">Account Profile</h2>
+
+  @if (loading()) {
+  <mat-progress-bar mode="query" aria-label="Loading profile" />
+  }
+
+  <form [formGroup]="form" (ngSubmit)="onSave()" aria-label="Account profile form" novalidate>
+    <!-- Section A: Account -->
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Display name</mat-label>
+      <input matInput type="text" autocomplete="off" formControlName="displayName" [readonly]="loading() || saving()" />
+      <mat-hint>Shown to runners on your event pages.</mat-hint>
+      @if ((form.get('displayName')?.hasError('required') || form.get('displayName')?.hasError('whitespace')) &&
+      form.get('displayName')?.touched) {
+      <mat-error>Display name is required.</mat-error>
+      } @else if (form.get('displayName')?.hasError('maxlength') && form.get('displayName')?.touched) {
+      <mat-error>Display name must be 100 characters or fewer.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Default currency</mat-label>
+      <mat-select formControlName="defaultCurrency" aria-label="Default currency" [disabled]="loading() || saving()">
+        @for (currency of currencies; track currency.code) {
+        <mat-option [value]="currency.code">{{ currency.code }} — {{ currency.name }}</mat-option>
+        }
+      </mat-select>
+      @if (form.get('defaultCurrency')?.hasError('required') && form.get('defaultCurrency')?.touched) {
+      <mat-error>Please select a currency.</mat-error>
+      }
+    </mat-form-field>
+
+    <mat-divider class="section-divider" />
+
+    <!-- Section B: Bank Transfer Details -->
+    <mat-card appearance="outlined" class="bank-card">
+      <mat-card-header>
+        <mat-card-title class="mat-title-medium">Bank Transfer Details</mat-card-title>
+        <mat-card-subtitle class="mat-body-small">
+          These details are shown to runners when they purchase your photos.
+        </mat-card-subtitle>
+      </mat-card-header>
+      <mat-card-content>
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Bank name</mat-label>
+          <input matInput type="text" formControlName="bankName" [readonly]="loading() || saving()" />
+          @if (form.get('bankName')?.hasError('maxlength') && form.get('bankName')?.touched) {
+          <mat-error>Bank name must be 100 characters or fewer.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Account holder name</mat-label>
+          <input matInput type="text" formControlName="bankAccountHolder" [readonly]="loading() || saving()" />
+          @if (form.get('bankAccountHolder')?.hasError('maxlength') && form.get('bankAccountHolder')?.touched) {
+          <mat-error>Account holder name must be 100 characters or fewer.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Account number</mat-label>
+          <input
+            matInput
+            type="text"
+            aria-label="Account number"
+            formControlName="bankAccountNumber"
+            [readonly]="loading() || saving()"
+          />
+          <mat-hint>Your account or IBAN number.</mat-hint>
+          @if (form.get('bankAccountNumber')?.hasError('maxlength') && form.get('bankAccountNumber')?.touched) {
+          <mat-error>Account number must be 50 characters or fewer.</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Payment instructions</mat-label>
+          <textarea
+            matInput
+            aria-label="Payment instructions"
+            formControlName="bankInstructions"
+            [readonly]="loading() || saving()"
+            cdkTextareaAutosize
+            cdkAutosizeMinRows="3"
+            cdkAutosizeMaxRows="8"
+          ></textarea>
+          <mat-hint>Additional instructions shown to runners, e.g. reference format or bank branch details.</mat-hint>
+          @if (form.get('bankInstructions')?.hasError('maxlength') && form.get('bankInstructions')?.touched) {
+          <mat-error>Payment instructions must be 500 characters or fewer.</mat-error>
+          }
+        </mat-form-field>
+      </mat-card-content>
+    </mat-card>
+
+    <div class="action-row">
+      <button mat-stroked-button type="button" (click)="onCancel()" [disabled]="saving()">Cancel</button>
+      <button mat-flat-button type="submit" [disabled]="loading() || saving()">
+        @if (saving()) {
+        <mat-progress-spinner mode="indeterminate" diameter="20" />
+        } @else { Save changes }
+      </button>
+    </div>
+  </form>
+</div>

@@ -1,0 +1,83 @@
+<a class="sr-only" href="#main-content">Skip to main content</a>
+
+<mat-sidenav-container class="layout-container">
+  <mat-sidenav #sidenav [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile()" class="sidebar">
+    <nav aria-label="Photographer navigation">
+      <div class="sidebar-header">
+        <span class="mat-title-medium wordmark">RaceShots</span>
+      </div>
+
+      <mat-nav-list>
+        <a
+          mat-list-item
+          routerLink="/photographer/events"
+          routerLinkActive="active-link"
+          (click)="closeSidenavOnMobile()"
+        >
+          <mat-icon matListItemIcon>event</mat-icon>
+          <span matListItemTitle>My Events</span>
+        </a>
+        <a
+          mat-list-item
+          routerLink="/photographer/dashboard"
+          routerLinkActive="active-link"
+          (click)="closeSidenavOnMobile()"
+        >
+          <mat-icon matListItemIcon>dashboard</mat-icon>
+          <span matListItemTitle>Dashboard</span>
+        </a>
+        <a
+          mat-list-item
+          routerLink="/photographer/profile"
+          routerLinkActive="active-link"
+          (click)="closeSidenavOnMobile()"
+        >
+          <mat-icon matListItemIcon>manage_accounts</mat-icon>
+          <span matListItemTitle>Profile</span>
+        </a>
+      </mat-nav-list>
+
+      <div class="sidebar-footer">
+        @if (signingOut()) {
+        <button mat-stroked-button class="sign-out-btn" aria-label="Sign out of RaceShots" disabled>
+          <mat-progress-spinner mode="indeterminate" diameter="20" />
+        </button>
+        } @else {
+        <button mat-stroked-button class="sign-out-btn" aria-label="Sign out of RaceShots" (click)="signOut()">
+          <mat-icon>logout</mat-icon>
+          Sign out
+        </button>
+        }
+      </div>
+    </nav>
+  </mat-sidenav>
+
+  <mat-sidenav-content>
+    <div class="top-bar">
+      @if (isMobile()) {
+      <button
+        mat-icon-button
+        aria-label="Open navigation menu"
+        [attr.aria-expanded]="sidenav.opened"
+        (click)="sidenav.toggle()"
+      >
+        <mat-icon>menu</mat-icon>
+      </button>
+      }
+      <span class="page-title mat-title-medium">{{ pageTitle() }}</span>
+      @if (!isMobile() && email()) {
+      <span class="user-email mat-body-small">{{ email() }}</span>
+      }
+    </div>
+
+    <main id="main-content" class="content-area" role="main">
+      @if (authStatus() === 'unknown') {
+      <div class="content-loading" aria-label="Loading" role="status">
+        <mat-progress-spinner mode="indeterminate" diameter="48" />
+      </div>
+      } @else {
+      <router-outlet />
+      }
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

@@ -1,10 +1,14 @@
 import { TestBed } from '@angular/core/testing';
+import { RouterTestingModule } from '@angular/router/testing';
+import { provideMockStore } from '@ngrx/store/testing';
 import { AppComponent } from './app.component';
+import { initialAuthState } from './store/auth/auth.state';
 
 describe('AppComponent', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [AppComponent],
+      imports: [AppComponent, RouterTestingModule],
+      providers: [provideMockStore({ initialState: { auth: initialAuthState } })],
     }).compileComponents();
   });
 
@@ -14,16 +18,10 @@ describe('AppComponent', () => {
     expect(app).toBeTruthy();
   });
 
-  it(`should have the 'racephotos V2' title`, () => {
-    const fixture = TestBed.createComponent(AppComponent);
-    const app = fixture.componentInstance;
-    expect(app.title).toEqual('racephotos V2');
-  });
-
-  it('should render title', () => {
+  it('should show spinner overlay when auth status is unknown', () => {
     const fixture = TestBed.createComponent(AppComponent);
     fixture.detectChanges();
     const compiled = fixture.nativeElement as HTMLElement;
-    expect(compiled.querySelector('h1')?.textContent).toContain('Hello, racephotos V2');
+    expect(compiled.querySelector('.auth-loading-overlay')).toBeTruthy();
   });
 });
