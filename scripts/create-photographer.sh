@@ -34,8 +34,16 @@ set -euo pipefail
 # ── Prompts ──────────────────────────────────────────────────────────────────
 
 read -r -p "Photographer email:                " EMAIL
+[[ -z "$EMAIL" ]] && { echo "Error: email is required."; exit 1; }
+
 read -r -p "AWS profile:                       " PROFILE
+[[ -z "$PROFILE" ]] && { echo "Error: AWS profile is required."; exit 1; }
+
 read -r -p "Environment (dev/qa/staging/prod): " ENV
+case "$ENV" in
+  dev|qa|staging|prod) ;;
+  *) echo "Error: invalid environment '${ENV}'. Must be one of: dev, qa, staging, prod"; exit 1 ;;
+esac
 
 # ── Resolve User Pool ID from SSM ────────────────────────────────────────────
 
@@ -73,8 +81,12 @@ fi
 # Prompted after the existence check so a re-run after a failed password
 # attempt does not require re-entering email/profile/environment first.
 
-read -r -s -p "Permanent password: " PERM_PASS
+read -r -s -p "Permanent password:                " PERM_PASS
 echo
+[[ -z "$PERM_PASS" ]] && { echo "Error: password is required."; exit 1; }
+read -r -s -p "Confirm password:                  " PERM_PASS_CONFIRM
+echo
+[[ "$PERM_PASS" != "$PERM_PASS_CONFIRM" ]] && { echo "Error: passwords do not match."; exit 1; }
 
 # ── Create the user if needed ────────────────────────────────────────────────
 # --message-action SUPPRESS prevents Cognito from sending a temporary-password
