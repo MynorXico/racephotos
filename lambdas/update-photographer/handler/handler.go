@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/racephotos/shared/models"
@@ -99,7 +100,7 @@ func validate(req updateRequest) error {
 	if req.DisplayName == "" {
 		return fmt.Errorf("displayName is required")
 	}
-	if len(req.DisplayName) > maxDisplayNameLength {
+	if utf8.RuneCountInString(req.DisplayName) > maxDisplayNameLength {
 		return fmt.Errorf("displayName must not exceed %d characters", maxDisplayNameLength)
 	}
 	if req.DefaultCurrency == "" {
@@ -109,16 +110,16 @@ func validate(req updateRequest) error {
 		return fmt.Errorf("unsupported currency code %q — must be one of USD, EUR, GBP, GTQ, MXN, CAD, AUD, BRL",
 			req.DefaultCurrency)
 	}
-	if len(req.BankName) > maxBankNameLength {
+	if utf8.RuneCountInString(req.BankName) > maxBankNameLength {
 		return fmt.Errorf("bankName must not exceed %d characters", maxBankNameLength)
 	}
-	if len(req.BankAccountHolder) > maxBankAccountHolderLen {
+	if utf8.RuneCountInString(req.BankAccountHolder) > maxBankAccountHolderLen {
 		return fmt.Errorf("bankAccountHolder must not exceed %d characters", maxBankAccountHolderLen)
 	}
-	if len(req.BankAccountNumber) > maxBankAccountNumberLen {
+	if utf8.RuneCountInString(req.BankAccountNumber) > maxBankAccountNumberLen {
 		return fmt.Errorf("bankAccountNumber must not exceed %d characters", maxBankAccountNumberLen)
 	}
-	if len(req.BankInstructions) > maxBankInstructionsLength {
+	if utf8.RuneCountInString(req.BankInstructions) > maxBankInstructionsLength {
 		return fmt.Errorf("bankInstructions must not exceed %d characters", maxBankInstructionsLength)
 	}
 	return nil

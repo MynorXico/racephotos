@@ -187,11 +187,10 @@ export class ProfileComponent implements OnInit, OnDestroy {
   }
 
   private focusFirstInvalidField(): void {
+    // Angular Forms applies .ng-invalid to the control element itself — a stable
+    // public-API class that works for both <input> and <mat-select>.
     const el = this.elementRef.nativeElement.querySelector(
-      '.mat-mdc-form-field.ng-invalid input:not([type="hidden"]), ' +
-        '.mat-mdc-form-field.ng-invalid textarea, ' +
-        '.mat-mdc-form-field.ng-invalid mat-select, ' +
-        '.mat-mdc-form-field.ng-invalid [role="combobox"]',
+      'input.ng-invalid, textarea.ng-invalid, mat-select.ng-invalid',
     ) as HTMLElement | null;
     el?.focus();
   }
