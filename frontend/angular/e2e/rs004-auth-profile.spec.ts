@@ -73,33 +73,29 @@ test.describe('RS-004 — Login page — icon rendering', () => {
   // name (e.g. "visibility"). If the font fails to load the ligature text is rendered
   // as plain characters. "vis" visible in the DOM means the icon text is overflowing
   // its container (truncated) rather than being replaced by the icon glyph.
+  let icon: import('@playwright/test').Locator;
 
-  test('password toggle icon has full ligature text, not a truncated stub', async ({ page }) => {
+  test.beforeEach(async ({ page }) => {
     await page.goto('/login');
-    const icon = page.locator('mat-icon').first();
+    icon = page.getByRole('button', { name: /toggle password visibility/i }).locator('mat-icon');
     await expect(icon).toBeVisible();
+  });
+
+  test('password toggle icon has full ligature text, not a truncated stub', async () => {
     // The ligature name must be complete — "vis" means the container is clipping the text.
     const text = await icon.textContent();
     expect(text?.trim()).toMatch(/^(visibility|visibility_off)$/);
   });
 
-  test('password toggle icon is rendered with Material Icons font', async ({ page }) => {
-    await page.goto('/login');
-    const icon = page.locator('mat-icon').first();
-    await expect(icon).toBeVisible();
+  test('password toggle icon is rendered with Material Icons font', async () => {
     // Verify the computed font-family includes the Material Icons font.
     // If the font is missing the family will fall back to a system font and
     // ligatures will render as plain text.
-    const fontFamily = await icon.evaluate(
-      (el) => window.getComputedStyle(el).fontFamily,
-    );
+    const fontFamily = await icon.evaluate((el) => window.getComputedStyle(el).fontFamily);
     expect(fontFamily.toLowerCase()).toContain('material icons');
   });
 
-  test('password toggle icon has non-zero rendered dimensions', async ({ page }) => {
-    await page.goto('/login');
-    const icon = page.locator('mat-icon').first();
-    await expect(icon).toBeVisible();
+  test('password toggle icon has non-zero rendered dimensions', async () => {
     // When the font fails to load the text "visibility_off" overflows the 24×24 icon
     // container and may be clipped. Verify the bounding box has the standard icon size.
     const box = await icon.boundingBox();
@@ -110,16 +106,11 @@ test.describe('RS-004 — Login page — icon rendering', () => {
   });
 
   test('password toggle icon button has visible icon after toggle', async ({ page }) => {
-    await page.goto('/login');
     // Initial state: visibility_off
-    const icon = page.locator('mat-icon').first();
-    await expect(icon).toBeVisible();
-    const initialText = await icon.textContent();
-    expect(initialText?.trim()).toBe('visibility_off');
+    await expect(icon).toHaveText('visibility_off');
 
     // After toggle: visibility
     await page.getByRole('button', { name: /toggle password visibility/i }).click();
-    const toggledText = await icon.textContent();
-    expect(toggledText?.trim()).toBe('visibility');
+    await expect(icon).toHaveText('visibility');
   });
 });
