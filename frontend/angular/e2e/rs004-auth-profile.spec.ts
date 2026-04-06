@@ -81,28 +81,20 @@ test.describe('RS-004 — Login page — icon rendering', () => {
     await expect(icon).toBeVisible();
   });
 
-  test('password toggle icon has full ligature text, not a truncated stub', async () => {
-    // The ligature name must be complete — "vis" means the container is clipping the text.
+  test('password toggle icon is rendered as a glyph (no text overflow)', async () => {
+    // 1. Verify the ligature text is correct in the DOM.
     const text = await icon.textContent();
     expect(text?.trim()).toMatch(/^(visibility|visibility_off)$/);
-  });
 
-  test('password toggle icon is rendered with Material Icons font', async () => {
-    // Verify the computed font-family includes the Material Icons font.
-    // If the font is missing the family will fall back to a system font and
-    // ligatures will render as plain text.
+    // 2. Verify the Material Icons font-family is applied via CSS.
     const fontFamily = await icon.evaluate((el) => window.getComputedStyle(el).fontFamily);
     expect(fontFamily.toLowerCase()).toContain('material icons');
-  });
 
-  test('password toggle icon has non-zero rendered dimensions', async () => {
-    // When the font fails to load the text "visibility_off" overflows the 24×24 icon
-    // container and may be clipped. Verify the bounding box has the standard icon size.
-    const box = await icon.boundingBox();
-    expect(box).not.toBeNull();
-    // Material icon default size is 24px; allow a small tolerance for browser rounding.
-    expect(box!.width).toBeGreaterThanOrEqual(20);
-    expect(box!.height).toBeGreaterThanOrEqual(20);
+    // 3. Verify the icon is not rendering as overflowing text.
+    // mat-icon has a fixed 24px CSS width; if the font fails to load the ligature
+    // string ("visibility_off") overflows the container, making scrollWidth > clientWidth.
+    const isOverflowing = await icon.evaluate((el) => el.scrollWidth > el.clientWidth);
+    expect(isOverflowing).toBe(false);
   });
 
   test('password toggle icon button has visible icon after toggle', async ({ page }) => {
