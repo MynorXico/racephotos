@@ -67,3 +67,63 @@ test.describe('RS-004 — Login page — responsive', () => {
     await expect(page.getByRole('button', { name: /sign in/i })).toBeVisible();
   });
 });
+
+test.describe('RS-004 — Login page — icon rendering', () => {
+  // Material Icons uses font ligatures: the text content of <mat-icon> is the icon
+  // name (e.g. "visibility"). If the font fails to load the ligature text is rendered
+  // as plain characters. "vis" visible in the DOM means the icon text is overflowing
+  // its container (truncated) rather than being replaced by the icon glyph.
+
+  test('password toggle icon has full ligature text, not a truncated stub', async ({ page }) => {
+    await page.goto('/login');
+    const icon = page.locator('mat-icon').first();
+    await expect(icon).toBeVisible();
+    // The ligature name must be complete — "vis" means the container is clipping the text.
+    const text = await icon.textContent();
+    expect(text?.trim()).toMatch(/^(visibility|visibility_off)$/);
+  });
+
+  test('password toggle icon is rendered with Material Icons font', async ({ page }) => {
+    await page.goto('/login');
+    const icon = page.locator('mat-icon').first();
+    await expect(icon).toBeVisible();
+    // Verify the computed font-family includes the Material Icons font.
+    // If the font is missing the family will fall back to a system font and
+    // ligatures will render as plain text.
+    const fontFamily = await icon.evaluate(
+      (el) => window.getComputedStyle(el).fontFamily,
+    );
+    expect(fontFamily.toLowerCase()).toContain('material icons');
+  });
+
+  test('password toggle icon is not overflowing its container', async ({ page }) => {
+    await page.goto('/login');
+    const icon = page.locator('mat-icon').first();
+    await expect(icon).toBeVisible();
+    // An icon clipped by overflow:hidden renders as a partial string ("vis").
+    // The icon element should not overflow its bounding box.
+    const overflow = await icon.evaluate((el) => {
+      const style = window.getComputedStyle(el);
+      return { overflow: style.overflow, overflowX: style.overflowX };
+    });
+    // Material icon containers must not use hidden overflow that clips the glyph.
+    // CDK mat-icon-button uses overflow:hidden on .mat-mdc-button-touch-target —
+    // assert the mat-icon itself is not clipped.
+    expect(overflow.overflow).not.toBe('hidden');
+    expect(overflow.overflowX).not.toBe('hidden');
+  });
+
+  test('password toggle icon button has visible icon after toggle', async ({ page }) => {
+    await page.goto('/login');
+    // Initial state: visibility_off
+    const icon = page.locator('mat-icon').first();
+    await expect(icon).toBeVisible();
+    const initialText = await icon.textContent();
+    expect(initialText?.trim()).toBe('visibility_off');
+
+    // After toggle: visibility
+    await page.getByRole('button', { name: /toggle password visibility/i }).click();
+    const toggledText = await icon.textContent();
+    expect(toggledText?.trim()).toBe('visibility');
+  });
+});
