@@ -83,6 +83,10 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	// Normalise before validation so the canonical values are stored.
 	req.DisplayName = strings.TrimSpace(req.DisplayName)
 	req.DefaultCurrency = strings.ToUpper(strings.TrimSpace(req.DefaultCurrency))
+	req.BankName = strings.TrimSpace(req.BankName)
+	req.BankAccountHolder = strings.TrimSpace(req.BankAccountHolder)
+	req.BankAccountNumber = strings.TrimSpace(req.BankAccountNumber)
+	req.BankInstructions = strings.TrimSpace(req.BankInstructions)
 
 	if err := validate(req); err != nil {
 		return errResponse(400, err.Error()), nil
