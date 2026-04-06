@@ -301,6 +301,10 @@ describe('ApiConstruct', () => {
       AuthorizerType: 'JWT',
       Name: 'CognitoJwtAuthorizer',
       IdentitySource: ['$request.header.Authorization'],
+      JwtConfiguration: {
+        Audience: [Match.anyValue()],
+        Issuer: Match.anyValue(),
+      },
     });
   });
 
