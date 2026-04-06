@@ -48,24 +48,14 @@ test.describe('RS-004 — Login page', () => {
 });
 
 test.describe('RS-004 — Auth guard redirect', () => {
-  test('AC1 — unauthenticated visit to /photographer/events redirects to /login', async ({
+  test('AC1 — unauthenticated visits redirect to /login with encoded returnUrl', async ({
     page,
   }) => {
     await page.goto('/photographer/events');
-    // Should be redirected to login with returnUrl
-    await expect(page).toHaveURL(/\/login/);
-  });
+    await expect(page).toHaveURL('/login?returnUrl=%2Fphotographer%2Fevents');
 
-  test('AC1 — unauthenticated visit to /photographer/profile redirects to /login', async ({
-    page,
-  }) => {
     await page.goto('/photographer/profile');
-    await expect(page).toHaveURL(/\/login/);
-  });
-
-  test('returnUrl is preserved in redirect', async ({ page }) => {
-    await page.goto('/photographer/profile');
-    await expect(page).toHaveURL(/returnUrl=/);
+    await expect(page).toHaveURL('/login?returnUrl=%2Fphotographer%2Fprofile');
   });
 });
 

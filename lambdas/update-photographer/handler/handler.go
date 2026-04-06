@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"sort"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -27,6 +28,17 @@ var validCurrencies = map[string]bool{
 	"USD": true, "EUR": true, "GBP": true, "GTQ": true,
 	"MXN": true, "CAD": true, "AUD": true, "BRL": true,
 }
+
+// validCurrencyList is a sorted, comma-separated string of validCurrencies keys,
+// built once at startup for use in validation error messages.
+var validCurrencyList = func() string {
+	codes := make([]string, 0, len(validCurrencies))
+	for k := range validCurrencies {
+		codes = append(codes, k)
+	}
+	sort.Strings(codes)
+	return strings.Join(codes, ", ")
+}()
 
 // PhotographerUpserter abstracts the DynamoDB write for the photographers table.
 // A single UpdateItem call handles both create and update, preserving CreatedAt
@@ -107,8 +119,8 @@ func validate(req updateRequest) error {
 		return fmt.Errorf("defaultCurrency is required")
 	}
 	if !validCurrencies[req.DefaultCurrency] {
-		return fmt.Errorf("unsupported currency code %q — must be one of USD, EUR, GBP, GTQ, MXN, CAD, AUD, BRL",
-			req.DefaultCurrency)
+		return fmt.Errorf("unsupported currency code %q — must be one of %s",
+			req.DefaultCurrency, validCurrencyList)
 	}
 	if utf8.RuneCountInString(req.BankName) > maxBankNameLength {
 		return fmt.Errorf("bankName must not exceed %d characters", maxBankNameLength)
