@@ -37,7 +37,7 @@
 **Setup**: None required.
 **Action**: `PUT /photographer/me` with valid JWT and body `null`.
 **Expected**: HTTP 400, `{"error":"invalid request body"}`.
-**Why it matters**: `json.Unmarshal([]byte("null"), &req)` succeeds in Go and leaves `req` as its zero value. The handler would then proceed to `validate()` with an empty `DefaultCurrency`, which passes validation (the currency check is guarded by `req.DefaultCurrency != ""`). This silently creates a profile with no currency code — a functional bug that the existing tests do not cover.
+**Why it matters**: `json.Unmarshal([]byte("null"), &req)` succeeds in Go and leaves `req` as its zero value. The handler now explicitly checks for `event.Body == ""` or `event.Body == "null"` before unmarshalling and returns 400 immediately. This case is covered by the `"null body — returns 400"` unit test. _(Previously this was a bug; fixed in this PR.)_
 
 ---
 
@@ -147,7 +147,7 @@
 **Setup**: Photographer record does not exist. Two concurrent PUT requests are issued for `sub = "concurrent-user"` simultaneously.
 **Action**: Fire two goroutines each sending `PUT /photographer/me` with identical body at the same instant.
 **Expected**: Both return HTTP 200. Exactly one record exists in DynamoDB. `CreatedAt` values in both responses are identical (whichever write "won" sets the canonical `CreatedAt`).
-**Why it matters**: The current implementation does a `GetItem` to fetch `createdAt`, then a `PutItem` — there is no DynamoDB conditional expression guarding the write. Under concurrent load, both goroutines may read "not found", both set `createdAt = now()` (potentially different timestamps), and both write. The one that writes last wins, but `createdAt` will differ between the two responses. This is a race condition: the `createdAt` returned to one caller will not match what ends up in DynamoDB. A conditional `attribute_not_exists(id)` on the first PutItem (create path) would prevent this.
+**Why it matters**: The implementation uses a single atomic `UpdateItem` with `SET createdAt = if_not_exists(createdAt, :ca)`. This eliminates the race condition entirely — DynamoDB preserves the first writer's `createdAt` atomically regardless of how many concurrent requests arrive. Both responses will contain the same canonical `createdAt`. _(Previously a race condition; resolved by the atomic UpdateItem approach in this PR.)_
 
 ---
 
@@ -323,7 +323,7 @@
 
 ## Risk areas
 
-1. **Concurrent first-write race on `CreatedAt` (TC-013)**: The `update-photographer` handler does `GetItem` → `PutItem` with no DynamoDB conditional expression. Two simultaneous first-time PUTs for the same photographer will both read "not found", both call `time.Now()` independently, and both write with potentially different `createdAt` values. Whichever write lands last in DynamoDB wins, but the caller that "won" the PutItem will have returned a `createdAt` that is now stale. This is a correctness bug for photographers who trigger the profile initialisation race. Developer should add a `ConditionExpression: attribute_not_exists(id)` on the create path and handle the resulting `ConditionalCheckFailedException` as a benign "already created" case.
+1. ~~**Concurrent first-write race on `CreatedAt` (TC-013)**~~: Resolved. The handler uses a single atomic `UpdateItem` with `SET createdAt = if_not_exists(createdAt, :ca)` — DynamoDB guarantees the first writer's timestamp is preserved regardless of concurrency. No `GetItem` + `PutItem` round-trip exists.
 
 2. **Empty-string `DefaultCurrency` bypasses ISO 4217 validation (TC-003)**: The `validate()` function explicitly skips validation when `DefaultCurrency == ""`. The story's intent (AC9, tech note "ISO 4217") implies the field should be required or validated on every PUT. An empty currency code persisted to DynamoDB will surface as a blank or broken currency display anywhere bank transfer details are shown to runners (Journey 3, step 2). Developer should decide whether to require the field or accept empty-as-unset and document the decision.
 
