@@ -6,6 +6,8 @@
 # permanent password immediately, bypassing the FORCE_CHANGE_PASSWORD state.
 # The photographer can log in straight away with the password entered here.
 #
+# If the user already exists you will be asked whether to update their password.
+#
 # No email is sent by Cognito — communicate the password to the photographer
 # through a secure channel of your choice.
 #
@@ -14,7 +16,8 @@
 #
 # Prerequisites:
 #   - AWS CLI configured with a profile that has the following permissions:
-#       ssm:GetParameter        on /racephotos/env/{env}/user-pool-id
+#       ssm:GetParameter            on /racephotos/env/{env}/user-pool-id
+#       cognito-idp:AdminGetUser
 #       cognito-idp:AdminCreateUser
 #       cognito-idp:AdminSetUserPassword
 #   - The target environment must already be deployed (AuthStack must exist so
@@ -30,11 +33,9 @@ set -euo pipefail
 
 # ── Prompts ──────────────────────────────────────────────────────────────────
 
-read -r -p "Photographer email:              " EMAIL
-read -r -p "AWS profile:                     " PROFILE
+read -r -p "Photographer email:                " EMAIL
+read -r -p "AWS profile:                       " PROFILE
 read -r -p "Environment (dev/qa/staging/prod): " ENV
-read -r -s -p "Permanent password:              " PERM_PASS
-echo
 
 # ── Resolve User Pool ID from SSM ────────────────────────────────────────────
 
@@ -48,34 +49,71 @@ USER_POOL_ID=$(aws ssm get-parameter \
 
 echo "User Pool: ${USER_POOL_ID}"
 
-# ── Create the user (no email sent) ──────────────────────────────────────────
+# ── Check if user already exists ─────────────────────────────────────────────
+
+USER_EXISTS=false
+if aws cognito-idp admin-get-user \
+     --user-pool-id "$USER_POOL_ID" \
+     --username "$EMAIL" \
+     --profile "$PROFILE" \
+     > /dev/null 2>&1; then
+  USER_EXISTS=true
+fi
+
+if $USER_EXISTS; then
+  echo "User ${EMAIL} already exists."
+  read -r -p "Update their password? [y/N] " CONFIRM
+  if [[ ! "$CONFIRM" =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 0
+  fi
+fi
+
+# ── Prompt for password ───────────────────────────────────────────────────────
+# Prompted after the existence check so a re-run after a failed password
+# attempt does not require re-entering email/profile/environment first.
+
+read -r -s -p "Permanent password: " PERM_PASS
+echo
+
+# ── Create the user if needed ────────────────────────────────────────────────
 # --message-action SUPPRESS prevents Cognito from sending a temporary-password
 # email. The user is created in FORCE_CHANGE_PASSWORD state; the next command
 # immediately promotes it to CONFIRMED.
 
-echo "Creating user ${EMAIL}..."
-
-aws cognito-idp admin-create-user \
-  --user-pool-id "$USER_POOL_ID" \
-  --username "$EMAIL" \
-  --user-attributes \
-      Name=email,Value="$EMAIL" \
-      Name=email_verified,Value=true \
-  --message-action SUPPRESS \
-  --profile "$PROFILE"
+if ! $USER_EXISTS; then
+  echo "Creating user ${EMAIL}..."
+  aws cognito-idp admin-create-user \
+    --user-pool-id "$USER_POOL_ID" \
+    --username "$EMAIL" \
+    --user-attributes \
+        Name=email,Value="$EMAIL" \
+        Name=email_verified,Value=true \
+    --message-action SUPPRESS \
+    --profile "$PROFILE"
+fi
 
 # ── Set permanent password (moves user to CONFIRMED) ─────────────────────────
 # Without this step the user would be stuck in FORCE_CHANGE_PASSWORD and
 # blocked from logging in until they complete a change-password flow.
+# If this fails (e.g. password does not meet the policy) the user account
+# will already exist, and re-running the script will offer to update the
+# password without attempting to recreate the account.
 
 echo "Setting permanent password..."
-
-aws cognito-idp admin-set-user-password \
-  --user-pool-id "$USER_POOL_ID" \
-  --username "$EMAIL" \
-  --password "$PERM_PASS" \
-  --permanent \
-  --profile "$PROFILE"
+if ! aws cognito-idp admin-set-user-password \
+       --user-pool-id "$USER_POOL_ID" \
+       --username "$EMAIL" \
+       --password "$PERM_PASS" \
+       --permanent \
+       --profile "$PROFILE"; then
+  echo ""
+  echo "ERROR: failed to set password for ${EMAIL}."
+  echo "The user account was created (or already existed)."
+  echo "Re-run this script to try a different password — you will be asked"
+  echo "whether to update the existing user rather than recreating them."
+  exit 1
+fi
 
 echo ""
 echo "Done. ${EMAIL} is confirmed in ${ENV} and can log in immediately."
