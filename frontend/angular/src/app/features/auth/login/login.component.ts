@@ -102,10 +102,11 @@ export class LoginComponent implements OnInit, OnDestroy {
       return;
     }
     this.submitting.set(true);
+    const { email, password } = this.form.getRawValue();
     this.store.dispatch(
       AuthActions.signIn({
-        username: this.form.value.email!,
-        password: this.form.value.password!,
+        username: email ?? '',
+        password: password ?? '',
       }),
     );
   }

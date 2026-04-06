@@ -29,13 +29,12 @@ test.describe('RS-004 — Login page', () => {
 
   test('AC3 — submitting empty form shows validation errors', async ({ page }) => {
     await page.goto('/login');
-    // Click sign in without filling in fields
+    // Submit without filling in any fields — markAllAsTouched() triggers touched state
     await page.getByRole('button', { name: /sign in/i }).click();
-    // Touch fields to trigger errors
-    await page.getByLabel('Email address').click();
-    await page.locator('input[autocomplete="current-password"]').click();
-    await page.getByRole('button', { name: /sign in/i }).focus();
-    // Check form is still present (did not navigate)
+    // Validation errors must be visible (template uses touched, not dirty)
+    await expect(page.getByText('Email address is required.')).toBeVisible();
+    await expect(page.getByText('Password is required.')).toBeVisible();
+    // Form must remain on page (no navigation)
     await expect(page.getByLabel('Email address')).toBeVisible();
   });
 

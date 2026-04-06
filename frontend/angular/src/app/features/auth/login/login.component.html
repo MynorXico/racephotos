@@ -8,9 +8,9 @@
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Email address</mat-label>
           <input matInput type="email" autocomplete="email" formControlName="email" cdkFocusInitial />
-          @if (form.get('email')?.hasError('required') && form.get('email')?.dirty) {
+          @if (form.get('email')?.hasError('required') && form.get('email')?.touched) {
           <mat-error>Email address is required.</mat-error>
-          } @else if (form.get('email')?.hasError('email') && form.get('email')?.dirty) {
+          } @else if (form.get('email')?.hasError('email') && form.get('email')?.touched) {
           <mat-error>Enter a valid email address.</mat-error>
           }
         </mat-form-field>
@@ -33,9 +33,9 @@
           >
             <mat-icon>{{ showPassword() ? 'visibility' : 'visibility_off' }}</mat-icon>
           </button>
-          @if (form.get('password')?.hasError('required') && form.get('password')?.dirty) {
+          @if (form.get('password')?.hasError('required') && form.get('password')?.touched) {
           <mat-error>Password is required.</mat-error>
-          } @else if (form.get('password')?.hasError('minlength') && form.get('password')?.dirty) {
+          } @else if (form.get('password')?.hasError('minlength') && form.get('password')?.touched) {
           <mat-error>Password must be at least 8 characters.</mat-error>
           }
         </mat-form-field>

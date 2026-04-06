@@ -3,6 +3,7 @@ import { applicationConfig } from '@storybook/angular';
 import { provideRouter } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { provideMockStore } from '@ngrx/store/testing';
+import { userEvent, within } from '@storybook/test';
 import { initialAuthState } from '../../../store/auth/auth.state';
 import { LoginComponent } from './login.component';
 
@@ -26,7 +27,10 @@ type Story = StoryObj<LoginComponent>;
 export const Default: Story = {};
 
 export const Submitting: Story = {
-  play: async ({ canvasElement: _ }) => {
-    // Simulated state — submitting signal set to true via component interaction
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByLabelText(/email address/i), 'test@example.com');
+    await userEvent.type(canvas.getByLabelText(/password/i), 'password123');
+    await userEvent.click(canvas.getByRole('button', { name: /sign in/i }));
   },
 };
