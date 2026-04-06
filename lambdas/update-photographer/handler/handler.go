@@ -13,7 +13,13 @@ import (
 	"github.com/racephotos/shared/models"
 )
 
-const maxDisplayNameLength = 100
+const (
+	maxDisplayNameLength      = 100
+	maxBankNameLength         = 100
+	maxBankAccountHolderLen   = 100
+	maxBankAccountNumberLen   = 50
+	maxBankInstructionsLength = 500
+)
 
 // validCurrencies is the curated list of supported ISO 4217 currency codes.
 var validCurrencies = map[string]bool{
@@ -102,6 +108,18 @@ func validate(req updateRequest) error {
 	if !validCurrencies[req.DefaultCurrency] {
 		return fmt.Errorf("unsupported currency code %q — must be one of USD, EUR, GBP, GTQ, MXN, CAD, AUD, BRL",
 			req.DefaultCurrency)
+	}
+	if len(req.BankName) > maxBankNameLength {
+		return fmt.Errorf("bankName must not exceed %d characters", maxBankNameLength)
+	}
+	if len(req.BankAccountHolder) > maxBankAccountHolderLen {
+		return fmt.Errorf("bankAccountHolder must not exceed %d characters", maxBankAccountHolderLen)
+	}
+	if len(req.BankAccountNumber) > maxBankAccountNumberLen {
+		return fmt.Errorf("bankAccountNumber must not exceed %d characters", maxBankAccountNumberLen)
+	}
+	if len(req.BankInstructions) > maxBankInstructionsLength {
+		return fmt.Errorf("bankInstructions must not exceed %d characters", maxBankInstructionsLength)
 	}
 	return nil
 }

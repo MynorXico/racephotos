@@ -47,6 +47,18 @@ func bodyWithDisplayName(displayName, currency string) string {
 	return string(b)
 }
 
+func bodyWithBank(bankName, bankAccountHolder, bankAccountNumber, bankInstructions string) string {
+	b, _ := json.Marshal(map[string]string{
+		"displayName":       "Test Photographer",
+		"defaultCurrency":   "USD",
+		"bankName":          bankName,
+		"bankAccountHolder": bankAccountHolder,
+		"bankAccountNumber": bankAccountNumber,
+		"bankInstructions":  bankInstructions,
+	})
+	return string(b)
+}
+
 func stubProfile(id string) *models.Photographer {
 	return &models.Photographer{
 		ID:              id,
@@ -127,6 +139,30 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:     "invalid currency code — returns 400",
 			event:    makeEvent("user-7", validBody("XYZ")),
+			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
+			wantCode: 400,
+		},
+		{
+			name:     "bankName exceeds 100 chars — returns 400",
+			event:    makeEvent("user-9a", bodyWithBank(strings.Repeat("b", 101), "", "", "")),
+			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
+			wantCode: 400,
+		},
+		{
+			name:     "bankAccountHolder exceeds 100 chars — returns 400",
+			event:    makeEvent("user-9b", bodyWithBank("", strings.Repeat("c", 101), "", "")),
+			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
+			wantCode: 400,
+		},
+		{
+			name:     "bankAccountNumber exceeds 50 chars — returns 400",
+			event:    makeEvent("user-9c", bodyWithBank("", "", strings.Repeat("d", 51), "")),
+			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
+			wantCode: 400,
+		},
+		{
+			name:     "bankInstructions exceeds 500 chars — returns 400",
+			event:    makeEvent("user-9d", bodyWithBank("", "", "", strings.Repeat("e", 501))),
 			mockFn:   func(m *mocks.MockPhotographerUpserter) {},
 			wantCode: 400,
 		},
