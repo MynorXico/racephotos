@@ -46,8 +46,10 @@ interface PhotographerConstructProps {
  *   - update-photographer : dynamodb:UpdateItem on photographersTable
  *                           (if_not_exists(createdAt) preserves CreatedAt — no pre-fetch needed)
  *
- * Both Lambdas inherit the HTTP API's default JWT authorizer automatically —
- * no explicit authorizer override is needed.
+ * Authorization:
+ *   Both routes explicitly attach the Cognito JWT authorizer imported from
+ *   httpAuthorizerId (stored in SSM by ApiConstruct). HTTP API v2 has no
+ *   API-level default authorizer — authorization is always set per route.
  *
  * AC: RS-004
  */
