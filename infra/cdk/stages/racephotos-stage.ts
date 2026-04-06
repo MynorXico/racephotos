@@ -63,11 +63,15 @@ export class RacePhotosStage extends cdk.Stage {
     // ensures AuthStack (which writes those SSM params) deploys first.
     // PhotographerStack — RS-004
     // GET + PUT /photographer/me. Depends on StorageStack (table) and AuthStack (API).
+    //
+    // The HTTP API ID is read from SSM inside PhotographerStack (not passed as a CDK
+    // object reference) to break the cross-stack cyclic dependency:
+    //   PhotographerStack → AuthStack  (via api.httpApi CDK object prop)
+    //   AuthStack → PhotographerStack  (via route integration referencing Lambda ARN)
     const photographerStack = new PhotographerStack(this, 'Photographer', {
       env: props.env,
       config,
       db: storage.db,
-      api: auth.api,
     });
     photographerStack.addDependency(storage);
     photographerStack.addDependency(auth);

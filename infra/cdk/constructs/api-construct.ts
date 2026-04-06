@@ -1,6 +1,5 @@
 import * as cdk from 'aws-cdk-lib';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
-import * as authorizers from 'aws-cdk-lib/aws-apigatewayv2-authorizers';
 import * as ssm from 'aws-cdk-lib/aws-ssm';
 import { Construct } from 'constructs';
 
@@ -16,9 +15,11 @@ interface ApiConstructProps {
  * ApiConstruct
  *
  * Creates:
- *   - HTTP API `racephotos-api` with Cognito JWT default authorizer
- *   - SSM parameter `/racephotos/env/{envName}/api-url` — consumed by
- *     FrontendConstruct to inject apiBaseUrl into config.json
+ *   - HTTP API `racephotos-api`
+ *   - JWT authorizer backed by the Cognito User Pool
+ *   - SSM parameter `/racephotos/env/{envName}/api-url`       — FrontendConstruct
+ *   - SSM parameter `/racephotos/env/{envName}/api-id`        — feature stacks (PhotographerStack, …)
+ *   - SSM parameter `/racephotos/env/{envName}/api-authorizer-id` — feature stacks that need auth
  *
  * CORS origins:
  *   - Custom domain set (config.domainName !== "none"): locked to that origin.
@@ -28,13 +29,28 @@ interface ApiConstructProps {
  *     pipeline self-mutates and tightens CORS to the real domain on the next
  *     synth run (generate-cdk-context.sh pre-populates the lookup cache).
  *
- * Routes are added per Lambda story (photo-upload, search, payment, …).
- * The default authorizer is applied automatically to every route added later.
+ * Authorization pattern for feature stacks:
+ *   Feature stacks import the HTTP API by ID (via api-id SSM param) and the
+ *   Cognito JWT authorizer by ID (via api-authorizer-id SSM param). Both are
+ *   read with valueForStringParameter (resolved at CloudFormation deploy time,
+ *   not at CDK synth time) to avoid cross-stack cyclic dependencies.
+ *
+ *   ⚠️  Routes that must be UNAUTHENTICATED (runner-facing) must explicitly
+ *   pass `new HttpNoneAuthorizer()` as the route's authorizer:
+ *     - GET  /events/{eventId}/photos?bib={bib}  (bib search — RS-006)
+ *     - POST /purchases                          (purchase claim — RS-007)
+ *     - GET  /purchases/{id}/download            (download link — RS-007)
+ *
+ *   ⚠️  Routes that must be AUTHENTICATED (photographer-facing) must pass
+ *   the IHttpRouteAuthorizer built from the api-authorizer-id SSM param
+ *   (see PhotographerConstruct for the pattern).
  */
 export class ApiConstruct extends Construct {
   readonly httpApi: apigatewayv2.HttpApi;
   /** Full HTTPS URL of the API Gateway stage endpoint. */
   readonly apiUrl: string;
+  /** Cognito JWT authorizer ID — store in SSM for feature stacks. */
+  readonly authorizerId: string;
 
   constructor(scope: Construct, id: string, props: ApiConstructProps) {
     super(scope, id);
@@ -71,8 +87,9 @@ export class ApiConstruct extends Construct {
         : [`https://${frontendDomain}`];
     }
 
-    const jwtIssuer = `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${cognitoConstruct.userPoolId}`;
-
+    // Create the HTTP API without a defaultAuthorizer — authorization is set
+    // explicitly on every route. This keeps AuthStack independent of the route
+    // stacks (PhotographerStack, etc.) and avoids cross-stack cyclic dependencies.
     this.httpApi = new apigatewayv2.HttpApi(this, 'HttpApi', {
       apiName: 'racephotos-api',
       corsPreflight: {
@@ -80,19 +97,25 @@ export class ApiConstruct extends Construct {
         allowMethods: [apigatewayv2.CorsHttpMethod.ANY],
         allowHeaders: ['Content-Type', 'Authorization'],
       },
-      // ⚠️  defaultAuthorizer applies to EVERY route added to this API.
-      // Routes that must be UNAUTHENTICATED (runner-facing) must explicitly
-      // override this with `authorizationType: HttpNoneAuthorizer`:
-      //   - GET  /events/{eventId}/photos?bib={bib}  (bib search — RS-006)
-      //   - POST /purchases                          (purchase claim — RS-007)
-      //   - GET  /purchases/{id}/download            (download link — RS-007)
-      // All photographer-facing routes (upload, event mgmt) rely on the default.
-      defaultAuthorizer: new authorizers.HttpJwtAuthorizer('CognitoAuthorizer', jwtIssuer, {
-        jwtAudience: [cognitoConstruct.clientId],
-      }),
     });
 
     this.apiUrl = this.httpApi.apiEndpoint;
+
+    // Create the JWT authorizer explicitly so the AWS::ApiGatewayV2::Authorizer
+    // resource is always present in AuthStack — regardless of which routes exist.
+    // Using HttpAuthorizer (L2) rather than HttpJwtAuthorizer (higher-level helper)
+    // because HttpJwtAuthorizer binds lazily (only when addRoutes() is called) and
+    // that call no longer happens in AuthStack after the cyclic-dependency refactor.
+    const jwtIssuer = `https://cognito-idp.${cdk.Stack.of(this).region}.amazonaws.com/${cognitoConstruct.userPoolId}`;
+    const jwtAuthorizer = new apigatewayv2.HttpAuthorizer(this, 'CognitoJwtAuthorizer', {
+      httpApi: this.httpApi,
+      authorizerName: 'CognitoJwtAuthorizer',
+      type: apigatewayv2.HttpAuthorizerType.JWT,
+      identitySource: ['$request.header.Authorization'],
+      jwtAudience: [cognitoConstruct.clientId],
+      jwtIssuer,
+    });
+    this.authorizerId = jwtAuthorizer.authorizerId;
 
     // Store API URL in SSM so the pipeline can inject it into config.json
     // without creating a circular dependency between AuthStack and FrontendStack.
@@ -100,6 +123,23 @@ export class ApiConstruct extends Construct {
       parameterName: `/racephotos/env/${config.envName}/api-url`,
       stringValue: this.apiUrl,
       description: `RaceShots API Gateway base URL — ${config.envName}`,
+    });
+
+    // Store API ID in SSM so downstream stacks (e.g. PhotographerStack) can
+    // import the HTTP API by ID via valueForStringParameter — avoiding a direct
+    // CDK object reference that would create a cross-stack cyclic dependency.
+    new ssm.StringParameter(this, 'ApiIdParameter', {
+      parameterName: `/racephotos/env/${config.envName}/api-id`,
+      stringValue: this.httpApi.apiId,
+      description: `RaceShots API Gateway ID — ${config.envName}`,
+    });
+
+    // Store the JWT authorizer ID in SSM so downstream stacks can attach it to
+    // routes without a CDK cross-stack token (which would recreate the cyclic dep).
+    new ssm.StringParameter(this, 'ApiAuthorizerIdParameter', {
+      parameterName: `/racephotos/env/${config.envName}/api-authorizer-id`,
+      stringValue: this.authorizerId,
+      description: `RaceShots API Gateway Cognito JWT authorizer ID — ${config.envName}`,
     });
   }
 }

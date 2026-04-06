@@ -290,15 +290,22 @@ describe('ApiConstruct', () => {
     });
   });
 
-  test('HTTP API has exactly one authorizer resource bound', () => {
-    // CDK materializes AWS::ApiGatewayV2::Authorizer only when a route is attached.
-    // With no routes in RS-002 the resource count is 0 — verified here so that a
-    // future story (RS-004+) adding a route cannot accidentally increase this count
-    // without an explicit assertion update.
-    // Full AuthorizerType + JwtConfiguration.Audience assertions are added in RS-004
-    // when the first photographer-facing route is attached.
+  test('HTTP API has exactly one JWT authorizer resource', () => {
+    // RS-004 fix: ApiConstruct now creates HttpAuthorizer explicitly (L2 construct)
+    // rather than relying on HttpJwtAuthorizer binding lazily via addRoutes().
+    // This ensures the AWS::ApiGatewayV2::Authorizer resource is always present
+    // in AuthStack — regardless of which route stacks have been deployed.
     const t = makeTemplate(devConfig);
-    t.resourceCountIs('AWS::ApiGatewayV2::Authorizer', 0);
+    t.resourceCountIs('AWS::ApiGatewayV2::Authorizer', 1);
+    t.hasResourceProperties('AWS::ApiGatewayV2::Authorizer', {
+      AuthorizerType: 'JWT',
+      Name: 'CognitoJwtAuthorizer',
+      IdentitySource: ['$request.header.Authorization'],
+      JwtConfiguration: {
+        Audience: [Match.anyValue()],
+        Issuer: Match.anyValue(),
+      },
+    });
   });
 
   // TC-006: CORS AllowOrigins is exactly one element — the custom domain, no wildcard leak.
@@ -346,12 +353,15 @@ describe('ApiConstruct', () => {
     });
   });
 
-  // TC-013: AuthStack has exactly 3 SSM parameters — api-url (ApiConstruct) +
-  // user-pool-id + client-id (CognitoConstruct). FrontendConstruct reads all three
-  // via valueFromLookup, avoiding cross-stack CDK tokens in Source.jsonData.
-  test('AuthStack creates exactly three SSM parameters', () => {
+  // TC-013: AuthStack has exactly 5 SSM parameters:
+  //   api-url + api-id + api-authorizer-id (ApiConstruct)
+  //   user-pool-id + client-id (CognitoConstruct)
+  // FrontendConstruct reads three via valueFromLookup; PhotographerStack reads
+  // api-id and api-authorizer-id via valueForStringParameter (no cross-stack
+  // CDK token dependency — RS-004 cyclic-dependency fix).
+  test('AuthStack creates exactly five SSM parameters', () => {
     const t = makeTemplate(devConfig);
-    t.resourceCountIs('AWS::SSM::Parameter', 3);
+    t.resourceCountIs('AWS::SSM::Parameter', 5);
   });
 
   test('CognitoConstruct stores user-pool-id in SSM at correct path', () => {
