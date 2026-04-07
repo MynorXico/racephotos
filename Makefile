@@ -28,11 +28,14 @@ test-integration:
 	done
 
 # Build all Lambda binaries (linux/amd64 for Lambda runtime)
+# Each Lambda is built in a subshell so a failure exits immediately (|| exit 1)
+# and the working directory is never left in a corrupted state.
+# CGO_ENABLED=0 ensures static linking — avoids GLIBC version mismatches on AL2023.
 build:
 	@for lambda in $(LAMBDAS); do \
 		if [ -d lambdas/$$lambda ]; then \
 			echo "==> build: $$lambda"; \
-			cd lambdas/$$lambda && GOOS=linux GOARCH=amd64 go build -o bootstrap . && cd ../..; \
+			(cd lambdas/$$lambda && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bootstrap .) || exit 1; \
 		fi \
 	done
 
