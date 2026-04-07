@@ -13,6 +13,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Store } from '@ngrx/store';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Subject, takeUntil, filter } from 'rxjs';
+import { Actions, ofType } from '@ngrx/effects';
 import { MatCardModule } from '@angular/material/card';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
@@ -57,6 +58,7 @@ import { EventArchiveDialogComponent } from '../event-archive-dialog/event-archi
 })
 export class EventDetailComponent implements OnInit, OnDestroy {
   private readonly store = inject(Store);
+  private readonly actions$ = inject(Actions);
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
@@ -92,13 +94,10 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       }
     });
 
-    // Show snackbar on archive success.
-    this.store
-      .select(selectSelectedEvent)
-      .pipe(
-        filter((e) => e?.status === 'archived'),
-        takeUntil(this.destroy$),
-      )
+    // Show snackbar only when the archive action succeeds (not on initial page load
+    // of an already-archived event, which the state-based subscription would trigger).
+    this.actions$
+      .pipe(ofType(EventsActions.archiveEventSuccess), takeUntil(this.destroy$))
       .subscribe(() => {
         this.snackBar.open('Event archived. It is no longer visible in the public listing.', undefined, {
           duration: 5000,
@@ -106,18 +105,14 @@ export class EventDetailComponent implements OnInit, OnDestroy {
       });
 
     // Show snackbar on archive failure.
-    this.store
-      .select(selectEventsError)
-      .pipe(
-        filter((e): e is string => e !== null),
-        takeUntil(this.destroy$),
-      )
-      .subscribe((error) => {
-        if (error === 'forbidden' || error.includes('archive')) {
-          this.snackBar.open('Could not archive the event. Please try again.', undefined, {
-            duration: 6000,
-          });
-        }
+    this.actions$
+      .pipe(ofType(EventsActions.archiveEventFailure), takeUntil(this.destroy$))
+      .subscribe(({ error }) => {
+        const message =
+          error === 'forbidden'
+            ? "You don't have permission to archive this event."
+            : 'Could not archive the event. Please try again.';
+        this.snackBar.open(message, undefined, { duration: 6000 });
       });
   }
 

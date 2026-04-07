@@ -3,6 +3,8 @@ import { ActivatedRoute } from '@angular/router';
 import { RouterTestingModule } from '@angular/router/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
+import { provideMockActions } from '@ngrx/effects/testing';
+import { ReplaySubject } from 'rxjs';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialogModule } from '@angular/material/dialog';
 import { of } from 'rxjs';
@@ -31,6 +33,7 @@ const mockEvent: Event = {
 
 describe('EventDetailComponent', () => {
   let store: MockStore;
+  const actions$ = new ReplaySubject(1);
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
@@ -43,6 +46,7 @@ describe('EventDetailComponent', () => {
       ],
       providers: [
         provideMockStore({ initialState: { events: initialEventsState } }),
+        provideMockActions(() => actions$),
         {
           provide: ActivatedRoute,
           useValue: {

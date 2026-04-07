@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"regexp"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -17,7 +16,11 @@ import (
 	"github.com/racephotos/shared/models"
 )
 
-var dateRegex = regexp.MustCompile(`^\d{4}-\d{2}-\d{2}$`)
+const (
+	maxNameLen          = 200
+	maxLocationLen      = 200
+	maxWatermarkTextLen = 200
+)
 
 // EventCreator abstracts PutItem for the events table.
 type EventCreator interface {
@@ -82,10 +85,14 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 	}
 
-	// Default watermarkText.
+	// Default watermarkText. Truncate to maxWatermarkTextLen in case the event
+	// name is very long (the suffix adds ~30 characters).
 	watermarkText := req.WatermarkText
 	if watermarkText == "" {
 		watermarkText = req.Name + " · racephotos.example.com"
+		if len(watermarkText) > maxWatermarkTextLen {
+			watermarkText = watermarkText[:maxWatermarkTextLen]
+		}
 	}
 
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -122,17 +129,26 @@ func validateCreateRequest(req createEventRequest) error {
 	if req.Name == "" {
 		return fmt.Errorf("name is required")
 	}
+	if len(req.Name) > maxNameLen {
+		return fmt.Errorf("name must be %d characters or fewer", maxNameLen)
+	}
 	if req.Date == "" {
 		return fmt.Errorf("date is required")
 	}
-	if !dateRegex.MatchString(req.Date) {
-		return fmt.Errorf("date must be ISO 8601 format YYYY-MM-DD")
+	if _, err := time.Parse("2006-01-02", req.Date); err != nil {
+		return fmt.Errorf("date must be a valid ISO 8601 date (YYYY-MM-DD)")
 	}
 	if req.Location == "" {
 		return fmt.Errorf("location is required")
 	}
+	if len(req.Location) > maxLocationLen {
+		return fmt.Errorf("location must be %d characters or fewer", maxLocationLen)
+	}
 	if req.PricePerPhoto < 0 {
 		return fmt.Errorf("pricePerPhoto must be non-negative")
+	}
+	if req.WatermarkText != "" && len(req.WatermarkText) > maxWatermarkTextLen {
+		return fmt.Errorf("watermarkText must be %d characters or fewer", maxWatermarkTextLen)
 	}
 	return nil
 }
