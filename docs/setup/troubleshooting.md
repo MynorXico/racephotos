@@ -4,6 +4,49 @@ Solutions to known issues encountered during setup and development.
 
 ---
 
+## Docker / LocalStack issues
+
+### `docker-compose up` fails with `KeyError: 'ContainerConfig'`
+
+**Symptom**
+
+```
+ERROR: for racephotos-localstack  'ContainerConfig'
+...
+KeyError: 'ContainerConfig'
+```
+
+**Cause**
+`docker-compose` v1 (the old Python-based CLI, typically v1.29.x) is
+incompatible with Docker Engine 25+. Newer Docker Engine versions removed
+`ContainerConfig` from image inspect output, which v1 relied on.
+
+**Fix**
+Use Docker Compose v2 (`docker compose`, no hyphen). It ships as a Docker CLI
+plugin and does not have this issue:
+
+```bash
+docker compose up -d
+```
+
+If v2 is not installed:
+
+```bash
+sudo apt-get update --allow-releaseinfo-change
+sudo apt-get install docker-compose-plugin
+docker compose version   # verify
+```
+
+All `docker-compose` commands in this repo should be run as `docker compose`
+(v2). If you want the old command name to keep working, add an alias:
+
+```bash
+echo "alias docker-compose='docker compose'" >> ~/.bashrc
+source ~/.bashrc
+```
+
+---
+
 ## CDK / Synth issues
 
 ### "No stacks match the name(s) RacePhotosPipeline"

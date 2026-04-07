@@ -1,0 +1,39 @@
+{
+  "version": "2.0",
+  "routeKey": "PUT /photographer/me",
+  "rawPath": "/photographer/me",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "requestContext": {
+    "accountId": "000000000000",
+    "apiId": "local",
+    "domainName": "localhost",
+    "domainPrefix": "localhost",
+    "http": {
+      "method": "PUT",
+      "path": "/photographer/me",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "local-debug"
+    },
+    "requestId": "local-req-002",
+    "routeKey": "PUT /photographer/me",
+    "stage": "$default",
+    "time": "06/Apr/2026:00:00:00 +0000",
+    "timeEpoch": 1743897600000,
+    "authorizer": {
+      "jwt": {
+        "claims": {
+          "sub": "test-photographer-001",
+          "email": "photographer@example.com",
+          "token_use": "access"
+        },
+        "scopes": null
+      }
+    }
+  },
+  "body": "{\"displayName\": \"Test Photographer\", \"defaultCurrency\": \"XYZ\"}",
+  "isBase64Encoded": false
+}

@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  RaceShots — SAM template for local Lambda debugging.
+  Not used for deployment (CDK owns infra). Use this to run Lambdas locally
+  against LocalStack via `make invoke-<lambda> EVENT=<event-file-stem>`.
+
+  Prerequisites:
+    docker compose up -d
+    make seed-local
+    pip install aws-sam-cli  # if not installed
+
+  Usage:
+    make invoke-get-photographer EVENT=get-existing
+    make invoke-update-photographer EVENT=update-valid
+
+Globals:
+  Function:
+    Runtime: provided.al2023
+    Architectures:
+      - x86_64
+    # Matches CDK PhotographerConstruct memorySize.
+    MemorySize: 256
+    # CDK default timeout is 3 s. Extended to 30 s here so LocalStack latency
+    # does not cause spurious timeouts during debugging. Lower to 3 to test
+    # timeout behaviour.
+    Timeout: 30
+    Environment:
+      Variables:
+        RACEPHOTOS_ENV: local
+        # SAM runs in Docker; reach LocalStack via the compose network name.
+        # The compose project name is `racephotos` (directory name) so the
+        # network is `racephotos_default` and the container DNS name is
+        # `racephotos-localstack`.
+        AWS_ENDPOINT_URL: http://racephotos-localstack:4566
+        AWS_ACCESS_KEY_ID: test
+        AWS_SECRET_ACCESS_KEY: test
+        AWS_REGION: us-east-1
+
+Resources:
+  GetPhotographerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-get-photographer-local
+      Handler: bootstrap
+      CodeUri: lambdas/get-photographer/
+      Environment:
+        Variables:
+          RACEPHOTOS_PHOTOGRAPHERS_TABLE: racephotos-photographers
+
+  UpdatePhotographerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-update-photographer-local
+      Handler: bootstrap
+      CodeUri: lambdas/update-photographer/
+      Environment:
+        Variables:
+          RACEPHOTOS_PHOTOGRAPHERS_TABLE: racephotos-photographers
