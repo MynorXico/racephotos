@@ -18,7 +18,7 @@ test-unit:
 		cd lambdas/shared && go test ./... -count=1 && cd ../..; \
 	fi
 
-# Integration tests — requires LocalStack running (docker-compose up -d)
+# Integration tests — requires LocalStack running (docker compose up -d)
 test-integration:
 	@for lambda in $(LAMBDAS); do \
 		if [ -d lambdas/$$lambda/test/integration ]; then \
