@@ -1,0 +1,40 @@
+.event-create-container {
+  max-width: 720px;
+  padding: 24px;
+}
+
+h1 {
+  margin-bottom: 24px;
+}
+
+.event-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.action-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+@media (max-width: 600px) {
+  .event-create-container {
+    max-width: 100%;
+    padding: 16px;
+  }
+
+  .action-row {
+    flex-direction: column-reverse;
+
+    button {
+      width: 100%;
+    }
+  }
+}

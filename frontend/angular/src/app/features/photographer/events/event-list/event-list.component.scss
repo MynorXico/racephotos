@@ -1,0 +1,142 @@
+.event-list-container {
+  max-width: 960px;
+  padding: 24px;
+  position: relative;
+}
+
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.filter-row {
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.shimmer-container {
+  .shimmer-row {
+    height: 52px;
+    margin-bottom: 2px;
+    border-radius: 4px;
+  }
+
+  @keyframes shimmer {
+    0% { background-position: -400px 0; }
+    100% { background-position: 400px 0; }
+  }
+
+  .loading-shimmer {
+    background: linear-gradient(
+      90deg,
+      var(--mat-sys-surface-variant) 25%,
+      color-mix(in srgb, var(--mat-sys-surface-variant), white 20%) 50%,
+      var(--mat-sys-surface-variant) 75%
+    );
+    background-size: 800px 100%;
+    animation: shimmer 1.5s infinite linear;
+  }
+}
+
+.error-state,
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 24px;
+  gap: 16px;
+  text-align: center;
+
+  .state-icon {
+    font-size: 72px;
+    width: 72px;
+    height: 72px;
+    color: var(--mat-sys-on-surface-variant);
+  }
+
+  .error-icon {
+    color: var(--mat-sys-error);
+  }
+
+  .empty-subtitle {
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.events-table {
+  width: 100%;
+}
+
+.event-row {
+  cursor: pointer;
+
+  &:hover {
+    background-color: var(--mat-sys-surface-variant);
+  }
+}
+
+.event-link {
+  text-decoration: none;
+  color: var(--mat-sys-primary);
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.status-chip {
+  pointer-events: none;
+  user-select: none;
+
+  &.status-active {
+    background-color: var(--mat-sys-tertiary-container);
+    color: var(--mat-sys-on-tertiary-container);
+  }
+
+  &.status-archived {
+    background-color: var(--mat-sys-surface-variant);
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.pagination-row {
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 0;
+}
+
+// Desktop-only create button, mobile FAB shown via media query
+.create-fab-mobile {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .create-btn-desktop {
+    display: none;
+  }
+
+  .create-fab-mobile {
+    display: flex;
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 100;
+  }
+
+  .location-col,
+  .price-col {
+    display: none;
+  }
+
+  .archive-btn {
+    display: none;
+  }
+
+  .filter-row {
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+}

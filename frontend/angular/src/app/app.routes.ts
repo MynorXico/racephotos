@@ -25,8 +25,29 @@ export const routes: Routes = [
       {
         path: 'events',
         loadComponent: () =>
-          import('./features/photographer/events-placeholder/events-placeholder.component').then(
-            (m) => m.EventsPlaceholderComponent,
+          import('./features/photographer/events/event-list/event-list.component').then(
+            (m) => m.EventListComponent,
+          ),
+      },
+      {
+        path: 'events/new',
+        loadComponent: () =>
+          import('./features/photographer/events/event-create/event-create.component').then(
+            (m) => m.EventCreateComponent,
+          ),
+      },
+      {
+        path: 'events/:id/edit',
+        loadComponent: () =>
+          import('./features/photographer/events/event-edit/event-edit.component').then(
+            (m) => m.EventEditComponent,
+          ),
+      },
+      {
+        path: 'events/:id',
+        loadComponent: () =>
+          import('./features/photographer/events/event-detail/event-detail.component').then(
+            (m) => m.EventDetailComponent,
           ),
       },
       {

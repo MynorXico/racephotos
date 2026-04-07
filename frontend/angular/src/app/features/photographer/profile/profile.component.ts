@@ -40,22 +40,12 @@ import {
   selectWasAutoInitialized,
 } from '../../../store/photographer/photographer.selectors';
 import { Photographer } from '../../../store/photographer/photographer.state';
+import {
+  SUPPORTED_CURRENCIES,
+  CurrencyOption,
+} from '../shared/currencies.constants';
 
-export interface CurrencyOption {
-  code: string;
-  name: string;
-}
-
-export const SUPPORTED_CURRENCIES: readonly CurrencyOption[] = [
-  { code: 'USD', name: 'US Dollar' },
-  { code: 'EUR', name: 'Euro' },
-  { code: 'GBP', name: 'British Pound' },
-  { code: 'CAD', name: 'Canadian Dollar' },
-  { code: 'AUD', name: 'Australian Dollar' },
-  { code: 'MXN', name: 'Mexican Peso' },
-  { code: 'GTQ', name: 'Guatemalan Quetzal' },
-  { code: 'BRL', name: 'Brazilian Real' },
-] as const;
+export type { CurrencyOption };
 
 /** Rejects strings that are non-empty but contain only whitespace. */
 function noWhitespaceOnly(control: AbstractControl): ValidationErrors | null {

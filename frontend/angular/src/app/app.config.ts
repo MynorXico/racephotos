@@ -20,6 +20,8 @@ import { authReducer } from './store/auth/auth.reducer';
 import { AuthEffects } from './store/auth/auth.effects';
 import { photographerReducer } from './store/photographer/photographer.reducer';
 import { PhotographerEffects } from './store/photographer/photographer.effects';
+import { eventsReducer } from './store/events/events.reducer';
+import { EventsEffects } from './store/events/events.effects';
 
 /**
  * Loads /assets/config.json and configures AWS Amplify before the app renders.
@@ -59,8 +61,8 @@ export const appConfig: ApplicationConfig = {
     },
 
     // NgRx root store
-    provideStore({ auth: authReducer, photographer: photographerReducer }),
-    provideEffects(AuthEffects, PhotographerEffects),
+    provideStore({ auth: authReducer, photographer: photographerReducer, events: eventsReducer }),
+    provideEffects(AuthEffects, PhotographerEffects, EventsEffects),
     provideRouterStore(),
     provideStoreDevtools({ maxAge: 25, logOnly: !isDevMode() }),
   ],

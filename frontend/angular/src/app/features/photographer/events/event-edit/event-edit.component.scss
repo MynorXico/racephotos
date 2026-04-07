@@ -1,0 +1,52 @@
+.event-edit-container {
+  max-width: 720px;
+  padding: 24px;
+}
+
+.loading-state {
+  display: flex;
+  justify-content: center;
+  padding: 48px;
+}
+
+h1 {
+  margin-bottom: 8px;
+}
+
+.edit-context {
+  color: var(--mat-sys-on-surface-variant);
+  font-style: italic;
+  margin-bottom: 24px;
+}
+
+.event-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.full-width {
+  width: 100%;
+}
+
+.action-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 16px;
+  margin-top: 24px;
+}
+
+@media (max-width: 600px) {
+  .event-edit-container {
+    max-width: 100%;
+    padding: 16px;
+  }
+
+  .action-row {
+    flex-direction: column-reverse;
+
+    button {
+      width: 100%;
+    }
+  }
+}
