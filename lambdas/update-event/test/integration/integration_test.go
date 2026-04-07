@@ -16,9 +16,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/racephotos/update-event/handler"
 	"github.com/racephotos/shared/apperrors"
 	"github.com/racephotos/shared/models"
+	"github.com/racephotos/update-event/handler"
 )
 
 func newDynamoClient(t *testing.T) *dynamodb.Client {

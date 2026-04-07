@@ -144,9 +144,9 @@ func TestHandler_Handle(t *testing.T) {
 			wantCode:     500,
 		},
 		{
-			name: "photographer store error — returns 500",
-			sub:  "user-1",
-			body: validBody(),
+			name:         "photographer store error — returns 500",
+			sub:          "user-1",
+			body:         validBody(),
 			mockEventsFn: func(m *mocks.MockEventCreator) {},
 			mockPhotosFn: func(m *mocks.MockPhotographerReader) {
 				m.EXPECT().GetPhotographer(gomock.Any(), "user-1").Return(nil, errors.New("ddb failure"))

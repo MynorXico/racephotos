@@ -7,8 +7,9 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	handler "github.com/racephotos/update-event/handler"
+
 	models "github.com/racephotos/shared/models"
+	handler "github.com/racephotos/update-event/handler"
 )
 
 // MockEventUpdater is a mock of EventUpdater interface.

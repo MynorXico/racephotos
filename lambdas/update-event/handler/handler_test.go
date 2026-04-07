@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/racephotos/update-event/handler"
-	"github.com/racephotos/update-event/handler/mocks"
 	"github.com/racephotos/shared/apperrors"
 	"github.com/racephotos/shared/models"
+	"github.com/racephotos/update-event/handler"
+	"github.com/racephotos/update-event/handler/mocks"
 )
 
 func makeEvent(sub, id, body string) events.APIGatewayV2HTTPRequest {

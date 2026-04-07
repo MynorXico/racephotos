@@ -32,23 +32,29 @@ func makeEvent(sub, body string) events.APIGatewayV2HTTPRequest {
 }
 
 func validBody(currency string) string {
-	b, _ := json.Marshal(map[string]string{
+	b, err := json.Marshal(map[string]string{
 		"displayName":     "Test Photographer",
 		"defaultCurrency": currency,
 	})
+	if err != nil {
+		panic(err)
+	}
 	return string(b)
 }
 
 func bodyWithDisplayName(displayName, currency string) string {
-	b, _ := json.Marshal(map[string]string{
+	b, err := json.Marshal(map[string]string{
 		"displayName":     displayName,
 		"defaultCurrency": currency,
 	})
+	if err != nil {
+		panic(err)
+	}
 	return string(b)
 }
 
 func bodyWithBank(bankName, bankAccountHolder, bankAccountNumber, bankInstructions string) string {
-	b, _ := json.Marshal(map[string]string{
+	b, err := json.Marshal(map[string]string{
 		"displayName":       "Test Photographer",
 		"defaultCurrency":   "USD",
 		"bankName":          bankName,
@@ -56,6 +62,9 @@ func bodyWithBank(bankName, bankAccountHolder, bankAccountNumber, bankInstructio
 		"bankAccountNumber": bankAccountNumber,
 		"bankInstructions":  bankInstructions,
 	})
+	if err != nil {
+		panic(err)
+	}
 	return string(b)
 }
 

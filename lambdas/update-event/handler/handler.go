@@ -10,6 +10,7 @@ import (
 	"regexp"
 
 	"github.com/aws/aws-lambda-go/events"
+
 	"github.com/racephotos/shared/apperrors"
 	"github.com/racephotos/shared/models"
 )
@@ -130,7 +131,10 @@ type errorBody struct {
 }
 
 func errResponse(statusCode int, message string) events.APIGatewayV2HTTPResponse {
-	b, _ := json.Marshal(errorBody{Error: message})
+	b, err := json.Marshal(errorBody{Error: message})
+	if err != nil {
+		b = []byte(`{"error":"internal server error"}`)
+	}
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: statusCode,
 		Headers: map[string]string{

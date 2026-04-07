@@ -9,6 +9,7 @@ import (
 	"log/slog"
 
 	"github.com/aws/aws-lambda-go/events"
+
 	"github.com/racephotos/shared/apperrors"
 	"github.com/racephotos/shared/models"
 )
@@ -90,21 +91,9 @@ type errorBody struct {
 }
 
 func errResponse(statusCode int, message string) events.APIGatewayV2HTTPResponse {
-	b, _ := json.Marshal(errorBody{Error: message})
-	return events.APIGatewayV2HTTPResponse{
-		StatusCode: statusCode,
-		Headers: map[string]string{
-			"Content-Type":  "application/json",
-			"Cache-Control": "no-store",
-		},
-		Body: string(b),
-	}
-}
-
-func jsonResponse(statusCode int, body any) (events.APIGatewayV2HTTPResponse, error) {
-	b, err := json.Marshal(body)
+	b, err := json.Marshal(errorBody{Error: message})
 	if err != nil {
-		return errResponse(500, "internal server error"), fmt.Errorf("jsonResponse: marshal: %w", err)
+		b = []byte(`{"error":"internal server error"}`)
 	}
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: statusCode,
@@ -113,5 +102,5 @@ func jsonResponse(statusCode int, body any) (events.APIGatewayV2HTTPResponse, er
 			"Cache-Control": "no-store",
 		},
 		Body: string(b),
-	}, nil
+	}
 }
