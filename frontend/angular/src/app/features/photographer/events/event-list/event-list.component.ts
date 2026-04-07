@@ -95,9 +95,13 @@ export class EventListComponent implements OnInit, OnDestroy {
         takeUntil(this.destroy$),
       )
       .subscribe(() => {
-        this.snackBar.open('Could not load your events.', 'Retry', { duration: 6000 }).onAction().subscribe(() => {
-          this.store.dispatch(EventsActions.loadEvents({}));
-        });
+        this.snackBar
+          .open('Could not load your events.', 'Retry', { duration: 6000 })
+          .onAction()
+          .pipe(takeUntil(this.destroy$))
+          .subscribe(() => {
+            this.store.dispatch(EventsActions.loadEvents({}));
+          });
       });
   }
 

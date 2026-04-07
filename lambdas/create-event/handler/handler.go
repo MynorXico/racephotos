@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"unicode/utf8"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/google/uuid"
@@ -85,13 +86,14 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 	}
 
-	// Default watermarkText. Truncate to maxWatermarkTextLen in case the event
-	// name is very long (the suffix adds ~30 characters).
+	// Default watermarkText. Truncate by rune (not byte) to handle multi-byte
+	// characters safely — the separator "·" and any non-ASCII name characters
+	// are multi-byte in UTF-8.
 	watermarkText := req.WatermarkText
 	if watermarkText == "" {
 		watermarkText = req.Name + " · racephotos.example.com"
-		if len(watermarkText) > maxWatermarkTextLen {
-			watermarkText = watermarkText[:maxWatermarkTextLen]
+		if runes := []rune(watermarkText); len(runes) > maxWatermarkTextLen {
+			watermarkText = string(runes[:maxWatermarkTextLen])
 		}
 	}
 
@@ -129,7 +131,7 @@ func validateCreateRequest(req createEventRequest) error {
 	if req.Name == "" {
 		return fmt.Errorf("name is required")
 	}
-	if len(req.Name) > maxNameLen {
+	if utf8.RuneCountInString(req.Name) > maxNameLen {
 		return fmt.Errorf("name must be %d characters or fewer", maxNameLen)
 	}
 	if req.Date == "" {
@@ -141,13 +143,13 @@ func validateCreateRequest(req createEventRequest) error {
 	if req.Location == "" {
 		return fmt.Errorf("location is required")
 	}
-	if len(req.Location) > maxLocationLen {
+	if utf8.RuneCountInString(req.Location) > maxLocationLen {
 		return fmt.Errorf("location must be %d characters or fewer", maxLocationLen)
 	}
 	if req.PricePerPhoto < 0 {
 		return fmt.Errorf("pricePerPhoto must be non-negative")
 	}
-	if req.WatermarkText != "" && len(req.WatermarkText) > maxWatermarkTextLen {
+	if req.WatermarkText != "" && utf8.RuneCountInString(req.WatermarkText) > maxWatermarkTextLen {
 		return fmt.Errorf("watermarkText must be %d characters or fewer", maxWatermarkTextLen)
 	}
 	return nil

@@ -66,7 +66,7 @@
         <mat-error>Price per photo is required.</mat-error>
       }
       @if (form.get('pricePerPhoto')?.hasError('min') && form.get('pricePerPhoto')?.touched) {
-        <mat-error>Price must be greater than zero.</mat-error>
+        <mat-error>Price must be zero or greater.</mat-error>
       }
       @if (form.get('pricePerPhoto')?.hasError('pattern') && form.get('pricePerPhoto')?.touched) {
         <mat-error>Enter a valid price (e.g. 10.00).</mat-error>

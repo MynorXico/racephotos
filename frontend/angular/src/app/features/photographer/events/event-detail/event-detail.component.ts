@@ -78,6 +78,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   readonly linkCopied = signal(false);
 
   private eventId = '';
+  private copyLinkTimeoutId?: ReturnType<typeof setTimeout>;
 
   get publicUrl(): string {
     const base = this.configService.get().publicBaseUrl ?? window.location.origin;
@@ -117,6 +118,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    clearTimeout(this.copyLinkTimeoutId);
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -139,7 +141,8 @@ export class EventDetailComponent implements OnInit, OnDestroy {
     void navigator.clipboard.writeText(this.publicUrl).then(() => {
       this.linkCopied.set(true);
       this.snackBar.open('Link copied to clipboard.', undefined, { duration: 2000 });
-      setTimeout(() => this.linkCopied.set(false), 2000);
+      clearTimeout(this.copyLinkTimeoutId);
+      this.copyLinkTimeoutId = setTimeout(() => this.linkCopied.set(false), 2000);
     });
   }
 

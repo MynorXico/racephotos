@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"unicode/utf8"
 
 	"github.com/aws/aws-lambda-go/events"
 
@@ -103,7 +104,7 @@ func validateUpdateRequest(req updateEventRequest) error {
 	if req.Name == "" {
 		return fmt.Errorf("name is required")
 	}
-	if len(req.Name) > maxNameLen {
+	if utf8.RuneCountInString(req.Name) > maxNameLen {
 		return fmt.Errorf("name must be %d characters or fewer", maxNameLen)
 	}
 	if req.Date == "" {
@@ -115,13 +116,13 @@ func validateUpdateRequest(req updateEventRequest) error {
 	if req.Location == "" {
 		return fmt.Errorf("location is required")
 	}
-	if len(req.Location) > maxLocationLen {
+	if utf8.RuneCountInString(req.Location) > maxLocationLen {
 		return fmt.Errorf("location must be %d characters or fewer", maxLocationLen)
 	}
 	if req.PricePerPhoto < 0 {
 		return fmt.Errorf("pricePerPhoto must be non-negative")
 	}
-	if req.WatermarkText != "" && len(req.WatermarkText) > maxWatermarkTextLen {
+	if req.WatermarkText != "" && utf8.RuneCountInString(req.WatermarkText) > maxWatermarkTextLen {
 		return fmt.Errorf("watermarkText must be %d characters or fewer", maxWatermarkTextLen)
 	}
 	return nil
