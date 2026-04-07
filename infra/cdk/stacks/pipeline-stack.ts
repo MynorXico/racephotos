@@ -46,7 +46,7 @@ export class PipelineStack extends cdk.Stack {
           version: '0.2',
           phases: {
             install: {
-              'runtime-versions': { nodejs: '20' },
+              'runtime-versions': { nodejs: '20', golang: '1.22' },
             },
           },
         }),
@@ -67,7 +67,11 @@ export class PipelineStack extends cdk.Stack {
         ],
 
         commands: [
-          // Build Angular first — FrontendConstruct references dist/browser/
+          // Build Go Lambda binaries — must run before cdk synth so that
+          // Code.fromAsset() packages the compiled bootstrap binary.
+          // Skips directories in the LAMBDAS list that are not present in the source.
+          'make build',
+          // Build Angular — FrontendConstruct references dist/browser/
           // as a CDK asset so it must exist before cdk synth runs.
           'cd frontend/angular && npm ci && npx ng build --configuration=production && cd ../..',
           // Verify Angular build produced the expected output directory.
