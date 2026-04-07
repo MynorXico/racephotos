@@ -35,7 +35,7 @@ build:
 	@for lambda in $(LAMBDAS); do \
 		if [ -d lambdas/$$lambda ]; then \
 			echo "==> build: $$lambda"; \
-			(cd lambdas/$$lambda && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o bootstrap .) || exit 1; \
+			(cd lambdas/$$lambda && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -ldflags="-s -w" -o bootstrap .) || exit 1; \
 		fi \
 	done
 
