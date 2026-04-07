@@ -170,7 +170,7 @@
 
     <!-- Pagination -->
     <div class="pagination-row">
-      <button mat-icon-button aria-label="Previous page" (click)="onPreviousPage()">
+      <button mat-icon-button aria-label="Previous page" [disabled]="!hasPreviousPage" (click)="onPreviousPage()">
         <mat-icon>chevron_left</mat-icon>
       </button>
       <button

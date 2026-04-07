@@ -25,13 +25,21 @@ export const eventsReducer = createReducer<EventsState>(
   initialEventsState,
 
   // ── Load Events ────────────────────────────────────────────────────────────
-  on(EventsActions.loadEvents, (state, { cursor }) => ({
-    ...state,
-    loading: true,
-    error: null,
-    // If loading with a cursor, push the current nextCursor onto the history stack.
-    cursorHistory: cursor ? [...state.cursorHistory, cursor] : state.cursorHistory,
-  })),
+  on(EventsActions.loadEvents, (state, { cursor }) => {
+    // When navigating back, the effect re-dispatches loadEvents with the previous
+    // page cursor. We must not push it again — only push when moving forward to a
+    // cursor that is not already at the top of the stack.
+    const isBack =
+      cursor !== undefined &&
+      state.cursorHistory.length > 0 &&
+      state.cursorHistory[state.cursorHistory.length - 1] === cursor;
+    return {
+      ...state,
+      loading: true,
+      error: null,
+      cursorHistory: cursor && !isBack ? [...state.cursorHistory, cursor] : state.cursorHistory,
+    };
+  }),
 
   on(EventsActions.loadEventsSuccess, (state, { events, nextCursor }) => ({
     ...state,

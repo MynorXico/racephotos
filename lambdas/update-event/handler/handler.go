@@ -119,6 +119,9 @@ func validateUpdateRequest(req updateEventRequest) error {
 	if utf8.RuneCountInString(req.Location) > maxLocationLen {
 		return fmt.Errorf("location must be %d characters or fewer", maxLocationLen)
 	}
+	if req.Currency == "" {
+		return fmt.Errorf("currency is required")
+	}
 	if req.PricePerPhoto < 0 {
 		return fmt.Errorf("pricePerPhoto must be non-negative")
 	}

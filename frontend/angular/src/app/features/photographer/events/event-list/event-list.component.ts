@@ -28,6 +28,7 @@ import {
   selectEventsLoading,
   selectEventsError,
   selectNextCursor,
+  selectCursorHistory,
 } from '../../../../store/events/events.selectors';
 import { Event } from '../event.model';
 import { EventArchiveDialogComponent } from '../event-archive-dialog/event-archive-dialog.component';
@@ -66,6 +67,11 @@ export class EventListComponent implements OnInit, OnDestroy {
   readonly error = toSignal(this.store.select(selectEventsError), { initialValue: null });
   readonly nextCursor = toSignal(this.store.select(selectNextCursor), { initialValue: null });
   readonly allEvents = toSignal(this.store.select(selectAllEvents), { initialValue: [] });
+  readonly cursorHistory = toSignal(this.store.select(selectCursorHistory), { initialValue: [] });
+
+  get hasPreviousPage(): boolean {
+    return this.cursorHistory().length > 0;
+  }
 
   readonly activeFilter = signal<EventFilter>('all');
 
