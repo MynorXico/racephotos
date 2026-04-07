@@ -110,7 +110,7 @@ export class EventEditComponent implements OnInit, OnDestroy {
     const current = this.selectedEvent();
     if (!current && this.eventId) {
       this.store.dispatch(EventsActions.loadEvent({ id: this.eventId }));
-    } else if (current) {
+    } else if (current && current.id === this.eventId) {
       this.patchFromEvent(current);
     }
 

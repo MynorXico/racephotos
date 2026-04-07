@@ -2,13 +2,15 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
+import { Store } from '@ngrx/store';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of } from 'rxjs';
-import { catchError, map, switchMap, tap } from 'rxjs/operators';
+import { catchError, map, switchMap, tap, withLatestFrom } from 'rxjs/operators';
 
 import { AppConfigService } from '../../core/config/app-config.service';
 import { EventsActions } from './events.actions';
 import { Event } from '../../features/photographer/events/event.model';
+import { selectCursorHistory } from './events.selectors';
 
 interface ListEventsResponse {
   events: Event[];
@@ -19,6 +21,7 @@ interface ListEventsResponse {
 export class EventsEffects {
   private readonly actions$ = inject(Actions);
   private readonly http = inject(HttpClient);
+  private readonly store = inject(Store);
   private readonly configService = inject(AppConfigService);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
@@ -54,11 +57,17 @@ export class EventsEffects {
     ),
   );
 
-  /** Previous page — same effect chain but uses cursor history (managed by reducer). */
+  /** Previous page — reads cursor history (already popped by reducer) and loads the prior page. */
   loadEventsPreviousPage$ = createEffect(() =>
     this.actions$.pipe(
       ofType(EventsActions.loadEventsPreviousPage),
-      map(() => EventsActions.loadEvents({})),
+      withLatestFrom(this.store.select(selectCursorHistory)),
+      map(([, cursorHistory]) => {
+        // The reducer already popped the current cursor from the stack; the last
+        // remaining entry (if any) is the cursor for the previous page.
+        const prevCursor = cursorHistory[cursorHistory.length - 1];
+        return EventsActions.loadEvents({ cursor: prevCursor });
+      }),
     ),
   );
 

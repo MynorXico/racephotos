@@ -149,7 +149,7 @@ export class EventDetailComponent implements OnInit, OnDestroy {
   }
 
   onDownloadQr(): void {
-    const canvas = document.querySelector('app-event-detail qrcode canvas') as HTMLCanvasElement;
+    const canvas = this.qrCanvasRef?.nativeElement.querySelector('canvas') as HTMLCanvasElement | null;
     if (!canvas) return;
     const link = document.createElement('a');
     link.download = `racephotos-event-${this.eventId}.png`;
