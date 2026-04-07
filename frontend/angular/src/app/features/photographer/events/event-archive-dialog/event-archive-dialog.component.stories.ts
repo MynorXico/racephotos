@@ -15,7 +15,7 @@ const meta: Meta<EventArchiveDialogComponent> = {
       providers: [
         provideAnimationsAsync(),
         provideMockStore({ initialState: { events: initialEventsState } }),
-        { provide: MatDialogRef, useValue: { close: () => {} } },
+        { provide: MatDialogRef, useValue: { close: (_result?: unknown) => undefined } },
         { provide: MAT_DIALOG_DATA, useValue: { eventId: 'evt-1', eventName: 'Guatemala City Half Marathon 2026' } },
       ],
     }),
@@ -33,7 +33,7 @@ export const Loading: Story = {
       providers: [
         provideAnimationsAsync(),
         provideMockStore({ initialState: { events: { ...initialEventsState, loading: true } } }),
-        { provide: MatDialogRef, useValue: { close: () => {} } },
+        { provide: MatDialogRef, useValue: { close: (_result?: unknown) => undefined } },
         { provide: MAT_DIALOG_DATA, useValue: { eventId: 'evt-1', eventName: 'Guatemala City Half Marathon 2026' } },
       ],
     }),

@@ -5,7 +5,6 @@ import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 
 import { EventCreateComponent } from './event-create.component';
-import { EventsActions } from '../../../../store/events/events.actions';
 import { initialEventsState } from '../../../../store/events/events.reducer';
 import { initialPhotographerState } from '../../../../store/photographer/photographer.state';
 

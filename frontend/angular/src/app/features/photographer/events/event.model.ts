@@ -23,4 +23,4 @@ export interface CreateEventRequest {
   watermarkText?: string;
 }
 
-export interface UpdateEventRequest extends Partial<CreateEventRequest> {}
+export type UpdateEventRequest = Partial<CreateEventRequest>;
