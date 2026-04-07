@@ -6,7 +6,7 @@ Description: >
   against LocalStack via `make invoke-<lambda> EVENT=<event-file-stem>`.
 
   Prerequisites:
-    docker-compose up -d
+    docker compose up -d
     make seed-local
     pip install aws-sam-cli  # if not installed
 

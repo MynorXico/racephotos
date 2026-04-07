@@ -35,7 +35,7 @@ sam --version
 **3. LocalStack running with resources seeded**
 
 ```bash
-docker-compose up -d
+docker compose up -d
 make seed-local
 ```
 
@@ -123,8 +123,6 @@ When a new Lambda is added to the project:
 ```yaml
 SearchFunction:
   Type: AWS::Serverless::Function
-  Metadata:
-    BuildMethod: makefile
   Properties:
     FunctionName: racephotos-search-local
     Handler: bootstrap

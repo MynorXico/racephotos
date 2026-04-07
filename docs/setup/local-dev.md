@@ -152,7 +152,7 @@ make seed-local
 
 ## LocalStack persistence
 
-The `docker compose.yml` sets `PERSISTENCE=1`. State is saved to `./volume/`
+The `docker-compose.yml` sets `PERSISTENCE=1`. State is saved to `./volume/`
 (gitignored). Stop and start without losing resources:
 
 ```bash

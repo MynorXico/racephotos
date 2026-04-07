@@ -97,7 +97,7 @@ validate: test lint cdk-check ng-build ng-lint ng-test storybook-build
 # Run a Lambda locally in Docker against LocalStack.
 #
 # Prerequisites:
-#   docker-compose up -d && make seed-local
+#   docker compose up -d && make seed-local
 #
 # Usage:
 #   make invoke-get-photographer EVENT=get-existing
@@ -114,6 +114,7 @@ validate: test lint cdk-check ng-build ng-lint ng-test storybook-build
 DOCKER_NETWORK ?= racephotos_default
 
 invoke-get-photographer:
+	@[ "$(EVENT)" ] || ( echo ">> EVENT is not set. Usage: make $@ EVENT=get-existing"; exit 1 )
 	cd lambdas/get-photographer && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap .
 	sam local invoke GetPhotographerFunction \
 	  -t template.yaml \
@@ -121,6 +122,7 @@ invoke-get-photographer:
 	  --docker-network $(DOCKER_NETWORK)
 
 invoke-update-photographer:
+	@[ "$(EVENT)" ] || ( echo ">> EVENT is not set. Usage: make $@ EVENT=update-valid"; exit 1 )
 	cd lambdas/update-photographer && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap .
 	sam local invoke UpdatePhotographerFunction \
 	  -t template.yaml \
