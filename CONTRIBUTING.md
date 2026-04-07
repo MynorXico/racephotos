@@ -120,6 +120,7 @@ chore(deps): bump @angular/core to 19.2.1
 - Do not include AWS account IDs, real domain names, or PII in committed files
 - Update `environments.example.ts` and `.env.example` if you add a new config key
 - Update `scripts/seed-local.sh` if you add a new AWS resource in CDK
+- Add every new Lambda to the SAM local invoke structure — see [local-lambda-debugging.md](docs/setup/local-lambda-debugging.md): a per-Lambda `Makefile` with the SAM build target, event files in `testdata/events/`, an entry in `template.yaml`, and a `make invoke-<name>` target in the root `Makefile`
 
 ---
 
@@ -137,6 +138,7 @@ See [CLAUDE.md](CLAUDE.md) for the full repository layout and all architectural 
 4. `environments.example.ts` and `.env.example` must stay in sync with actual config shape
 5. All manual setup steps must be documented in `docs/setup/`
 6. `scripts/seed-local.sh` must mirror CDK resource definitions
+7. Every Lambda must be runnable locally via `make invoke-<name>` — add it to the SAM structure described in [docs/setup/local-lambda-debugging.md](docs/setup/local-lambda-debugging.md)
 
 ---
 

@@ -396,6 +396,11 @@ AWS_REGION=us-east-1
 6. Self-review generated code for: missing error wrapping, missing context
    propagation, missing X-Ray segments, SDK calls bypassing interfaces, and
    any hardcoded infrastructure value
+7. When adding a new Lambda, add it to the SAM local invoke structure:
+   - `lambdas/<name>/testdata/events/` with at least a happy-path event file
+   - A resource entry in `template.yaml`
+   - A `make invoke-<name>` target in the root `Makefile` (and add to `.PHONY`)
+     See `docs/setup/local-lambda-debugging.md` for the full pattern.
 
 ## What Claude Code must never do
 

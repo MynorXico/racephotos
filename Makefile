@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format
+.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer
 
 LAMBDAS := photo-upload photo-processor watermark search payment get-photographer update-photographer
 
@@ -92,3 +92,37 @@ format:
 
 # Full validation — runs everything (cdk-check, not synth — synth needs credentials)
 validate: test lint cdk-check ng-build ng-lint ng-test storybook-build
+
+# ── SAM local invoke ─────────────────────────────────────────────────────────
+# Run a Lambda locally in Docker against LocalStack.
+#
+# Prerequisites:
+#   docker-compose up -d && make seed-local
+#
+# Usage:
+#   make invoke-get-photographer EVENT=get-existing
+#   make invoke-get-photographer EVENT=get-not-found
+#   make invoke-get-photographer EVENT=missing-auth
+#
+#   make invoke-update-photographer EVENT=update-valid
+#   make invoke-update-photographer EVENT=update-invalid-currency
+#   make invoke-update-photographer EVENT=update-empty-body
+#
+# The SAM Lambda container joins the LocalStack Docker network so it can reach
+# http://racephotos-localstack:4566. If your compose project name differs from
+# `racephotos`, override: make invoke-get-photographer DOCKER_NETWORK=mynet_default
+DOCKER_NETWORK ?= racephotos_default
+
+invoke-get-photographer:
+	cd lambdas/get-photographer && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap .
+	sam local invoke GetPhotographerFunction \
+	  -t template.yaml \
+	  -e lambdas/get-photographer/testdata/events/$(EVENT).json \
+	  --docker-network $(DOCKER_NETWORK)
+
+invoke-update-photographer:
+	cd lambdas/update-photographer && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap .
+	sam local invoke UpdatePhotographerFunction \
+	  -t template.yaml \
+	  -e lambdas/update-photographer/testdata/events/$(EVENT).json \
+	  --docker-network $(DOCKER_NETWORK)
