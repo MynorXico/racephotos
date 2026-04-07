@@ -23,6 +23,21 @@ type Handler struct {
 	Store EventGetter
 }
 
+// publicEventResponse is the response shape for the unauthenticated GET /events/{id}
+// endpoint. It deliberately omits photographerId (Cognito sub) and other internal
+// fields not needed by runners. Matches the AC3 response shape exactly.
+type publicEventResponse struct {
+	ID            string  `json:"id"`
+	Name          string  `json:"name"`
+	Date          string  `json:"date"`
+	Location      string  `json:"location"`
+	PricePerPhoto float64 `json:"pricePerPhoto"`
+	Currency      string  `json:"currency"`
+	WatermarkText string  `json:"watermarkText"`
+	Status        string  `json:"status"`
+	CreatedAt     string  `json:"createdAt"`
+}
+
 // Handle processes an API Gateway v2 HTTP request.
 func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	id := event.PathParameters["id"]
@@ -42,7 +57,32 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(500, "internal server error"), nil
 	}
 
-	return jsonResponse(200, e)
+	resp := publicEventResponse{
+		ID:            e.ID,
+		Name:          e.Name,
+		Date:          e.Date,
+		Location:      e.Location,
+		PricePerPhoto: e.PricePerPhoto,
+		Currency:      e.Currency,
+		WatermarkText: e.WatermarkText,
+		Status:        e.Status,
+		CreatedAt:     e.CreatedAt,
+	}
+
+	b, err := json.Marshal(resp)
+	if err != nil {
+		return errResponse(500, "internal server error"), fmt.Errorf("Handle: marshal: %w", err)
+	}
+	// Public cacheable response: event data is stable; allow CDN and browser caching.
+	// s-maxage=300 lets CloudFront absorb QR-code burst traffic at race finish lines.
+	return events.APIGatewayV2HTTPResponse{
+		StatusCode: 200,
+		Headers: map[string]string{
+			"Content-Type":  "application/json",
+			"Cache-Control": "public, max-age=60, s-maxage=300",
+		},
+		Body: string(b),
+	}, nil
 }
 
 type errorBody struct {

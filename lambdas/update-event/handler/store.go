@@ -98,8 +98,10 @@ func (s *DynamoEventUpdater) itemExists(ctx context.Context, id string) (bool, e
 		return false, fmt.Errorf("itemExists: marshal key: %w", err)
 	}
 	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(s.TableName),
-		Key:       key,
+		TableName:            aws.String(s.TableName),
+		Key:                  key,
+		ConsistentRead:       aws.Bool(true),
+		ProjectionExpression: aws.String("id"),
 	})
 	if err != nil {
 		return false, fmt.Errorf("itemExists: dynamodb.GetItem: %w", err)

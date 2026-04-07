@@ -4,6 +4,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 
@@ -39,9 +40,11 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 
 	result, nextCursor, err := h.Store.ListEventsByPhotographer(ctx, photographerID, cursor, defaultPageSize)
 	if err != nil {
+		if errors.Is(err, errInvalidCursor) {
+			return errResponse(400, "invalid cursor"), nil
+		}
 		slog.ErrorContext(ctx, "ListEventsByPhotographer failed",
 			slog.String("error", err.Error()),
-			slog.String("photographerId", photographerID),
 		)
 		return errResponse(500, "internal server error"), nil
 	}

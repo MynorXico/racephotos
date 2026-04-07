@@ -70,7 +70,6 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 			} else {
 				slog.ErrorContext(ctx, "GetPhotographer failed",
 					slog.String("error", err.Error()),
-					slog.String("photographerId", photographerID),
 				)
 				return errResponse(500, "internal server error"), nil
 			}
@@ -106,9 +105,11 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	if err := h.Events.CreateEvent(ctx, e); err != nil {
+		if errors.Is(err, apperrors.ErrConflict) {
+			return errResponse(409, "event already exists"), nil
+		}
 		slog.ErrorContext(ctx, "CreateEvent failed",
 			slog.String("error", err.Error()),
-			slog.String("photographerId", photographerID),
 		)
 		return errResponse(500, "internal server error"), nil
 	}

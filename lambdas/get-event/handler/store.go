@@ -30,9 +30,11 @@ func (s *DynamoEventGetter) GetEvent(ctx context.Context, id string) (*models.Ev
 		return nil, fmt.Errorf("GetEvent: marshal key: %w", err)
 	}
 	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:      aws.String(s.TableName),
-		Key:            key,
-		ConsistentRead: aws.Bool(true),
+		TableName: aws.String(s.TableName),
+		Key:       key,
+		// Eventually consistent read: event data is stable (written once, mutated rarely).
+		// Consistent reads are 2× the RCU cost and add p99 latency on a high-traffic
+		// public endpoint. A stale read window of ≤1s is acceptable for runner use-case.
 	})
 	if err != nil {
 		return nil, fmt.Errorf("GetEvent: dynamodb.GetItem: %w", err)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,6 +15,9 @@ import (
 )
 
 const gsiName = "photographerId-createdAt-index"
+
+// errInvalidCursor is returned when the cursor query parameter cannot be decoded.
+var errInvalidCursor = errors.New("invalid cursor")
 
 // DynamoQuerier is the minimal DynamoDB API surface used by DynamoEventLister.
 type DynamoQuerier interface {
@@ -44,11 +48,9 @@ func (s *DynamoEventLister) ListEventsByPhotographer(ctx context.Context, photog
 	if cursor != "" {
 		lek, err := decodeCursor(cursor)
 		if err != nil {
-			// Ignore invalid cursor — start from the beginning.
-			_ = err
-		} else {
-			input.ExclusiveStartKey = lek
+			return nil, "", fmt.Errorf("%w: invalid cursor", errInvalidCursor)
 		}
+		input.ExclusiveStartKey = lek
 	}
 
 	out, err := s.Client.Query(ctx, input)
@@ -95,12 +97,12 @@ func encodeCursor(key map[string]types.AttributeValue) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("encodeCursor: marshal: %w", err)
 	}
-	return base64.StdEncoding.EncodeToString(b), nil
+	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
 // decodeCursor deserialises a base64-encoded cursor back to a DynamoDB key map.
 func decodeCursor(cursor string) (map[string]types.AttributeValue, error) {
-	b, err := base64.StdEncoding.DecodeString(cursor)
+	b, err := base64.RawURLEncoding.DecodeString(cursor)
 	if err != nil {
 		return nil, fmt.Errorf("decodeCursor: base64 decode: %w", err)
 	}

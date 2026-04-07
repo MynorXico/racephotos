@@ -84,9 +84,15 @@ func TestHandler_Handle(t *testing.T) {
 			assert.Equal(t, "application/json", resp.Headers["Content-Type"])
 
 			if tt.wantID != "" {
-				var e models.Event
-				require.NoError(t, json.Unmarshal([]byte(resp.Body), &e))
-				assert.Equal(t, tt.wantID, e.ID)
+				// Unmarshal into a generic map to verify the exact response shape:
+				// photographerId must NOT appear (it's an internal Cognito sub).
+				var body map[string]any
+				require.NoError(t, json.Unmarshal([]byte(resp.Body), &body))
+				assert.Equal(t, tt.wantID, body["id"])
+				assert.NotContains(t, body, "photographerId", "photographerId must not be present in public response")
+				assert.Contains(t, body, "name")
+				assert.Contains(t, body, "status")
+				assert.Contains(t, body, "createdAt")
 			}
 		})
 	}
