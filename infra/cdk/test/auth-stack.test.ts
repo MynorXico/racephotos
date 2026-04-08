@@ -319,7 +319,8 @@ describe('ApiConstruct', () => {
     expect(origins).toEqual(['https://app.example.com']);
   });
 
-  // TC-007: CORS AllowOrigins is exactly ['*'] for dev — no extra entries.
+  // TC-007: CORS AllowOrigins is exactly ['*'] for dev when SSM returns a dummy —
+  // localhost is NOT added when wildcard is already present.
   test('HTTP API CORS AllowOrigins is exactly wildcard for no-custom-domain config', () => {
     const t = makeTemplate(devConfig);
     const apis = t.findResources('AWS::ApiGatewayV2::Api');
@@ -328,6 +329,38 @@ describe('ApiConstruct', () => {
       'CorsConfiguration'
     ]['AllowOrigins'];
     expect(origins).toEqual(['*']);
+  });
+
+  // TC-007b: when SSM resolves to a real CloudFront domain, dev also includes localhost:4200.
+  test('HTTP API CORS includes localhost:4200 for dev when CloudFront domain is known', () => {
+    const app = new cdk.App({
+      context: {
+        [`ssm:account=${devConfig.account}:parameterName=/racephotos/env/dev/frontend-origin:region=${devConfig.region}`]:
+          'd1234abcdefg.cloudfront.net',
+      },
+    });
+    const stack = new AuthStack(app, 'TestAuthStack', {
+      config: devConfig,
+      env: { account: devConfig.account, region: devConfig.region },
+    });
+    const t = Template.fromStack(stack);
+    const apis = t.findResources('AWS::ApiGatewayV2::Api');
+    const [api] = Object.values(apis);
+    const origins = (api as Record<string, Record<string, Record<string, string[]>>>)['Properties'][
+      'CorsConfiguration'
+    ]['AllowOrigins'];
+    expect(origins).toEqual(['https://d1234abcdefg.cloudfront.net', 'http://localhost:4200']);
+  });
+
+  // TC-007c: prod never gets localhost even when CloudFront domain is known.
+  test('HTTP API CORS does not include localhost for prod', () => {
+    const t = makeTemplate(prodConfig);
+    const apis = t.findResources('AWS::ApiGatewayV2::Api');
+    const [api] = Object.values(apis);
+    const origins = (api as Record<string, Record<string, Record<string, string[]>>>)['Properties'][
+      'CorsConfiguration'
+    ]['AllowOrigins'];
+    expect(origins).not.toContain('http://localhost:4200');
   });
 
   // TC-011: SSM parameter Value is a CloudFormation intrinsic (Fn::GetAtt), not a literal string.

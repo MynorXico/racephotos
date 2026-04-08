@@ -86,6 +86,12 @@ export class ApiConstruct extends Construct {
         ? ['*']
         : [`https://${frontendDomain}`];
     }
+    // dev and local environments additionally allow localhost:4200 so engineers
+    // can debug API calls from a local Angular dev server without CORS errors.
+    // qa/staging/prod are intentionally excluded for security.
+    if ((config.envName === 'dev' || config.envName === 'local') && !corsAllowOrigins.includes('*')) {
+      corsAllowOrigins.push('http://localhost:4200');
+    }
 
     // Create the HTTP API without a defaultAuthorizer — authorization is set
     // explicitly on every route. This keeps AuthStack independent of the route
