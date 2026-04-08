@@ -18,10 +18,10 @@ export const PhotoUploadActions = createActionGroup({
   source: 'PhotoUpload',
   events: {
     /** Component dispatches this when the photographer drops or selects files. */
-    'Upload Files': props<{ files: File[] }>(),
+    'Upload Files': props<{ files: File[]; eventId: string }>(),
 
     /** Effect dispatches internally — one per 100-file batch. */
-    'Presign Batch': props<{ batch: File[] }>(),
+    'Presign Batch': props<{ batch: File[]; eventId: string }>(),
 
     /** Effect dispatches after the presign API returns successfully. */
     'Presign Batch Success': props<{ presignedFiles: PresignedFile[] }>(),
@@ -36,7 +36,7 @@ export const PhotoUploadActions = createActionGroup({
     'File Upload Failed': props<{ file: File; errorMessage: string }>(),
 
     /** Component dispatches when the photographer clicks Retry on a single file. */
-    'Retry File': props<{ file: File }>(),
+    'Retry File': props<{ file: File; eventId: string }>(),
 
     /** Component dispatches in ngOnDestroy to reset the slice on navigation away. */
     'Reset Upload': emptyProps(),

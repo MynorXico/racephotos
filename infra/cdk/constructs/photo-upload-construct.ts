@@ -2,6 +2,7 @@ import * as path from 'path';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
@@ -62,7 +63,7 @@ export class PhotoUploadConstruct extends Construct {
     this.presignPhotosFn = new lambda.Function(this, 'PresignPhotosFn', {
       functionName: `racephotos-presign-photos-${config.envName}`,
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.X86_64,
+      architecture: lambda.Architecture.ARM_64,
       handler: 'bootstrap',
       memorySize: 256,
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/presign-photos')),
@@ -74,7 +75,14 @@ export class PhotoUploadConstruct extends Construct {
       },
     });
 
-    rawBucket.grantPut(this.presignPhotosFn);
+    // Grant only s3:PutObject — grantPut() also grants s3:PutObjectAcl which is
+    // unnecessary and would allow the role to change object visibility (security fix).
+    this.presignPhotosFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:PutObject'],
+        resources: [rawBucket.arnForObjects('*')],
+      }),
+    );
     photosTable.grant(this.presignPhotosFn, 'dynamodb:BatchWriteItem');
     eventsTable.grant(this.presignPhotosFn, 'dynamodb:GetItem');
 

@@ -166,7 +166,7 @@ describe('EventUploadComponent', () => {
 
     comp.onDrop(dropEvent);
     expect(dispatchSpy).toHaveBeenCalledWith(
-      PhotoUploadActions.uploadFiles({ files: [file] }),
+      PhotoUploadActions.uploadFiles({ files: [file], eventId: 'evt-1' }),
     );
   });
 
@@ -194,7 +194,7 @@ describe('EventUploadComponent', () => {
 
     const file = new File([], 'photo.jpg', { type: 'image/jpeg' });
     fixture.componentInstance.onRetryFile({ file, errorMessage: 'Network error' });
-    expect(dispatchSpy).toHaveBeenCalledWith(PhotoUploadActions.retryFile({ file }));
+    expect(dispatchSpy).toHaveBeenCalledWith(PhotoUploadActions.retryFile({ file, eventId: 'evt-1' }));
   });
 
   it('should dispatch uploadFiles with all failed files on onRetryAll', () => {
@@ -213,7 +213,7 @@ describe('EventUploadComponent', () => {
 
     fixture.componentInstance.onRetryAll();
     expect(dispatchSpy).toHaveBeenCalledWith(
-      PhotoUploadActions.uploadFiles({ files: [failedFile] }),
+      PhotoUploadActions.uploadFiles({ files: [failedFile], eventId: 'evt-1' }),
     );
   });
 
@@ -232,7 +232,7 @@ describe('EventUploadComponent', () => {
 
     comp.onTryAgain();
     expect(dispatchSpy).toHaveBeenCalledWith(
-      PhotoUploadActions.uploadFiles({ files: [file] }),
+      PhotoUploadActions.uploadFiles({ files: [file], eventId: 'evt-1' }),
     );
   });
 
@@ -280,7 +280,7 @@ describe('EventUploadComponent', () => {
 
     fixture.componentInstance.onFileInputChange(event);
     expect(dispatchSpy).toHaveBeenCalledWith(
-      PhotoUploadActions.uploadFiles({ files: [file] }),
+      PhotoUploadActions.uploadFiles({ files: [file], eventId: 'evt-1' }),
     );
   });
 
