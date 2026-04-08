@@ -106,16 +106,17 @@
 
     <!-- Links row -->
     <div class="links-row">
-      <button
-        mat-flat-button
-        color="primary"
-        disabled
-        aria-label="Upload photos — coming soon"
-        aria-disabled="true"
-      >
-        <mat-icon>upload</mat-icon>
-        Upload Photos
-      </button>
+      @if (event.status === 'active') {
+        <button
+          mat-flat-button
+          color="primary"
+          [routerLink]="['/photographer/events', event.id, 'upload']"
+          [attr.aria-label]="'Upload photos for ' + event.name"
+        >
+          <mat-icon>upload</mat-icon>
+          Upload Photos
+        </button>
+      }
       <button
         mat-flat-button
         disabled

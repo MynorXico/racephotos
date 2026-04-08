@@ -14,11 +14,13 @@ After creating an event (RS-005), the photographer uploads photos in bulk via dr
 - [ ] AC1: Given `POST /events/{eventId}/photos/presign` is called with a valid Cognito JWT and `{ photos: [{filename, contentType, size}] }` (max 100 items), when the caller owns the event, then for each photo: a UUID photoId is generated, a Photo record is created in DynamoDB with `status="uploading"`, `rawS3Key="{envName}/{eventId}/{photoId}/{filename}"`, `eventId`, `uploadedAt`, and a presigned S3 PUT URL (15-minute TTL) is returned. Response: `{ photos: [{photoId, presignedUrl}] }`.
 - [ ] AC2: Given the request exceeds 100 items, then a 400 error is returned.
 - [ ] AC3: Given the caller does not own the event, then a 403 error is returned.
+- [ ] AC9: Given the `eventId` does not exist in DynamoDB, then a 404 error is returned.
 - [ ] AC4: Given a photographer visits `/photographer/events/{id}/upload`, then a drag-and-drop zone is shown accepting JPEG and PNG files.
 - [ ] AC5: Given the photographer drops or selects files, when upload begins, then files are chunked into batches of 100, each batch requests presigned URLs, and S3 PUTs are performed with max 5 concurrent uploads.
 - [ ] AC6: Given uploads are in progress, then a progress indicator shows "X of N photos uploaded" updating in real time.
 - [ ] AC7: Given all uploads complete successfully, then a success message is shown with a link to "View photos" (→ `/photographer/events/{id}/photos`).
 - [ ] AC8: Given one or more uploads fail, then the failed files are listed with a "Retry" button for each.
+- [ ] AC10: Given the request contains a photo with a `contentType` that is not `image/jpeg` or `image/png`, then a 400 error is returned. (This allowlist will be extended by RS-015 when RAW/HEIC/TIFF support ships.)
 
 ## Out of scope
 
@@ -53,7 +55,8 @@ After creating an event (RS-005), the photographer uploads photos in bulk via dr
       UploadedAt            string   `dynamodbav:"uploadedAt"`
   }
   ```
-- DynamoDB: `BatchWriteItem` for creating up to 100 Photo records in a single call
+- DynamoDB: `BatchWriteItem` for batch-creating Photo records — max 25 items per call, so a batch of 100 requires 4 sequential or parallel calls; the `BatchCreatePhotos` interface implementation is responsible for chunking
+- Note: `status="uploading"` is a new state introduced by this story, extending the four states defined in PRODUCT_CONTEXT.md; RS-007 transitions it to `"processing"` when the S3 ObjectCreated message is received
 - S3 presigned PUT: use AWS SDK v2 `s3.PresignClient.PresignPutObject` — pure local crypto, no S3 API call at presign time
 - New env vars:
   ```
@@ -65,10 +68,11 @@ After creating an event (RS-005), the photographer uploads photos in bulk via dr
 - CDK: add Lambda + route to `PhotoStorageConstruct` or new `PhotoUploadConstruct`; grant `s3:PutObject` on raw bucket and `dynamodb:BatchWriteItem` on photos table; `dynamodb:GetItem` on events table for ownership check; wrap Lambda with `ObservabilityConstruct`
 - Angular:
   - `src/app/features/photographer/event-upload/event-upload.component.ts` — drag-and-drop zone using Angular CDK `DragDrop` or native `dragover`/`drop` events; accepts `image/jpeg` and `image/png` only
-  - Use `HttpClient` for presign API call; use `XMLHttpRequest` (not `fetch`) for S3 PUT uploads to enable `progress` event tracking
+  - HTTP calls are made inside NgRx Effects (ADR-0005 — component must not call HTTP directly): the presign API call uses `HttpClient` in an Effect; S3 PUT uploads use `XMLHttpRequest` (not `fetch`) inside an Effect to enable `progress` event tracking piped back to the store
   - Concurrency control: semaphore of 5 — never dispatch more than 5 simultaneous S3 PUTs
-  - NgRx slice: `store/photo-upload/` — state shape: `{ total: number, uploaded: number, failed: File[], inProgress: boolean }`
-- `.env.example`: add `RACEPHOTOS_RAW_BUCKET` and `RACEPHOTOS_PHOTOS_TABLE`
+  - NgRx slice: `store/photo-upload/` (see ADR-0005) — state shape: `{ total: number, uploaded: number, failed: File[], inProgress: boolean }`
+  - Storybook: one story per component state — `idle` (empty drop zone), `uploading` (progress bar with X of N), `partial-failure` (failed files listed with Retry), `complete` (success message with View photos link)
+- `.env.example`: add `RACEPHOTOS_RAW_BUCKET`, `RACEPHOTOS_PHOTOS_TABLE`, and `RACEPHOTOS_EVENTS_TABLE`
 
 ## Definition of Done
 
