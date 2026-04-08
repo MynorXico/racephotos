@@ -138,7 +138,7 @@ describe('PhotoStorageConstruct', () => {
           Match.objectLike({
             AllowedOrigins: ['http://localhost:4200'],
             AllowedMethods: ['PUT'],
-            AllowedHeaders: ['Content-Type'],
+            AllowedHeaders: ['*'],
           }),
         ],
       },

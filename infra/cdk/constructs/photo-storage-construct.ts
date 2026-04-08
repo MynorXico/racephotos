@@ -81,8 +81,9 @@ export class PhotoStorageConstruct extends Construct {
         rawCorsOrigins.push(`https://${frontendDomain}`);
       }
     }
-    // Always add localhost for dev regardless of custom domain configuration.
-    if (config.envName === 'dev') {
+    // Always add localhost for dev and local (LocalStack) environments regardless
+    // of custom domain configuration.
+    if (config.envName === 'dev' || config.envName === 'local') {
       rawCorsOrigins.push('http://localhost:4200');
     }
 
@@ -113,7 +114,7 @@ export class PhotoStorageConstruct extends Construct {
         {
           allowedOrigins: rawCorsOrigins,
           allowedMethods: [s3.HttpMethods.PUT],
-          allowedHeaders: ['Content-Type'],
+          allowedHeaders: ['*'],
           maxAge: 3000,
         },
       ] : undefined,
