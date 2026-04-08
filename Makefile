@@ -1,6 +1,6 @@
 .PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format
 
-LAMBDAS := photo-upload photo-processor watermark search payment get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events
+LAMBDAS := presign-photos photo-processor watermark search payment get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events
 
 # Run all tests
 test: test-unit test-integration
