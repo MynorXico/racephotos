@@ -32,8 +32,10 @@ var allowedContentTypes = map[string]bool{
 }
 
 // safeFilename accepts filenames containing only alphanumerics, dots, hyphens, and
-// underscores (max 255 chars). Prevents path-traversal via ../sequences or null bytes.
-var safeFilename = regexp.MustCompile(`^[a-zA-Z0-9._\-]{1,255}$`)
+// underscores, spaces, and parentheses (max 255 chars).
+// Specifically blocks path-traversal sequences (/, ..) and null bytes while
+// allowing common camera-generated names like "Finish Line.jpg" or "IMG_001 (1).jpg".
+var safeFilename = regexp.MustCompile(`^[a-zA-Z0-9._\- ()]{1,255}$`)
 
 // S3Presigner generates presigned S3 PUT URLs.
 type S3Presigner interface {
