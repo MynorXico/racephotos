@@ -160,7 +160,9 @@ func (h *Handler) Handle(ctx context.Context, req events.APIGatewayV2HTTPRequest
 				RawS3Key:   fmt.Sprintf("%s/%s/%s/%s", h.Env, eventID, id, p.Filename),
 				UploadedAt: now,
 			},
-			contentType: p.ContentType,
+			// Normalize to lowercase so the presigned URL's Content-Type header
+			// matches what XHR sends (e.g. "image/JPEG" → "image/jpeg").
+			contentType: strings.ToLower(p.ContentType),
 		}
 	}
 

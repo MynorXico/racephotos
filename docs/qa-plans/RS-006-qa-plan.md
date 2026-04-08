@@ -438,8 +438,8 @@ Body: { "photos": [{"filename":"a.jpg","contentType":"image/jpeg","size":"big"}]
 
 ## Risk areas
 
-**Risk 1 — Orphan DynamoDB records on mid-batch presign failure (TC-013) — HIGH**
-The handler writes all Photo records to DynamoDB before generating any presign URLs (lines 136–159). If `PresignPutObject` fails on item N, items 0 through N-1 have DynamoDB records with `status=uploading` but no presigned URL was ever returned to the caller. These records cannot self-heal: the photo-processor only fires on S3 ObjectCreated events, which will never arrive because the upload never happened. There is no cleanup job, no TTL on `status=uploading` records, and no mechanism for the photographer to discover these ghost records. This is a correctness gap that should be addressed — either by reversing the write order (presign first, then write to DynamoDB on first S3 ObjectCreated), or by adding a TTL-based cleaner, or by rolling back the DynamoDB writes on presign failure.
+**Risk 1 — Orphan DynamoDB records on mid-batch presign failure — MITIGATED**
+The handler generates all presigned URLs first (pure local crypto, lines 172–186) and only writes to DynamoDB after all URLs are successfully generated (lines 189–195). If `PresignPutObject` fails on item N, no DynamoDB records have been written yet, so no orphan records can be created. TC-013 verifies this order: a `PresignPutObject` error must not trigger a `BatchCreatePhotos` call.
 
 **Risk 2 — Unprocessed items on DynamoDB retry are silently ignored (TC-014) — HIGH**
 `store.go` line 63–67: the second `BatchWriteItem` call (the retry for unprocessed items) ignores its own `UnprocessedItems` return value (`if _, err := ...`). If DynamoDB is persistently throttled, the retry also produces unprocessed items, the function returns `nil`, and some photos are never written. The handler then generates presigned URLs for those photo IDs and returns 200 to the client. The photographer uploads successfully, but some photos have no DynamoDB record, so they will never appear in search results. This is a silent data loss path.
