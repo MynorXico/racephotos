@@ -57,35 +57,32 @@ export class PhotoStorageConstruct extends Construct {
       : cdk.RemovalPolicy.DESTROY;
 
     // ── Raw bucket CORS origins ───────────────────────────────────────────────
-    // Mirrors the ApiConstruct CORS pattern.
     // Custom domain envs: lock to that origin.
     // No custom domain: read the CloudFront frontend origin from SSM context
     // (populated by generate-cdk-context.sh before synth). On first deploy the
-    // SSM param doesn't exist yet → CDK returns a dummy → fall back to '*'.
-    // Pipeline self-mutates and tightens CORS to the real domain on the next run.
-    // dev env additionally allows localhost:4200 so engineers can test locally.
+    // SSM param doesn't exist yet → CDK returns a dummy → origins list is empty
+    // and the CORS rule is omitted entirely (no wildcard fallback). The pipeline
+    // self-mutates and the real origin is applied on the next run.
+    // dev always additionally allows localhost:4200 for local testing.
     const hasCustomDomain =
       config.domainName !== 'none' &&
       !config.domainName.startsWith('dummy-value-for-') &&
       config.certificateArn.startsWith('arn:');
 
-    let rawCorsOrigins: string[];
+    const rawCorsOrigins: string[] = [];
     if (hasCustomDomain) {
-      rawCorsOrigins = [`https://${config.domainName}`];
+      rawCorsOrigins.push(`https://${config.domainName}`);
     } else {
       const frontendDomain = ssm.StringParameter.valueFromLookup(
         this,
         `/racephotos/env/${config.envName}/frontend-origin`,
       );
-      if (frontendDomain.startsWith('dummy-value-for-')) {
-        rawCorsOrigins = ['*'];
-      } else {
-        rawCorsOrigins = [`https://${frontendDomain}`];
+      if (!frontendDomain.startsWith('dummy-value-for-')) {
+        rawCorsOrigins.push(`https://${frontendDomain}`);
       }
     }
-    // Always add localhost for dev so engineers can test locally, regardless of
-    // whether the dev env is configured with a custom domain.
-    if (config.envName === 'dev' && !rawCorsOrigins.includes('*')) {
+    // Always add localhost for dev regardless of custom domain configuration.
+    if (config.envName === 'dev') {
       rawCorsOrigins.push('http://localhost:4200');
     }
 
@@ -110,14 +107,16 @@ export class PhotoStorageConstruct extends Construct {
       // The bucket is private (blockPublicAccess) and authorization is
       // enforced by the presigned URL signature — CORS headers here only
       // control whether the browser's preflight OPTIONS is accepted.
-      cors: [
+      // Rule is omitted when no valid origins are known (first-deploy bootstrap)
+      // rather than falling back to '*'.
+      cors: rawCorsOrigins.length > 0 ? [
         {
           allowedOrigins: rawCorsOrigins,
           allowedMethods: [s3.HttpMethods.PUT],
           allowedHeaders: ['Content-Type'],
           maxAge: 3000,
         },
-      ],
+      ] : undefined,
     });
 
     // ── Processed bucket (watermarked copies) ─────────────────────────────────
