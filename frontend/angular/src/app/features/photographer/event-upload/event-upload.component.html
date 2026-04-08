@@ -1,0 +1,182 @@
+<div class="upload-container">
+
+  <!-- ── Breadcrumb / page header ──────────────────────────────────────────── -->
+  <div class="page-header">
+    <button
+      mat-icon-button
+      [routerLink]="['/photographer/events', eventId]"
+      aria-label="Back to event"
+    >
+      <mat-icon>arrow_back</mat-icon>
+    </button>
+    <div class="header-text">
+      <h1 class="mat-headline-small">Upload Photos</h1>
+      @if (eventsLoading()) {
+        <mat-progress-bar mode="indeterminate" class="event-name-skeleton"></mat-progress-bar>
+      } @else if (selectedEvent()) {
+        <p class="mat-body-medium event-name">{{ selectedEvent()!.name }}</p>
+      }
+    </div>
+  </div>
+
+  <!-- ── Presign error banner ──────────────────────────────────────────────── -->
+  @if (presignError()) {
+    <mat-card class="error-banner" role="alert" aria-live="assertive">
+      <mat-card-content class="error-banner-content">
+        <mat-icon class="error-icon">error</mat-icon>
+        <span class="mat-body-medium">Could not request upload URLs. {{ presignError() }}</span>
+        <button
+          #tryAgainBtn
+          mat-stroked-button
+          (click)="onTryAgain()"
+          aria-label="Try requesting upload URLs again"
+        >
+          Try again
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <!-- ── Drop zone (shown when not in progress and not complete) ───────────── -->
+  @if (!uploadInProgress() && !uploadComplete()) {
+    <mat-card
+      class="drop-zone"
+      [class.drop-zone--active]="isDragOver"
+      role="region"
+      aria-label="Photo upload drop zone"
+      tabindex="0"
+      (dragover)="onDragOver($event)"
+      (dragleave)="onDragLeave($event)"
+      (drop)="onDrop($event)"
+      (keydown)="onDropZoneKeyDown($event)"
+    >
+      <mat-card-content class="drop-zone-content">
+        <mat-icon class="upload-icon">cloud_upload</mat-icon>
+        <p class="mat-title-medium">Drag photos here</p>
+        <p class="mat-body-medium hint-text">JPEG and PNG only · or</p>
+        <input
+          #fileInput
+          type="file"
+          multiple
+          accept="image/jpeg,image/png"
+          aria-label="Select photo files to upload"
+          class="visually-hidden"
+          (change)="onFileInputChange($event)"
+        />
+        <button
+          mat-stroked-button
+          type="button"
+          aria-label="Browse and select photo files"
+          (click)="openFilePicker()"
+        >
+          Browse files
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <!-- ── Progress panel (shown while uploads are in flight) ───────────────── -->
+  @if (uploadInProgress()) {
+    <mat-card class="progress-panel">
+      <mat-card-content>
+        <mat-progress-bar
+          [mode]="uploadedCount() === 0 ? 'buffer' : 'determinate'"
+          [value]="progressPercent()"
+          aria-label="Upload progress"
+          [attr.aria-valuenow]="progressPercent()"
+          aria-valuemin="0"
+          aria-valuemax="100"
+        ></mat-progress-bar>
+        <p class="mat-body-large progress-counter" aria-live="polite">
+          <strong>{{ uploadedCount() }}</strong> of <strong>{{ uploadTotal() }}</strong> photos uploaded
+        </p>
+        <p class="mat-body-small warning-text">
+          <mat-icon class="warning-inline-icon">warning</mat-icon>
+          Do not close this tab while uploading.
+        </p>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <!-- ── Failed files list (shown after session ends, when failures exist) ── -->
+  @if (hasFailures() && !uploadInProgress()) {
+    <div class="failed-section">
+      <div class="failed-section-header">
+        <mat-icon class="error-inline-icon">error_outline</mat-icon>
+        <h2 class="mat-title-small failed-heading">Failed uploads</h2>
+        <button
+          mat-flat-button
+          color="warn"
+          class="retry-all-btn"
+          aria-label="Retry all failed uploads"
+          (click)="onRetryAll()"
+        >
+          <mat-icon>refresh</mat-icon>
+          Retry all failed
+        </button>
+      </div>
+      <mat-list class="failed-list">
+        @for (failed of failedFiles(); track failed.file.name) {
+          <mat-list-item class="failed-item">
+            <mat-icon matListItemIcon class="error-file-icon">broken_image</mat-icon>
+            <span matListItemTitle class="failed-filename">{{ failed.file.name }}</span>
+            <span matListItemLine class="failed-error mat-body-small">{{ failed.errorMessage }}</span>
+            <button
+              mat-stroked-button
+              color="warn"
+              matListItemMeta
+              [attr.aria-label]="retryAriaLabel(failed.file.name)"
+              (click)="onRetryFile(failed)"
+            >
+              Retry
+            </button>
+          </mat-list-item>
+        }
+      </mat-list>
+    </div>
+  }
+
+  <!-- ── Success panel (all files uploaded) ───────────────────────────────── -->
+  @if (uploadComplete() && !hasFailures()) {
+    <mat-card class="success-panel">
+      <mat-card-content class="success-content">
+        <mat-icon class="success-icon">check_circle</mat-icon>
+        <h2 class="mat-title-large" aria-live="polite">Upload complete</h2>
+        <p class="mat-body-large">
+          <strong>{{ uploadTotal() }}</strong> photos uploaded successfully.
+        </p>
+        <button
+          #viewPhotosBtn
+          mat-flat-button
+          color="primary"
+          [routerLink]="['/photographer/events', eventId, 'photos']"
+          aria-label="View uploaded photos for this event"
+        >
+          View photos
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
+
+  <!-- ── Partial-failure panel (some succeeded, some failed) ──────────────── -->
+  @if (uploadComplete() && hasFailures()) {
+    <mat-card class="partial-failure-panel">
+      <mat-card-content class="partial-failure-content">
+        <mat-icon class="partial-failure-icon">warning_amber</mat-icon>
+        <h2 class="mat-title-large">Upload finished with errors</h2>
+        <p class="mat-body-large">
+          <strong>{{ uploadedCount() }}</strong> of <strong>{{ uploadTotal() }}</strong> photos uploaded.
+          <strong>{{ failedFiles().length }}</strong> failed.
+        </p>
+        <button
+          mat-stroked-button
+          [routerLink]="['/photographer/events', eventId, 'photos']"
+          aria-label="View uploaded photos for this event"
+        >
+          View photos
+        </button>
+      </mat-card-content>
+    </mat-card>
+  }
+
+</div>

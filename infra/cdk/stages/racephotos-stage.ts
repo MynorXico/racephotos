@@ -8,6 +8,7 @@ import { AuthStack } from '../stacks/auth-stack';
 import { SesStack } from '../stacks/ses-stack';
 import { PhotographerStack } from '../stacks/photographer-stack';
 import { EventStack } from '../stacks/event-stack';
+import { PhotoUploadStack } from '../stacks/photo-upload-stack';
 
 interface RacePhotosStageProps extends cdk.StageProps {
   config: EnvConfig;
@@ -86,6 +87,18 @@ export class RacePhotosStage extends cdk.Stage {
     });
     eventStack.addDependency(storage);
     eventStack.addDependency(auth);
+
+    // PhotoUploadStack — RS-006
+    // presign-photos Lambda: POST /events/{eventId}/photos/presign (JWT required)
+    // Depends on StorageStack (raw bucket, photos table, events table) and AuthStack (API).
+    const photoUploadStack = new PhotoUploadStack(this, 'PhotoUpload', {
+      env: props.env,
+      config,
+      db: storage.db,
+      storage: storage.photoStorage,
+    });
+    photoUploadStack.addDependency(storage);
+    photoUploadStack.addDependency(auth);
 
     // FrontendStack — Angular SPA on S3 + CloudFront.
     // FrontendConstruct reads apiBaseUrl, userPoolId, and clientId from SSM via
