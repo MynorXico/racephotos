@@ -20,7 +20,7 @@ import (
 
 const (
 	maxPresignBatch = 100
-	presignTTL      = 15 * time.Minute
+	presignTTL      = 60 * time.Minute
 	maxPhotoBytes   = 50 * 1024 * 1024 // 50 MB
 )
 

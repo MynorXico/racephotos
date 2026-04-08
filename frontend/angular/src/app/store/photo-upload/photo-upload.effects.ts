@@ -151,7 +151,7 @@ export class PhotoUploadEffects {
     return new Observable<void>((subscriber) => {
       const xhr = new XMLHttpRequest();
       // 5-minute timeout per file. Without this, xhr.ontimeout never fires.
-      xhr.timeout = 5 * 60 * 1000;
+      xhr.timeout = 10 * 60 * 1000;
       xhr.open('PUT', presignedUrl);
       xhr.setRequestHeader('Content-Type', contentType);
 
