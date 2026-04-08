@@ -2,7 +2,7 @@
 
 **ID**: RS-006
 **Epic**: Photo Upload / Frontend
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
