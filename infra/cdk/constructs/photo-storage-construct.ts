@@ -82,9 +82,11 @@ export class PhotoStorageConstruct extends Construct {
       } else {
         rawCorsOrigins = [`https://${frontendDomain}`];
       }
-      if (config.envName === 'dev' && !rawCorsOrigins.includes('*')) {
-        rawCorsOrigins.push('http://localhost:4200');
-      }
+    }
+    // Always add localhost for dev so engineers can test locally, regardless of
+    // whether the dev env is configured with a custom domain.
+    if (config.envName === 'dev' && !rawCorsOrigins.includes('*')) {
+      rawCorsOrigins.push('http://localhost:4200');
     }
 
     // ── Raw bucket (private originals) ────────────────────────────────────────
