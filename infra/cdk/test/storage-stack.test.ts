@@ -129,11 +129,14 @@ describe('PhotoStorageConstruct', () => {
 
   test('raw bucket has CORS rule allowing PUT for presigned uploads', () => {
     const t = makeTemplate(devConfig);
+    // devConfig has no custom domain and SSM returns a dummy → only localhost:4200
+    // is present (no wildcard fallback).
     t.hasResourceProperties('AWS::S3::Bucket', {
       BucketName: 'racephotos-raw-dev',
       CorsConfiguration: {
         CorsRules: [
           Match.objectLike({
+            AllowedOrigins: ['http://localhost:4200'],
             AllowedMethods: ['PUT'],
             AllowedHeaders: ['Content-Type'],
           }),
