@@ -197,7 +197,7 @@ export class EventUploadComponent implements OnInit, OnDestroy {
   // ── Upload control ────────────────────────────────────────────────────────────
 
   onRetryFile(failedFile: FailedFile): void {
-    this.store.dispatch(PhotoUploadActions.retryFile({ file: failedFile.file }));
+    this.store.dispatch(PhotoUploadActions.retryFile({ file: failedFile.file, eventId: this.eventId }));
   }
 
   onRetryAll(): void {
@@ -219,7 +219,7 @@ export class EventUploadComponent implements OnInit, OnDestroy {
 
   private startUpload(files: File[]): void {
     this.lastAttemptedFiles = files;
-    this.store.dispatch(PhotoUploadActions.uploadFiles({ files }));
+    this.store.dispatch(PhotoUploadActions.uploadFiles({ files, eventId: this.eventId }));
   }
 
   private filterAccepted(files: File[]): File[] {

@@ -63,9 +63,6 @@ func main() {
 
 	slog.Info("presign-photos Lambda starting",
 		slog.String("env", env),
-		slog.String("rawBucket", rawBucket),
-		slog.String("photosTable", photosTable),
-		slog.String("eventsTable", eventsTable),
 	)
 
 	lambda.Start(h.Handle)

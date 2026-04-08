@@ -7,7 +7,6 @@ import {
   concatMap,
   map,
   mergeMap,
-  switchMap,
   tap,
 } from 'rxjs/operators';
 
@@ -38,13 +37,13 @@ export class PhotoUploadEffects {
   uploadFiles$ = createEffect(() =>
     this.actions$.pipe(
       ofType(PhotoUploadActions.uploadFiles),
-      switchMap(({ files }) => {
+      concatMap(({ files, eventId }) => {
         const batches: File[][] = [];
         for (let i = 0; i < files.length; i += PRESIGN_BATCH_SIZE) {
           batches.push(files.slice(i, i + PRESIGN_BATCH_SIZE));
         }
         return from(batches).pipe(
-          concatMap((batch) => of(PhotoUploadActions.presignBatch({ batch }))),
+          concatMap((batch) => of(PhotoUploadActions.presignBatch({ batch, eventId }))),
         );
       }),
     ),
@@ -56,27 +55,19 @@ export class PhotoUploadEffects {
   retryFile$ = createEffect(() =>
     this.actions$.pipe(
       ofType(PhotoUploadActions.retryFile),
-      map(({ file }) => PhotoUploadActions.presignBatch({ batch: [file] })),
+      map(({ file, eventId }) => PhotoUploadActions.presignBatch({ batch: [file], eventId })),
     ),
   );
 
   /**
    * On `Presign Batch`: call POST /events/{eventId}/photos/presign, then
    * dispatch `Presign Batch Success` or `Presign Batch Failure`.
-   * The eventId is read from the URL — the component must cache it.
+   * The eventId comes from the action payload (set by the component from ActivatedRoute).
    */
   presignBatch$ = createEffect(() =>
     this.actions$.pipe(
       ofType(PhotoUploadActions.presignBatch),
-      concatMap(({ batch }) => {
-        // Extract eventId from the current browser URL: /photographer/events/{id}/upload
-        const eventId = this.extractEventIdFromUrl();
-        if (!eventId) {
-          return of(
-            PhotoUploadActions.presignBatchFailure({ error: 'Could not determine event ID' }),
-          );
-        }
-
+      concatMap(({ batch, eventId }) => {
         const payload = {
           photos: batch.map((f) => ({
             filename: f.name,
@@ -121,17 +112,19 @@ export class PhotoUploadEffects {
   /**
    * On `Presign Batch Success`: upload each file directly to S3 via XHR
    * (XMLHttpRequest required for `progress` event tracking).
-   * Concurrency is limited to 5 simultaneous PUTs (mergeMap concurrency param).
+   * concatMap processes one batch's files at a time; mergeMap within each batch
+   * caps concurrent PUTs at S3_PUT_CONCURRENCY (AC5: max 5 concurrent uploads).
    */
   uploadToS3$ = createEffect(() =>
     this.actions$.pipe(
       ofType(PhotoUploadActions.presignBatchSuccess),
-      mergeMap(({ presignedFiles }) =>
+      concatMap(({ presignedFiles }) =>
         from(presignedFiles).pipe(
           mergeMap(
             ({ file, presignedUrl, contentType }) =>
               this.uploadViaXHR(presignedUrl, file, contentType).pipe(
-                tap(() => {/* XHR completed */}),
+                // eslint-disable-next-line @typescript-eslint/no-empty-function
+                tap(() => {}),
                 map(() => PhotoUploadActions.fileUploadProgress({ uploadedCount: 1 })),
                 catchError((err: Error) =>
                   of(
@@ -176,13 +169,5 @@ export class PhotoUploadEffects {
       // Abort the upload if the Observable is unsubscribed (e.g. component destroyed).
       return () => xhr.abort();
     });
-  }
-
-  /** Extract the event ID from the current browser pathname. */
-  private extractEventIdFromUrl(): string | null {
-    if (typeof window === 'undefined') return null;
-    // Pattern: /photographer/events/{id}/upload
-    const match = window.location.pathname.match(/\/photographer\/events\/([^/]+)\/upload/);
-    return match?.[1] ?? null;
   }
 }

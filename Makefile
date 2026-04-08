@@ -27,12 +27,16 @@ test-integration:
 		fi \
 	done
 
-# Build all Lambda binaries (linux/amd64 for Lambda runtime)
+# Build all Lambda binaries.
+# presign-photos targets ARM64 (Graviton2); all other Lambdas target x86_64.
+ARM64_LAMBDAS := presign-photos
 build:
 	@for lambda in $(LAMBDAS); do \
 		if [ -d lambdas/$$lambda ]; then \
 			echo "==> build: $$lambda"; \
-			cd lambdas/$$lambda && GOOS=linux GOARCH=amd64 go build -o bootstrap . && cd ../..; \
+			ARCH=amd64; \
+			for a in $(ARM64_LAMBDAS); do [ "$$lambda" = "$$a" ] && ARCH=arm64; done; \
+			cd lambdas/$$lambda && GOOS=linux GOARCH=$$ARCH go build -o bootstrap . && cd ../..; \
 		fi \
 	done
 

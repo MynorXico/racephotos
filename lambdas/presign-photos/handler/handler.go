@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -19,6 +20,7 @@ import (
 const (
 	maxPresignBatch = 100
 	presignTTL      = 15 * time.Minute
+	maxPhotoBytes   = 50 * 1024 * 1024 // 50 MB
 )
 
 // allowedContentTypes is the set of accepted MIME types for RS-006.
@@ -27,6 +29,10 @@ var allowedContentTypes = map[string]bool{
 	"image/jpeg": true,
 	"image/png":  true,
 }
+
+// safeFilename accepts filenames containing only alphanumerics, dots, hyphens, and
+// underscores (max 255 chars). Prevents path-traversal via ../sequences or null bytes.
+var safeFilename = regexp.MustCompile(`^[a-zA-Z0-9._\-]{1,255}$`)
 
 // S3Presigner generates presigned S3 PUT URLs.
 type S3Presigner interface {
@@ -83,6 +89,11 @@ func (h *Handler) Handle(ctx context.Context, req events.APIGatewayV2HTTPRequest
 	if eventID == "" {
 		return errResponse(400, "missing eventId"), nil
 	}
+	// Validate eventId is a UUID to prevent enumeration probing and enforce the
+	// project's input-validation contract (CLAUDE.md).
+	if _, err := uuid.Parse(eventID); err != nil {
+		return errResponse(400, "invalid eventId"), nil
+	}
 
 	var body presignRequest
 	if err := json.Unmarshal([]byte(req.Body), &body); err != nil {
@@ -94,8 +105,15 @@ func (h *Handler) Handle(ctx context.Context, req events.APIGatewayV2HTTPRequest
 		return errResponse(400, fmt.Sprintf("batch exceeds maximum of %d items", maxPresignBatch)), nil
 	}
 
-	// AC10: validate content types.
+	// Validate each photo entry: filename, size, and content type.
 	for i, p := range body.Photos {
+		if !safeFilename.MatchString(p.Filename) {
+			return errResponse(400, fmt.Sprintf("photos[%d]: invalid filename", i)), nil
+		}
+		if p.Size <= 0 || p.Size > maxPhotoBytes {
+			return errResponse(400, fmt.Sprintf("photos[%d]: size must be between 1 and %d bytes", i, maxPhotoBytes)), nil
+		}
+		// AC10: validate content types.
 		if !allowedContentTypes[p.ContentType] {
 			return errResponse(400, fmt.Sprintf("photos[%d]: unsupported contentType %q; accepted: image/jpeg, image/png", i, p.ContentType)), nil
 		}
@@ -117,19 +135,47 @@ func (h *Handler) Handle(ctx context.Context, req events.APIGatewayV2HTTPRequest
 		return errResponse(403, "forbidden"), nil
 	}
 
-	// Build Photo records (status="uploading", RS-006 note: RS-007 transitions to "processing").
+	// Build photo IDs and S3 keys. Presigning happens before the DynamoDB write so
+	// that a PresignPutObject failure leaves no ghost records.
 	now := time.Now().UTC().Format(time.RFC3339)
-	photos := make([]models.Photo, len(body.Photos))
+	type photoWork struct {
+		photo       models.Photo
+		contentType string
+	}
+	work := make([]photoWork, len(body.Photos))
 	for i, p := range body.Photos {
 		id := uuid.New().String()
-		photos[i] = models.Photo{
-			ID:         id,
-			EventID:    eventID,
-			BibNumbers: []string{},
-			Status:     "uploading",
-			RawS3Key:   fmt.Sprintf("%s/%s/%s/%s", h.Env, eventID, id, p.Filename),
-			UploadedAt: now,
+		work[i] = photoWork{
+			photo: models.Photo{
+				ID:         id,
+				EventID:    eventID,
+				Status:     "uploading",
+				RawS3Key:   fmt.Sprintf("%s/%s/%s/%s", h.Env, eventID, id, p.Filename),
+				UploadedAt: now,
+			},
+			contentType: p.ContentType,
 		}
+	}
+
+	// Generate presigned PUT URLs before any DynamoDB writes.
+	// PresignPutObject is pure local crypto (no network I/O); errors here are fatal
+	// but leave the database in a consistent state.
+	results := make([]photoPresignResult, len(work))
+	photos := make([]models.Photo, len(work))
+	for i, w := range work {
+		url, err := h.Presigner.PresignPutObject(ctx, h.RawBucket, w.photo.RawS3Key, w.contentType, presignTTL)
+		if err != nil {
+			slog.ErrorContext(ctx, "PresignPutObject failed",
+				slog.String("photoId", w.photo.ID),
+				slog.String("error", err.Error()),
+			)
+			return errResponse(500, "internal server error"), nil
+		}
+		results[i] = photoPresignResult{
+			PhotoID:      w.photo.ID,
+			PresignedURL: url,
+		}
+		photos[i] = w.photo
 	}
 
 	// Persist photos (store handles chunking into BatchWriteItem calls of 25).
@@ -139,23 +185,6 @@ func (h *Handler) Handle(ctx context.Context, req events.APIGatewayV2HTTPRequest
 			slog.String("error", err.Error()),
 		)
 		return errResponse(500, "internal server error"), nil
-	}
-
-	// Generate presigned PUT URLs.
-	results := make([]photoPresignResult, len(photos))
-	for i, photo := range photos {
-		url, err := h.Presigner.PresignPutObject(ctx, h.RawBucket, photo.RawS3Key, body.Photos[i].ContentType, presignTTL)
-		if err != nil {
-			slog.ErrorContext(ctx, "PresignPutObject failed",
-				slog.String("photoId", photo.ID),
-				slog.String("error", err.Error()),
-			)
-			return errResponse(500, "internal server error"), nil
-		}
-		results[i] = photoPresignResult{
-			PhotoID:      photo.ID,
-			PresignedURL: url,
-		}
 	}
 
 	return jsonResponse(200, map[string]any{"photos": results})
