@@ -144,6 +144,8 @@ export class EventUploadComponent implements OnInit, OnDestroy {
   onBeforeUnload(event: BeforeUnloadEvent): void {
     if (this.uploadInProgress()) {
       event.preventDefault();
+      // Modern browsers require returnValue to be set to show the confirmation dialog.
+      event.returnValue = true;
     }
   }
 

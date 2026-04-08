@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -100,6 +101,10 @@ func (h *Handler) Handle(ctx context.Context, req events.APIGatewayV2HTTPRequest
 		return errResponse(400, "invalid request body"), nil
 	}
 
+	// Reject empty batches — no business value and wastes a DynamoDB consistent read.
+	if len(body.Photos) == 0 {
+		return errResponse(400, "no photos provided"), nil
+	}
 	// AC2: enforce batch limit.
 	if len(body.Photos) > maxPresignBatch {
 		return errResponse(400, fmt.Sprintf("batch exceeds maximum of %d items", maxPresignBatch)), nil
@@ -113,8 +118,8 @@ func (h *Handler) Handle(ctx context.Context, req events.APIGatewayV2HTTPRequest
 		if p.Size <= 0 || p.Size > maxPhotoBytes {
 			return errResponse(400, fmt.Sprintf("photos[%d]: size must be between 1 and %d bytes", i, maxPhotoBytes)), nil
 		}
-		// AC10: validate content types.
-		if !allowedContentTypes[p.ContentType] {
+		// AC10: validate content types (case-insensitive — some clients send "image/JPEG").
+		if !allowedContentTypes[strings.ToLower(p.ContentType)] {
 			return errResponse(400, fmt.Sprintf("photos[%d]: unsupported contentType %q; accepted: image/jpeg, image/png", i, p.ContentType)), nil
 		}
 	}

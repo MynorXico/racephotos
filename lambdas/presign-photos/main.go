@@ -25,7 +25,7 @@ import (
 )
 
 func main() {
-	env := os.Getenv("RACEPHOTOS_ENV")
+	env := mustGetenv("RACEPHOTOS_ENV")
 	rawBucket := mustGetenv("RACEPHOTOS_RAW_BUCKET")
 	photosTable := mustGetenv("RACEPHOTOS_PHOTOS_TABLE")
 	eventsTable := mustGetenv("RACEPHOTOS_EVENTS_TABLE")
