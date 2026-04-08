@@ -7,6 +7,7 @@ import { StorageStack } from '../stacks/storage-stack';
 import { AuthStack } from '../stacks/auth-stack';
 import { SesStack } from '../stacks/ses-stack';
 import { PhotographerStack } from '../stacks/photographer-stack';
+import { EventStack } from '../stacks/event-stack';
 
 interface RacePhotosStageProps extends cdk.StageProps {
   config: EnvConfig;
@@ -75,6 +76,16 @@ export class RacePhotosStage extends cdk.Stage {
     });
     photographerStack.addDependency(storage);
     photographerStack.addDependency(auth);
+
+    // EventStack — RS-005
+    // Five event management Lambdas. Depends on StorageStack (tables) and AuthStack (API).
+    const eventStack = new EventStack(this, 'Events', {
+      env: props.env,
+      config,
+      db: storage.db,
+    });
+    eventStack.addDependency(storage);
+    eventStack.addDependency(auth);
 
     // FrontendStack — Angular SPA on S3 + CloudFront.
     // FrontendConstruct reads apiBaseUrl, userPoolId, and clientId from SSM via

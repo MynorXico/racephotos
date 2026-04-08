@@ -1,0 +1,193 @@
+<div class="event-detail-container">
+  @if (loading()) {
+    <!-- Loading state -->
+    <div class="loading-state">
+      <p class="mat-headline-small">Loading event&hellip;</p>
+      <mat-spinner diameter="48" mode="indeterminate"></mat-spinner>
+    </div>
+  }
+
+  @else if (error()) {
+    <!-- Error state -->
+    <div class="error-state">
+      @if (error() === 'not_found') {
+        <mat-card appearance="outlined" class="error-card">
+          <mat-card-content>
+            <mat-icon class="state-icon error-icon">event_busy</mat-icon>
+            <p class="mat-title-medium">Event not found.</p>
+            <button mat-stroked-button routerLink="/photographer/events">Back to My Events</button>
+          </mat-card-content>
+        </mat-card>
+      } @else {
+        <mat-card appearance="outlined" class="error-card">
+          <mat-card-content>
+            <mat-icon class="state-icon error-icon">event_busy</mat-icon>
+            <p class="mat-title-medium">Could not load this event.</p>
+            <button mat-stroked-button (click)="onRetry()">Retry</button>
+          </mat-card-content>
+        </mat-card>
+      }
+    </div>
+  }
+
+  @else if (selectedEvent()) {
+    @let event = selectedEvent()!;
+
+    <!-- Page header -->
+    <div class="page-header">
+      <div class="event-title-row">
+        <h1 [id]="'event-heading-' + event.id" class="mat-headline-small">{{ event.name }}</h1>
+        @if (event.status === 'active') {
+          <mat-chip class="status-chip status-active" [attr.aria-label]="'Status: Active'" [disableRipple]="true">
+            <mat-icon matChipAvatar>radio_button_checked</mat-icon>
+            Active
+          </mat-chip>
+        } @else {
+          <mat-chip class="status-chip status-archived" [attr.aria-label]="'Status: Archived'" [disableRipple]="true">
+            <mat-icon matChipAvatar>archive</mat-icon>
+            Archived
+          </mat-chip>
+        }
+      </div>
+      <div class="action-buttons">
+        <button
+          mat-stroked-button
+          [routerLink]="['/photographer/events', event.id, 'edit']"
+          [attr.aria-label]="'Edit event ' + event.name"
+        >
+          <mat-icon>edit</mat-icon>
+          Edit
+        </button>
+        @if (event.status === 'active') {
+          <button
+            mat-stroked-button
+            (click)="onArchive()"
+            [attr.aria-label]="'Archive event ' + event.name"
+          >
+            <mat-icon>archive</mat-icon>
+            Archive
+          </button>
+        }
+      </div>
+    </div>
+
+    <!-- Details card -->
+    <mat-card appearance="outlined" class="details-card">
+      <mat-card-content>
+        <h2 class="mat-title-medium card-heading">Event Details</h2>
+        <div class="details-grid">
+          <div class="detail-item">
+            <span class="mat-body-small detail-label">Date</span>
+            <span class="mat-body-medium">{{ event.date | date: 'longDate' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="mat-body-small detail-label">Location</span>
+            <span class="mat-body-medium">{{ event.location }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="mat-body-small detail-label">Price per photo</span>
+            <span class="mat-body-medium">{{ event.currency }} {{ event.pricePerPhoto | number: '1.2-2' }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="mat-body-small detail-label">Currency</span>
+            <span class="mat-body-medium">{{ event.currency }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="mat-body-small detail-label">Watermark text</span>
+            <span class="mat-body-medium">{{ event.watermarkText }}</span>
+          </div>
+          <div class="detail-item">
+            <span class="mat-body-small detail-label">Created</span>
+            <span class="mat-body-medium">{{ event.createdAt | date: 'medium' }}</span>
+          </div>
+        </div>
+      </mat-card-content>
+    </mat-card>
+
+    <!-- Links row -->
+    <div class="links-row">
+      <button
+        mat-flat-button
+        color="primary"
+        disabled
+        aria-label="Upload photos — coming soon"
+        aria-disabled="true"
+      >
+        <mat-icon>upload</mat-icon>
+        Upload Photos
+      </button>
+      <button
+        mat-flat-button
+        disabled
+        aria-label="View photos — coming soon"
+        aria-disabled="true"
+      >
+        <mat-icon>photo_library</mat-icon>
+        View Photos
+      </button>
+    </div>
+
+    <!-- Share section -->
+    <mat-card appearance="outlined" class="share-card">
+      <mat-card-content>
+        <div class="share-heading-row">
+          <mat-icon>share</mat-icon>
+          <h2 class="mat-title-medium">Share with Runners</h2>
+        </div>
+        <p class="mat-body-small secondary-text">
+          Share this link or QR code with runners so they can search for their photos.
+        </p>
+
+        <div class="share-grid">
+          <!-- URL section -->
+          <div class="url-section">
+            <span class="mat-body-small detail-label">Public URL</span>
+            <mat-form-field appearance="outline" class="url-field">
+              <input
+                matInput
+                [value]="publicUrl"
+                readonly
+                aria-label="Public event URL"
+                aria-readonly="true"
+              />
+            </mat-form-field>
+            <button
+              mat-stroked-button
+              (click)="onCopyLink()"
+              aria-label="Copy event link to clipboard"
+            >
+              <mat-icon>{{ linkCopied() ? 'check' : 'content_copy' }}</mat-icon>
+              {{ linkCopied() ? 'Copied!' : 'Copy link' }}
+            </button>
+            <span class="visually-hidden" aria-live="polite">
+              {{ linkCopied() ? 'Copied!' : '' }}
+            </span>
+          </div>
+
+          <!-- QR code section -->
+          <figure
+            class="qr-section"
+            [attr.aria-label]="'QR code for event ' + event.name + ' public URL'"
+            role="img"
+          >
+            <qrcode
+              #qrCanvas
+              [qrdata]="publicUrl"
+              [width]="200"
+              [errorCorrectionLevel]="'M'"
+              [margin]="1"
+            ></qrcode>
+            <button
+              mat-stroked-button
+              (click)="onDownloadQr()"
+              aria-label="Download QR code as PNG image"
+            >
+              <mat-icon>download</mat-icon>
+              Download QR
+            </button>
+          </figure>
+        </div>
+      </mat-card-content>
+    </mat-card>
+  }
+</div>

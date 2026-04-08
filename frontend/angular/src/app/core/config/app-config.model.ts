@@ -27,4 +27,12 @@ export interface AppConfig {
   /** AWS region where the Cognito User Pool is deployed — used by Amplify.
    *  Example: "us-east-1" */
   cognitoRegion: string;
+
+  /**
+   * Public base URL for the RaceShots frontend, without trailing slash.
+   * Used to build share links (e.g. publicBaseUrl + '/events/{id}').
+   * Falls back to window.location.origin if not set in config.json.
+   * Example: "https://www.example.com"
+   */
+  publicBaseUrl?: string;
 }

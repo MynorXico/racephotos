@@ -1,0 +1,35 @@
+<h2 mat-dialog-title class="mat-title-large">Archive event?</h2>
+
+<mat-dialog-content>
+  <p class="mat-body-medium">
+    Archiving <strong>{{ data.eventName }}</strong> will remove it from the public event listing.
+    Runners who already have the direct link can still find their photos.
+    This action cannot be undone.
+  </p>
+  <p class="mat-body-small secondary-text">
+    You can still view and share this event's direct link after archiving.
+  </p>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button
+    mat-stroked-button
+    [mat-dialog-close]="false"
+    cdkFocusInitial
+  >
+    Cancel
+  </button>
+  <button
+    mat-flat-button
+    class="archive-confirm-btn"
+    [mat-dialog-close]="true"
+    [disabled]="loading()"
+    [attr.aria-label]="'Confirm archive event ' + data.eventName"
+  >
+    @if (loading()) {
+      <mat-spinner diameter="20"></mat-spinner>
+    } @else {
+      Archive event
+    }
+  </button>
+</mat-dialog-actions>
