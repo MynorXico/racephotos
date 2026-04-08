@@ -1,5 +1,6 @@
 import * as cdk from 'aws-cdk-lib';
 import * as s3 from 'aws-cdk-lib/aws-s3';
+import * as ssm from 'aws-cdk-lib/aws-ssm';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import { Construct } from 'constructs';
@@ -55,6 +56,37 @@ export class PhotoStorageConstruct extends Construct {
       ? cdk.RemovalPolicy.RETAIN
       : cdk.RemovalPolicy.DESTROY;
 
+    // ── Raw bucket CORS origins ───────────────────────────────────────────────
+    // Custom domain envs: lock to that origin.
+    // No custom domain: read the CloudFront frontend origin from SSM context
+    // (populated by generate-cdk-context.sh before synth). On first deploy the
+    // SSM param doesn't exist yet → CDK returns a dummy → origins list is empty
+    // and the CORS rule is omitted entirely (no wildcard fallback). The pipeline
+    // self-mutates and the real origin is applied on the next run.
+    // dev always additionally allows localhost:4200 for local testing.
+    const hasCustomDomain =
+      config.domainName !== 'none' &&
+      !config.domainName.startsWith('dummy-value-for-') &&
+      config.certificateArn.startsWith('arn:');
+
+    const rawCorsOrigins: string[] = [];
+    if (hasCustomDomain) {
+      rawCorsOrigins.push(`https://${config.domainName}`);
+    } else {
+      const frontendDomain = ssm.StringParameter.valueFromLookup(
+        this,
+        `/racephotos/env/${config.envName}/frontend-origin`,
+      );
+      if (!frontendDomain.startsWith('dummy-value-for-')) {
+        rawCorsOrigins.push(`https://${frontendDomain}`);
+      }
+    }
+    // Always add localhost for dev and local (LocalStack) environments regardless
+    // of custom domain configuration.
+    if (config.envName === 'dev' || config.envName === 'local') {
+      rawCorsOrigins.push('http://localhost:4200');
+    }
+
     // ── Raw bucket (private originals) ────────────────────────────────────────
     // Lambda execution role only — never publicly accessible (domain rule 7).
     // Originals are safe to expire after photoRetentionDays: the watermarked copy
@@ -72,6 +104,20 @@ export class PhotoStorageConstruct extends Construct {
           expiration: cdk.Duration.days(config.photoRetentionDays),
         },
       ],
+      // CORS is required for browser XHR presigned PUT uploads (RS-006).
+      // The bucket is private (blockPublicAccess) and authorization is
+      // enforced by the presigned URL signature — CORS headers here only
+      // control whether the browser's preflight OPTIONS is accepted.
+      // Rule is omitted when no valid origins are known (first-deploy bootstrap)
+      // rather than falling back to '*'.
+      cors: rawCorsOrigins.length > 0 ? [
+        {
+          allowedOrigins: rawCorsOrigins,
+          allowedMethods: [s3.HttpMethods.PUT],
+          allowedHeaders: ['*'],
+          maxAge: 3000,
+        },
+      ] : undefined,
     });
 
     // ── Processed bucket (watermarked copies) ─────────────────────────────────

@@ -26,7 +26,10 @@ const prodConfig: EnvConfig = {
 
 function makeTemplate(config: EnvConfig): Template {
   const app = new cdk.App();
-  const stack = new StorageStack(app, 'TestStorageStack', { config });
+  const stack = new StorageStack(app, 'TestStorageStack', {
+    config,
+    env: { account: config.account, region: config.region },
+  });
   return Template.fromStack(stack);
 }
 
@@ -122,6 +125,44 @@ describe('PhotoStorageConstruct', () => {
       Description: Match.stringLikeRegexp('CloudFront CDN domain.*processed photos'),
     });
     expect(Object.keys(outputs).length).toBe(1);
+  });
+
+  test('raw bucket has CORS rule allowing PUT for presigned uploads', () => {
+    const t = makeTemplate(devConfig);
+    // devConfig has no custom domain and SSM returns a dummy → only localhost:4200
+    // is present (no wildcard fallback).
+    t.hasResourceProperties('AWS::S3::Bucket', {
+      BucketName: 'racephotos-raw-dev',
+      CorsConfiguration: {
+        CorsRules: [
+          Match.objectLike({
+            AllowedOrigins: ['http://localhost:4200'],
+            AllowedMethods: ['PUT'],
+            AllowedHeaders: ['*'],
+          }),
+        ],
+      },
+    });
+  });
+
+  test('raw bucket CORS allows custom domain origin for prod', () => {
+    const prodWithDomain: EnvConfig = {
+      ...prodConfig,
+      domainName: 'app.example.com',
+      certificateArn: 'arn:aws:acm:us-east-1:000000000000:certificate/abc',
+    };
+    const t = makeTemplate(prodWithDomain);
+    t.hasResourceProperties('AWS::S3::Bucket', {
+      BucketName: 'racephotos-raw-prod',
+      CorsConfiguration: {
+        CorsRules: [
+          Match.objectLike({
+            AllowedOrigins: ['https://app.example.com'],
+            AllowedMethods: ['PUT'],
+          }),
+        ],
+      },
+    });
   });
 });
 
@@ -304,7 +345,10 @@ describe('ProcessingPipelineConstruct', () => {
 
   test('S3 notification is attached to the raw bucket (not the processed bucket)', () => {
     const app = new cdk.App();
-    const stack = new StorageStack(app, 'TestStorageStack', { config: devConfig });
+    const stack = new StorageStack(app, 'TestStorageStack', {
+      config: devConfig,
+      env: { account: devConfig.account, region: devConfig.region },
+    });
     const t = Template.fromStack(stack);
     // The S3BucketNotifications custom resource references the raw bucket's logical ID.
     // Obtain both bucket logical IDs and confirm the notification references the raw one.
@@ -383,7 +427,10 @@ describe('Security hardening', () => {
 
   test('prod stack has no autoDeleteObjects custom resource (RETAIN policy)', () => {
     const app = new cdk.App();
-    const stack = new StorageStack(app, 'ProdStack', { config: prodConfig });
+    const stack = new StorageStack(app, 'ProdStack', {
+      config: prodConfig,
+      env: { account: prodConfig.account, region: prodConfig.region },
+    });
     const t = Template.fromStack(stack);
     // CDK emits a Custom::S3AutoDeleteObjects resource only when autoDeleteObjects=true.
     // With enableDeletionProtection=true that resource must be absent.
