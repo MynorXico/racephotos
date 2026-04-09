@@ -12,7 +12,7 @@ export const {
 
 export const selectHasMorePages = createSelector(
   selectNextCursor,
-  (cursor) => cursor !== null,
+  (cursor) => !!cursor,
 );
 
 export const selectPhotoCount = createSelector(

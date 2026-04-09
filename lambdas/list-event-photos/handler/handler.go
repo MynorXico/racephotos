@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"regexp"
 	"strconv"
@@ -209,7 +208,12 @@ func errResponse(statusCode int, message string) events.APIGatewayV2HTTPResponse
 func jsonResponse(statusCode int, body any) (events.APIGatewayV2HTTPResponse, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
-		return errResponse(500, "internal server error"), fmt.Errorf("jsonResponse: marshal: %w", err)
+		// Log before returning so the failure is visible in CloudWatch. Returning a
+		// non-nil error from a Lambda handler causes API Gateway to ignore the
+		// response body and emit a 502 — return nil so the custom 500 body reaches
+		// the caller.
+		slog.Error("jsonResponse: marshal failed", slog.String("error", err.Error()))
+		return errResponse(500, "internal server error"), nil
 	}
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: statusCode,
