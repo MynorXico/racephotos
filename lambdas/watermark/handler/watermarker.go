@@ -17,7 +17,8 @@ const (
 	// watermarkFontPath is the TrueType font tried at runtime. If absent (minimal
 	// Lambda runtime), gg falls back to its built-in monospace font.
 	watermarkFontPath = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-	// watermarkAngleDeg is the counter-clockwise rotation of each watermark tile in degrees.
+	// watermarkAngleDeg is the tile rotation in degrees. Applied as -watermarkAngleDeg
+	// (clockwise) since gg.Rotate treats positive values as counter-clockwise.
 	watermarkAngleDeg = 30.0
 	// watermarkOpacity is the alpha of the white watermark text (0–255).
 	// 80 ≈ 31% opacity — visible enough to deter theft, light enough to preview the photo.
