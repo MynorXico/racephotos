@@ -70,6 +70,11 @@ func (w *GgWatermarker) ApplyTextWatermark(src io.Reader, text string) (image.Im
 	//      to the full image diagonal — this ensures all four corners are
 	//      covered even after the rotation is applied.
 	textW, textH := dc.MeasureString(text)
+	if textW <= 0 || textH <= 0 {
+		// Empty or unmeasurable text — return the image without a watermark rather
+		// than entering an infinite loop (zero rowSpacing would never advance y).
+		return img, nil
+	}
 	colSpacing := textW * 2.0 // horizontal gap between columns
 	rowSpacing := textH * 3.5 // vertical gap between rows
 
