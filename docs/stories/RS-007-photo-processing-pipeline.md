@@ -2,7 +2,7 @@
 
 **ID**: RS-007
 **Epic**: Photo Processing
-**Status**: ready
+**Status**: done
 **Has UI**: no
 
 ## Context
