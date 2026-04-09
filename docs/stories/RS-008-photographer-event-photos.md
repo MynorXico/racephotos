@@ -2,7 +2,7 @@
 
 **ID**: RS-008
 **Epic**: Photo Upload
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
