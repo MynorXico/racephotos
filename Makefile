@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer
+.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark
 
 LAMBDAS := presign-photos photo-processor watermark search payment get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events
 
@@ -135,3 +135,18 @@ invoke-update-photographer:
 	  -t template.yaml \
 	  -e lambdas/update-photographer/testdata/events/$(EVENT).json \
 	  --docker-network $(DOCKER_NETWORK)
+
+define invoke_lambda
+	@[ "$(EVENT)" ] || ( echo ">> EVENT is not set. Usage: make $@ EVENT=happy-path"; exit 1 )
+	cd lambdas/$(1) && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap .
+	sam local invoke $(2) \
+	  -t template.yaml \
+	  -e lambdas/$(1)/testdata/events/$(EVENT).json \
+	  --docker-network $(DOCKER_NETWORK)
+endef
+
+invoke-photo-processor:
+	$(call invoke_lambda,photo-processor,PhotoProcessorFunction)
+
+invoke-watermark:
+	$(call invoke_lambda,watermark,WatermarkFunction)

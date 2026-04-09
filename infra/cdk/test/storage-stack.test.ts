@@ -368,11 +368,11 @@ describe('ProcessingPipelineConstruct', () => {
     expect(bucketRef).toContain(rawBucketId);
   });
 
-  test('watermark queue has 2-minute visibility timeout', () => {
+  test('watermark queue has 6-minute visibility timeout', () => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::SQS::Queue', {
       QueueName: 'racephotos-watermark',
-      VisibilityTimeout: 120,
+      VisibilityTimeout: 360,
     });
   });
 
