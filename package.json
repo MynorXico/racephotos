@@ -11,7 +11,7 @@
     "@eslint/js": "^10.0.1",
     "angular-eslint": "^21.3.1",
     "husky": "^9.0.0",
-    "lint-staged": "^15.0.0",
+    "lint-staged": "^16.4.0",
     "prettier": "^3.0.0"
   },
   "lint-staged": {
