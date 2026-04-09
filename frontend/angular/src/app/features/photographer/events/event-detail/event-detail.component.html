@@ -118,10 +118,9 @@
         </button>
       }
       <button
-        mat-flat-button
-        disabled
-        aria-label="View photos — coming soon"
-        aria-disabled="true"
+        mat-stroked-button
+        [routerLink]="['/photographer/events', event.id, 'photos']"
+        [attr.aria-label]="'View photos for ' + event.name"
       >
         <mat-icon>photo_library</mat-icon>
         View Photos

@@ -1,0 +1,134 @@
+$amber-bg: #fff3e0;
+$amber-text: #e65100;
+
+.photo-card {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+// ── Thumbnail ────────────────────────────────────────────────────────────────
+
+.thumbnail-container {
+  position: relative;
+  padding-top: 56.25%; // 16:9
+  overflow: hidden;
+  background: var(--mat-sys-surface-variant);
+}
+
+.thumbnail-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.thumbnail-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.placeholder-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+}
+
+.placeholder-label {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// ── Content strip ────────────────────────────────────────────────────────────
+
+.card-content {
+  padding: 10px 12px 12px !important;
+}
+
+.badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 12px;
+  font-weight: 500;
+
+  &.badge--indexed {
+    background: var(--mat-sys-tertiary-container);
+    color: var(--mat-sys-on-tertiary-container);
+  }
+
+  &.badge--review {
+    background: $amber-bg;
+    color: $amber-text;
+  }
+
+  &.badge--error {
+    background: var(--mat-sys-error-container);
+    color: var(--mat-sys-on-error-container);
+  }
+
+  &.badge--processing {
+    background: var(--mat-sys-surface-variant);
+    color: var(--mat-sys-on-surface-variant);
+  }
+}
+
+.badge-icon {
+  font-size: 14px;
+  width: 14px;
+  height: 14px;
+}
+
+.error-info-btn {
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+
+  mat-icon {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+  }
+}
+
+// ── Bib & timestamp rows ─────────────────────────────────────────────────────
+
+.bib-row {
+  margin-top: 6px;
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: default;
+}
+
+.timestamp-row {
+  margin-top: 4px;
+  color: var(--mat-sys-on-surface-variant);
+  text-align: right;
+}
+
+// ── Mobile ───────────────────────────────────────────────────────────────────
+
+@media (max-width: 599px) {
+  .card-content {
+    padding: 8px 10px 10px !important;
+  }
+
+  .card-timestamp {
+    display: none;
+  }
+}

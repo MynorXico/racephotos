@@ -1,8 +1,8 @@
 # Story: Photographer views event photos gallery
 
 **ID**: RS-008
-**Epic**: Photo Upload / Frontend
-**Status**: ready
+**Epic**: Photo Upload
+**Status**: done
 **Has UI**: yes
 
 ## Context
@@ -11,13 +11,13 @@ After photos are uploaded and processed (RS-006, RS-007), the photographer needs
 
 ## Acceptance criteria
 
-- [ ] AC1: Given `GET /events/{id}/photos` is called with a valid Cognito JWT, when the caller owns the event, then paginated photo records are returned sorted by `uploadedAt` DESC: `{ photos: [{id, status, watermarkedS3Key, bibNumbers, uploadedAt}], nextCursor }`. Returns 403 if not the owner.
+- [ ] AC1: Given `GET /events/{id}/photos` is called with a valid Cognito JWT, when the caller owns the event, then paginated photo records are returned sorted by `uploadedAt` DESC: `{ photos: [{id, status, thumbnailUrl, bibNumbers, uploadedAt, errorReason}], nextCursor }` (`errorReason` is nullable — only populated when `status=error`) where `thumbnailUrl` is the full CloudFront URL (`https://{photoCdnDomain}/{watermarkedS3Key}`). Returns 403 if the caller does not own the event, 404 if the event does not exist, 401 if the JWT is missing or invalid.
 - [ ] AC2: Given an optional `?status=` query parameter is provided, when the Lambda processes the request, then only photos matching that status are returned.
 - [ ] AC3: Given a photographer visits `/photographer/events/{id}/photos`, when the page loads, then a photo grid is shown with watermarked thumbnails (using CloudFront processed bucket URL) or a placeholder icon for photos not yet watermarked.
-- [ ] AC4: Given photos are shown in the grid, then each photo displays a colour-coded status badge: green=indexed, amber=review_required, red=error, grey=uploading/processing.
+- [ ] AC4: Given photos are shown in the grid, when the grid renders each card, then each photo displays a colour-coded status badge: green=indexed, amber=review_required, red=error, grey=uploading/processing.
 - [ ] AC5: Given filter chips are shown (All / Indexed / Review Required / Error / Processing), when a chip is selected, then the grid re-fetches with the corresponding `?status=` filter.
-- [ ] AC6: Given more photos exist beyond the current page, then a "Load more" button triggers the next page fetch using the `nextCursor` value.
-- [ ] AC7: Given a photo has `status=error`, then its card shows an "Error" badge and a tooltip or description with the failure reason (if available in the Photo record).
+- [ ] AC6: Given more photos exist beyond the current page, when the photographer clicks the "Load more" button, then the next page is fetched using the `nextCursor` value and appended to the grid.
+- [ ] AC7: Given a photo has `status=error`, when the photographer views its card, then the card shows an "Error" badge and a tooltip or description with the failure reason (if available in the Photo record).
 
 ## Out of scope
 
@@ -37,7 +37,7 @@ After photos are uploaded and processed (RS-006, RS-007), the photographer needs
   ```
 - DynamoDB access pattern: Query `eventId-uploadedAt-index` GSI (PK=`eventId`, SK=`uploadedAt` DESC), filter by `status` if provided, cursor-based pagination using base64-encoded `LastEvaluatedKey`
 - API response must never include `rawS3Key` — that field is internal only (domain rule 7)
-- CloudFront URL construction: `https://{photoCdnDomain}/{watermarkedS3Key}` — `photoCdnDomain` injected via env var from `PhotoStorageConstruct` output; Angular constructs the full thumbnail URL client-side
+- CloudFront URL construction: the Lambda constructs `thumbnailUrl` as `https://{RACEPHOTOS_PHOTO_CDN_DOMAIN}/{watermarkedS3Key}` and returns it in the response; Angular uses `thumbnailUrl` directly — no client-side URL construction needed
 - New env vars:
   ```
   RACEPHOTOS_ENV              required — "local"|"dev"|"qa"|"staging"|"prod"
@@ -52,7 +52,8 @@ After photos are uploaded and processed (RS-006, RS-007), the photographer needs
   - Filter chips use Angular Material `MatChipsModule`; selecting a chip dispatches `PhotosActions.filterByStatus({ status })`
   - "Load more" button dispatches `PhotosActions.loadNextPage({ cursor })` — appends to existing photos array in store rather than replacing it
   - NgRx slice: `store/photos/` — state shape: `{ photos: Photo[], nextCursor: string | null, activeFilter: string | null, loading: boolean, error: string | null }`
-  - `AppConfigService` provides `photoCdnDomain` (injected from Angular environment at build time)
+  - Storybook stories required: `EventPhotosComponent` (states: loading, loaded-with-photos, empty, error), `PhotoStatusBadgePipe` (all four statuses: indexed, review_required, error, processing)
+  - Photo cards render `thumbnailUrl` returned directly from the API — no CDN domain config needed in Angular
 - `.env.example`: add `RACEPHOTOS_PHOTO_CDN_DOMAIN`
 
 ## Definition of Done

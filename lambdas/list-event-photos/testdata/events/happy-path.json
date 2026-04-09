@@ -1,0 +1,41 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /events/{id}/photos",
+  "rawPath": "/events/event-1/photos",
+  "rawQueryString": "",
+  "headers": {
+    "authorization": "Bearer eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.stub"
+  },
+  "queryStringParameters": {},
+  "pathParameters": {
+    "id": "event-1"
+  },
+  "requestContext": {
+    "accountId": "123456789012",
+    "apiId": "stub",
+    "domainName": "stub.execute-api.us-east-1.amazonaws.com",
+    "domainPrefix": "stub",
+    "http": {
+      "method": "GET",
+      "path": "/events/event-1/photos",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "curl/7.79.1"
+    },
+    "requestId": "stub-request-id",
+    "routeKey": "GET /events/{id}/photos",
+    "stage": "$default",
+    "time": "01/Apr/2026:10:00:00 +0000",
+    "timeEpoch": 1743501600000,
+    "authorizer": {
+      "jwt": {
+        "claims": {
+          "sub": "photographer-1",
+          "email": "photographer@example.com"
+        },
+        "scopes": null
+      }
+    }
+  },
+  "isBase64Encoded": false
+}

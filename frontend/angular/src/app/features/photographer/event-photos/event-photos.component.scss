@@ -1,0 +1,202 @@
+.event-photos-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+// ── Header ───────────────────────────────────────────────────────────────────
+
+.page-header {
+  margin-bottom: 16px;
+}
+
+.header-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+
+  h1 {
+    margin: 0;
+  }
+}
+
+.event-name-subtitle {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.event-name-skeleton {
+  width: 160px;
+  height: 18px;
+  border-radius: 4px;
+}
+
+// ── Filter chips ─────────────────────────────────────────────────────────────
+
+.filter-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.error-chip-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  color: var(--mat-sys-error);
+}
+
+// ── Results summary ───────────────────────────────────────────────────────────
+
+.results-summary {
+  margin: 0 0 16px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// ── Photo grid ────────────────────────────────────────────────────────────────
+
+.photo-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+}
+
+// ── Skeleton ──────────────────────────────────────────────────────────────────
+
+.skeleton-card {
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--mat-sys-outline-variant);
+}
+
+.skeleton-thumbnail {
+  padding-top: 56.25%;
+  border-radius: 4px 4px 0 0;
+}
+
+.skeleton-meta {
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.skeleton-badge {
+  width: 80px;
+  height: 20px;
+  border-radius: 10px;
+}
+
+.skeleton-bibs {
+  width: 120px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+// ── Shimmer animation ─────────────────────────────────────────────────────────
+
+.shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--mat-sys-surface-variant) 25%,
+    color-mix(in srgb, var(--mat-sys-surface-variant) 60%, white) 50%,
+    var(--mat-sys-surface-variant) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+@keyframes shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+// ── Empty / error states ──────────────────────────────────────────────────────
+
+.state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px;
+  gap: 8px;
+}
+
+.state-icon {
+  font-size: 64px;
+  width: 64px;
+  height: 64px;
+  color: var(--mat-sys-on-surface-variant);
+
+  &--error {
+    color: var(--mat-sys-error);
+  }
+}
+
+.state-body {
+  color: var(--mat-sys-on-surface-variant);
+  margin-bottom: 8px;
+}
+
+// ── Load more ─────────────────────────────────────────────────────────────────
+
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 24px;
+  margin-bottom: 40px;
+}
+
+.load-more-spinner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// ── Accessibility ─────────────────────────────────────────────────────────────
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+// ── Mobile ────────────────────────────────────────────────────────────────────
+
+@media (max-width: 599px) {
+  .event-photos-container {
+    padding: 16px 16px 40px;
+    max-width: none;
+  }
+
+  .header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .photo-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .load-more-row button {
+    width: 100%;
+  }
+
+  .state-icon {
+    font-size: 48px;
+    width: 48px;
+    height: 48px;
+  }
+}
