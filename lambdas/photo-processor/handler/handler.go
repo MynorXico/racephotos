@@ -109,14 +109,29 @@ func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error 
 	}
 
 	// Domain rule 10: Rekognition is called exactly once per photo.
-	// SQS provides at-least-once delivery, so a redelivered message could re-invoke
-	// DetectText on an already-processed photo. Skip if status has moved past "processing".
-	if photo.Status != "processing" {
-		slog.InfoContext(ctx, "photo already processed — skipping Rekognition",
+	// SQS provides at-least-once delivery. On redelivery, the photo status may
+	// have already advanced past "processing" from a previous (partial) execution.
+	//
+	// We must NOT skip all downstream steps on redelivery — a Lambda crash between
+	// the DynamoDB status write and WriteBibEntries/SendWatermarkMessage would
+	// leave the photo indexed in the photos table but missing bib entries or a
+	// watermark. Instead:
+	//   - "indexed" / "review_required": skip Rekognition, re-drive downstream
+	//     idempotent steps using the bib numbers already stored in the photo record.
+	//   - "error": ack — do not retry a known-bad photo.
+	//   - any other unexpected status: treat as "processing" (Rekognition not yet run).
+	switch photo.Status {
+	case "error":
+		slog.InfoContext(ctx, "photo in error state — acking without reprocessing",
+			slog.String("photoId", photoID),
+		)
+		return nil
+	case "indexed", "review_required":
+		slog.InfoContext(ctx, "photo already processed — skipping Rekognition, re-driving downstream steps",
 			slog.String("photoId", photoID),
 			slog.String("status", photo.Status),
 		)
-		return nil
+		return h.driveDownstream(ctx, photo, photo.RawS3Key)
 	}
 
 	// Call Rekognition. On error: write status=error and ack (AC3).
@@ -157,33 +172,48 @@ func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error 
 		return fmt.Errorf("UpdatePhotoStatus %s: %w", photoID, err)
 	}
 
+	// Propagate the freshly-computed bibs and status so driveDownstream sees them.
+	photo.BibNumbers = bibs
+	photo.Status = update.Status
+	return h.driveDownstream(ctx, photo, rawS3Key)
+}
+
+// driveDownstream writes bib index entries and queues the watermark message.
+// It is called both on the normal processing path and on SQS redelivery when the
+// photo record is already in a terminal status (indexed/review_required) — making
+// these steps safe to re-run if a previous execution crashed partway through.
+// WriteBibEntries uses BatchWriteItem (PutRequest = idempotent overwrite).
+// SendWatermarkMessage is safe to re-send — the watermark Lambda checks its own state.
+func (h *Handler) driveDownstream(ctx context.Context, photo *models.Photo, rawS3Key string) error {
+	bibs := photo.BibNumbers
+
 	// Write one BibEntry per detected bib (fan-out — ADR-0003).
 	if len(bibs) > 0 {
 		entries := make([]models.BibEntry, len(bibs))
 		for i, bib := range bibs {
 			entries[i] = models.BibEntry{
 				BibKey:  fmt.Sprintf("%s#%s", photo.EventID, bib),
-				PhotoID: photoID,
+				PhotoID: photo.ID,
 			}
 		}
 		if err := h.BibIndex.WriteBibEntries(ctx, entries); err != nil {
-			return fmt.Errorf("WriteBibEntries %s: %w", photoID, err)
+			return fmt.Errorf("WriteBibEntries %s: %w", photo.ID, err)
 		}
 	}
 
 	// Publish to watermark queue regardless of bib detection outcome (watermark
 	// applies event name overlay to every photo, not just indexed ones).
 	if err := h.WatermarkQ.SendWatermarkMessage(ctx, models.WatermarkMessage{
-		PhotoID:  photoID,
+		PhotoID:  photo.ID,
 		EventID:  photo.EventID,
 		RawS3Key: rawS3Key,
 	}); err != nil {
-		return fmt.Errorf("SendWatermarkMessage %s: %w", photoID, err)
+		return fmt.Errorf("SendWatermarkMessage %s: %w", photo.ID, err)
 	}
 
 	slog.InfoContext(ctx, "photo processed",
-		slog.String("photoId", photoID),
-		slog.String("status", update.Status),
+		slog.String("photoId", photo.ID),
+		slog.String("status", photo.Status),
 		slog.Int("bibCount", len(bibs)),
 	)
 

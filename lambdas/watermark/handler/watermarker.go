@@ -7,6 +7,7 @@ import (
 	_ "image/jpeg" // register JPEG decoder
 	_ "image/png"  // register PNG decoder
 	"io"
+	"log/slog"
 
 	"github.com/fogleman/gg"
 )
@@ -56,7 +57,12 @@ func (w *GgWatermarker) ApplyTextWatermark(src io.Reader, text string) (image.Im
 	// TTF via dc.LoadFontFace for branding; this keeps the binary lean for v1.
 	// Attempt to load a system TrueType font for better rendering.
 	// If unavailable (e.g. minimal Lambda runtime), gg uses its built-in font.
-	_ = dc.LoadFontFace(watermarkFontPath, watermarkFontSize)
+	if err := dc.LoadFontFace(watermarkFontPath, watermarkFontSize); err != nil {
+		slog.Warn("watermarker: could not load font — falling back to built-in",
+			slog.String("path", watermarkFontPath),
+			slog.String("error", err.Error()),
+		)
+	}
 
 	dc.SetColor(color.White)
 	textY := height - barH/2

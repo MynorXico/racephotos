@@ -175,8 +175,10 @@ func TestHandler_ProcessBatch(t *testing.T) {
 		},
 		{
 			// TC-027 / domain rule 10: on SQS redelivery the photo may already be
-			// indexed; we must not call Rekognition again.
-			name: "domain rule 10: already-indexed photo — Rekognition skipped",
+			// indexed (previous execution wrote status but crashed before downstream
+			// steps). Rekognition must NOT be called again, but bib entries and the
+			// watermark message must still be re-driven using stored bib numbers.
+			name:    "domain rule 10: already-indexed photo — Rekognition skipped, downstream re-driven",
 			sqsBody: s3NotifBody("racephotos-raw-local", testRawS3Key),
 			setupDetector: func(m *mocks.MockTextDetector) {
 				// DetectText must NOT be called
@@ -184,12 +186,39 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {
 				already := testPhoto()
 				already.Status = "indexed"
+				already.BibNumbers = []string{"101"}
 				m.EXPECT().GetPhotoById(gomock.Any(), testPhotoID).Return(already, nil)
 				// UpdatePhotoStatus must NOT be called
 			},
+			setupBibIndex: func(m *mocks.MockBibIndexStore) {
+				// bib entries are re-written (idempotent PutItem overwrite)
+				m.EXPECT().WriteBibEntries(gomock.Any(), []models.BibEntry{
+					{BibKey: "evt-aaa#101", PhotoID: testPhotoID},
+				}).Return(nil)
+			},
+			setupWmQueue: func(m *mocks.MockWatermarkQueue) {
+				// watermark message re-queued
+				m.EXPECT().SendWatermarkMessage(gomock.Any(), models.WatermarkMessage{
+					PhotoID:  testPhotoID,
+					EventID:  testEventID,
+					RawS3Key: testRawS3Key,
+				}).Return(nil)
+			},
+			wantFailures: 0,
+		},
+		{
+			// TC-027b: status=error on redelivery — ack, do not reprocess.
+			name:    "domain rule 10: error-status photo — acked without reprocessing",
+			sqsBody: s3NotifBody("racephotos-raw-local", testRawS3Key),
+			setupDetector: func(m *mocks.MockTextDetector) {},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {
+				already := testPhoto()
+				already.Status = "error"
+				m.EXPECT().GetPhotoById(gomock.Any(), testPhotoID).Return(already, nil)
+			},
 			setupBibIndex: func(m *mocks.MockBibIndexStore) {},
 			setupWmQueue:  func(m *mocks.MockWatermarkQueue) {},
-			wantFailures:  0, // acked — idempotent
+			wantFailures:  0,
 		},
 		{
 			// TC-003 / domain rule 9: S3 event envelope with two records — both must be
