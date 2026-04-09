@@ -154,13 +154,14 @@ invoke-watermark:
 invoke-list-event-photos:
 	$(call invoke_lambda,list-event-photos,ListEventPhotosFunction)
 
-# Preview the watermark locally without deploying.
-# Usage:
-#   make test-watermark IN=photo.jpg
-#   make test-watermark IN=photo.jpg OUT=out.jpg TEXT="MyEvent · racephotos.example.com"
+## test-watermark: apply watermark locally and open the result — no AWS needed.
+## Usage:
+##   make test-watermark IN=/path/to/photo.jpg
+##   make test-watermark IN=/path/to/photo.jpg TEXT="My Event 2026" OUT=/tmp/result.jpg
 test-watermark:
-	@[ "$(IN)" ] || ( echo ">> IN is not set. Usage: make $@ IN=photo.jpg"; exit 1 )
+	@[ "$(IN)" ] || ( echo ">> IN is not set. Usage: make test-watermark IN=/path/to/photo.jpg"; exit 1 )
 	cd lambdas/watermark && go run ./cmd/test-watermark \
-	  -in "$(abspath $(IN))" \
-	  -out "$(or $(OUT),$(abspath $(IN))-watermarked.jpg)" \
-	  -text "$(or $(TEXT),MyEvent · racephotos.example.com)"
+	  -in "$(IN)" \
+	  -out "$(or $(OUT),/tmp/watermarked-preview.jpg)" \
+	  -text "$(or $(TEXT),RaceShots · racephotos.example.com)"
+	@echo ">> open $(or $(OUT),/tmp/watermarked-preview.jpg)"
