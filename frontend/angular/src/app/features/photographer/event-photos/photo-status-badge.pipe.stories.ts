@@ -2,7 +2,7 @@ import { Meta, StoryObj, moduleMetadata } from '@storybook/angular';
 import { Component } from '@angular/core';
 import { NgClass } from '@angular/common';
 import { MatIconModule } from '@angular/material/icon';
-import { PhotoStatusBadgePipe, BadgeConfig } from './photo-status-badge.pipe';
+import { PhotoStatusBadgePipe } from './photo-status-badge.pipe';
 
 @Component({
   standalone: true,
