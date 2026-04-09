@@ -1,8 +1,10 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { RouterTestingModule } from '@angular/router/testing';
+import { convertToParamMap } from '@angular/router';
 import { provideMockStore, MockStore } from '@ngrx/store/testing';
 import { ActivatedRoute } from '@angular/router';
+import { of } from 'rxjs';
 
 import { EventPhotosComponent } from './event-photos.component';
 import { Photo, PhotosActions } from '../../../store/photos/photos.actions';
@@ -17,7 +19,9 @@ import {
 } from '../../../store/photos/photos.selectors';
 import { selectSelectedEvent, selectEventsLoading } from '../../../store/events/events.selectors';
 
-const mockRoute = { snapshot: { paramMap: { get: () => 'event-1' } } };
+// Provide paramMap as an Observable — the component uses toSignal(this.route.paramMap)
+// rather than snapshot.paramMap so it reacts to navigation between different events.
+const mockRoute = { paramMap: of(convertToParamMap({ id: 'event-1' })) };
 
 const mockPhoto: Photo = {
   id: 'p1',

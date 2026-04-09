@@ -98,9 +98,12 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 	}
 
-	// Launch the ownership check and photo listing concurrently. Both are
-	// independent DynamoDB calls; running them in parallel reduces wall-clock
-	// latency to max(GetItem, Query) instead of their sum.
+	// Launch both DynamoDB calls concurrently. The listing goroutine uses a
+	// cancellable child context so it can be aborted early when ownership fails,
+	// avoiding a wasted DynamoDB Query on unauthorised requests.
+	listCtx, cancelList := context.WithCancel(ctx)
+	defer cancelList()
+
 	ownerCh := make(chan ownerResult, 1)
 	listCh := make(chan listResult, 1)
 
@@ -110,14 +113,15 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}()
 
 	go func() {
-		photos, nc, err := h.Photos.ListPhotosByEvent(ctx, eventID, filter, cursor, limit)
+		photos, nc, err := h.Photos.ListPhotosByEvent(listCtx, eventID, filter, cursor, limit)
 		listCh <- listResult{photos: photos, nextCursor: nc, err: err}
 	}()
 
-	// Evaluate ownership first; discard the list result if unauthorised.
+	// Evaluate ownership first; cancel and drain the listing goroutine if unauthorised.
 	ownerRes := <-ownerCh
 	if ownerRes.err != nil {
-		<-listCh // drain to prevent goroutine leak
+		cancelList() // abort in-flight DynamoDB Query
+		<-listCh    // drain to prevent goroutine leak
 		if errors.Is(ownerRes.err, ErrEventNotFound) {
 			return errResponse(404, "event not found"), nil
 		}
@@ -128,7 +132,8 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(500, "internal server error"), nil
 	}
 	if ownerRes.id != photographerID {
-		<-listCh // drain to prevent goroutine leak
+		cancelList() // abort in-flight DynamoDB Query
+		<-listCh    // drain to prevent goroutine leak
 		return errResponse(403, "forbidden"), nil
 	}
 

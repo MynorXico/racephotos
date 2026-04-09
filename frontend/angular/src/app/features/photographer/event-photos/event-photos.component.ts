@@ -1,10 +1,10 @@
 import {
   Component,
-  OnInit,
   OnDestroy,
   inject,
   ChangeDetectionStrategy,
   computed,
+  effect,
 } from '@angular/core';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { Store } from '@ngrx/store';
@@ -46,7 +46,7 @@ interface FilterChip { label: string; value: PhotoStatus | null }
   templateUrl: './event-photos.component.html',
   styleUrl: './event-photos.component.scss',
 })
-export class EventPhotosComponent implements OnInit, OnDestroy {
+export class EventPhotosComponent implements OnDestroy {
   private readonly store = inject(Store);
   private readonly route = inject(ActivatedRoute);
   private readonly titleService = inject(NavigationTitleService);
@@ -61,6 +61,12 @@ export class EventPhotosComponent implements OnInit, OnDestroy {
   readonly selectedEvent = toSignal(this.store.select(selectSelectedEvent), { initialValue: null });
   readonly eventsLoading = toSignal(this.store.select(selectEventsLoading), { initialValue: false });
 
+  // Derive eventId reactively from the route so that Angular component reuse
+  // (navigation between different events without destroying this instance) is
+  // handled correctly. Using snapshot.paramMap would only capture the ID once.
+  private readonly paramMap = toSignal(this.route.paramMap);
+  readonly eventId = computed(() => this.paramMap()?.get('id') ?? '');
+
   readonly filterChips: FilterChip[] = [
     { label: 'All', value: null },
     { label: 'Indexed', value: 'indexed' },
@@ -74,20 +80,24 @@ export class EventPhotosComponent implements OnInit, OnDestroy {
   readonly isInitialLoading = computed(() => this.loading() && this.photos().length === 0);
   readonly isLoadMoreInFlight = computed(() => this.loading() && this.photos().length > 0);
 
-  eventId = '';
-
   filterLabel(status: PhotoStatus | null): string {
     const chip = this.filterChips.find((c) => c.value === status);
     return chip?.label.toLowerCase() ?? '';
   }
 
-  ngOnInit(): void {
+  constructor() {
     this.titleService.setTitle('Event Photos');
-    this.eventId = this.route.snapshot.paramMap.get('id') ?? '';
-    if (this.eventId) {
-      this.store.dispatch(EventsActions.loadEvent({ id: this.eventId }));
-      this.store.dispatch(PhotosActions.loadPhotos({ eventId: this.eventId }));
-    }
+
+    // Re-load photos whenever the route's :id param changes. This handles both
+    // the initial render and Angular component reuse during navigation.
+    effect(() => {
+      const id = this.eventId();
+      if (id) {
+        this.store.dispatch(PhotosActions.clearPhotos());
+        this.store.dispatch(EventsActions.loadEvent({ id }));
+        this.store.dispatch(PhotosActions.loadPhotos({ eventId: id }));
+      }
+    });
   }
 
   ngOnDestroy(): void {
@@ -95,17 +105,17 @@ export class EventPhotosComponent implements OnInit, OnDestroy {
   }
 
   onFilterChip(status: PhotoStatus | null): void {
-    this.store.dispatch(PhotosActions.filterByStatus({ eventId: this.eventId, status }));
+    this.store.dispatch(PhotosActions.filterByStatus({ eventId: this.eventId(), status }));
   }
 
   onLoadMore(): void {
     const cursor = this.nextCursor();
     if (cursor) {
-      this.store.dispatch(PhotosActions.loadNextPage({ eventId: this.eventId, cursor }));
+      this.store.dispatch(PhotosActions.loadNextPage({ eventId: this.eventId(), cursor }));
     }
   }
 
   onRetry(): void {
-    this.store.dispatch(PhotosActions.loadPhotos({ eventId: this.eventId }));
+    this.store.dispatch(PhotosActions.loadPhotos({ eventId: this.eventId() }));
   }
 }
