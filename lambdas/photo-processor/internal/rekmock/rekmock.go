@@ -80,22 +80,9 @@ func (d *FileBackedDetector) DetectText(ctx context.Context, input *rekognition.
 // extractPhotoID parses photoId from a raw S3 key of the form
 // {envName}/{eventId}/{photoId}/{filename}.
 func extractPhotoID(key string) string {
-	parts := splitKey(key)
+	parts := strings.Split(key, "/")
 	if len(parts) >= 4 {
 		return parts[2]
 	}
 	return key
-}
-
-func splitKey(key string) []string {
-	var parts []string
-	start := 0
-	for i := 0; i < len(key); i++ {
-		if key[i] == '/' {
-			parts = append(parts, key[start:i])
-			start = i + 1
-		}
-	}
-	parts = append(parts, key[start:])
-	return parts
 }

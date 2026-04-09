@@ -195,7 +195,7 @@ func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error 
 // Returns deduplicated bib strings and the highest confidence score.
 func (h *Handler) extractBibs(detections []types.TextDetection) ([]string, float64) {
 	seen := map[string]struct{}{}
-	var bibs []string
+	bibs := make([]string, 0)
 	var maxConf float64
 
 	for _, d := range detections {
@@ -219,8 +219,5 @@ func (h *Handler) extractBibs(detections []types.TextDetection) ([]string, float
 		}
 	}
 
-	if bibs == nil {
-		bibs = []string{}
-	}
 	return bibs, maxConf // Rekognition native range 0–100; stored as-is in DynamoDB
 }

@@ -13,6 +13,9 @@ import (
 	"github.com/racephotos/shared/models"
 )
 
+// defaultJPEGQuality is the JPEG encoding quality for watermarked output photos.
+const defaultJPEGQuality = 85
+
 // Handler holds dependencies for the watermark Lambda.
 type Handler struct {
 	RawReader       RawPhotoReader
@@ -85,7 +88,7 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 
 	// Encode watermarked image to JPEG.
 	var buf bytes.Buffer
-	if err := jpeg.Encode(&buf, watermarked, &jpeg.Options{Quality: 85}); err != nil {
+	if err := jpeg.Encode(&buf, watermarked, &jpeg.Options{Quality: defaultJPEGQuality}); err != nil {
 		return fmt.Errorf("processMessage: jpeg.Encode: %w", err)
 	}
 

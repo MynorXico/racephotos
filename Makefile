@@ -136,18 +136,17 @@ invoke-update-photographer:
 	  -e lambdas/update-photographer/testdata/events/$(EVENT).json \
 	  --docker-network $(DOCKER_NETWORK)
 
-invoke-photo-processor:
+define invoke_lambda
 	@[ "$(EVENT)" ] || ( echo ">> EVENT is not set. Usage: make $@ EVENT=happy-path"; exit 1 )
-	cd lambdas/photo-processor && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap .
-	sam local invoke PhotoProcessorFunction \
+	cd lambdas/$(1) && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap .
+	sam local invoke $(2) \
 	  -t template.yaml \
-	  -e lambdas/photo-processor/testdata/events/$(EVENT).json \
+	  -e lambdas/$(1)/testdata/events/$(EVENT).json \
 	  --docker-network $(DOCKER_NETWORK)
+endef
+
+invoke-photo-processor:
+	$(call invoke_lambda,photo-processor,PhotoProcessorFunction)
 
 invoke-watermark:
-	@[ "$(EVENT)" ] || ( echo ">> EVENT is not set. Usage: make $@ EVENT=happy-path"; exit 1 )
-	cd lambdas/watermark && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap .
-	sam local invoke WatermarkFunction \
-	  -t template.yaml \
-	  -e lambdas/watermark/testdata/events/$(EVENT).json \
-	  --docker-network $(DOCKER_NETWORK)
+	$(call invoke_lambda,watermark,WatermarkFunction)
