@@ -48,6 +48,9 @@ func (w *GgWatermarker) ApplyTextWatermark(src io.Reader, text string) (image.Im
 
 	// ── Semi-transparent bar ──────────────────────────────────────────────────
 	barH := watermarkFontSize*1.8 + watermarkPaddingFrac*height
+	if barH > height {
+		barH = height // cap for very small images
+	}
 	dc.SetColor(watermarkBarColor)
 	dc.DrawRectangle(0, height-barH, width, barH)
 	dc.Fill()

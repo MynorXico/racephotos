@@ -27,7 +27,10 @@ type ImageWatermarker interface {
 
 // EventStore reads event configuration from DynamoDB (racephotos-events).
 type EventStore interface {
-	GetWatermarkText(ctx context.Context, eventId string) (string, error)
+	// GetWatermarkText returns the photographer-configured watermark text and the
+	// event name. If watermarkText is empty, the handler falls back to the default:
+	// "{eventName} · racephotos.example.com".
+	GetWatermarkText(ctx context.Context, eventId string) (watermarkText, eventName string, err error)
 }
 
 // PhotoStore updates the watermarkedS3Key on a Photo record (racephotos-photos).

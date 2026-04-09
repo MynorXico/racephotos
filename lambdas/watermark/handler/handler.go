@@ -13,8 +13,17 @@ import (
 	"github.com/racephotos/shared/models"
 )
 
-// defaultJPEGQuality is the JPEG encoding quality for watermarked output photos.
-const defaultJPEGQuality = 85
+const (
+	// defaultJPEGQuality is the JPEG encoding quality for watermarked output photos.
+	defaultJPEGQuality = 85
+	// watermarkDefaultDomain is the placeholder domain used in the default watermark
+	// text when the photographer has not set a custom watermarkText on the event.
+	watermarkDefaultDomain = "racephotos.example.com"
+	// watermarkMaxChars is the maximum number of characters allowed in the rendered
+	// watermark string. Text longer than this is truncated with "…" to prevent
+	// overflow on narrow images.
+	watermarkMaxChars = 60
+)
 
 // Handler holds dependencies for the watermark Lambda.
 type Handler struct {
@@ -67,10 +76,15 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 	)
 
 	// Fetch watermark text first — fast DynamoDB call; fail before expensive S3 I/O.
-	watermarkText, err := h.Events.GetWatermarkText(ctx, wm.EventID)
+	watermarkText, eventName, err := h.Events.GetWatermarkText(ctx, wm.EventID)
 	if err != nil {
 		return fmt.Errorf("processMessage: GetWatermarkText eventId=%s: %w", wm.EventID, err)
 	}
+	// Default watermark when photographer has not configured custom text (PRODUCT_CONTEXT.md).
+	if watermarkText == "" {
+		watermarkText = eventName + " · " + watermarkDefaultDomain
+	}
+	watermarkText = truncateWatermark(watermarkText, watermarkMaxChars)
 
 	// Download raw photo from private S3 bucket.
 	// rawS3Key is never included in log or error strings (CLAUDE.md — private bucket paths must not be logged).
@@ -111,4 +125,14 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 	)
 
 	return nil
+}
+
+// truncateWatermark truncates text to at most maxChars runes, appending "…" if cut.
+// Prevents long event names from overflowing the image width in DrawStringAnchored.
+func truncateWatermark(text string, maxChars int) string {
+	runes := []rune(text)
+	if len(runes) <= maxChars {
+		return text
+	}
+	return string(runes[:maxChars-1]) + "…"
 }

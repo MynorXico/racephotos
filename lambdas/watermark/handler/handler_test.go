@@ -68,7 +68,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			name:    "AC5: happy path — watermark applied, photo updated",
 			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key),
 			setupEventStore: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("Marathon 2026 · racephotos.example.com", nil)
+				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("Marathon 2026 · racephotos.example.com", "Marathon 2026", nil)
 			},
 			setupReader: func(m *mocks.MockRawPhotoReader) {
 				m.EXPECT().GetObject(gomock.Any(), gomock.Any(), testRawS3Key).
@@ -86,13 +86,34 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			wantFailures: 0,
 		},
 		{
+			// TC-019: when watermarkText is empty, default to "{eventName} · racephotos.example.com".
+			name:    "TC-019: empty watermarkText — default applied",
+			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key),
+			setupEventStore: func(m *mocks.MockEventStore) {
+				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("", "City Marathon 2026", nil)
+			},
+			setupReader: func(m *mocks.MockRawPhotoReader) {
+				m.EXPECT().GetObject(gomock.Any(), gomock.Any(), testRawS3Key).Return(nopReader(), nil)
+			},
+			setupWatermark: func(m *mocks.MockImageWatermarker) {
+				m.EXPECT().ApplyTextWatermark(gomock.Any(), "City Marathon 2026 · racephotos.example.com").Return(testImg(), nil)
+			},
+			setupWriter: func(m *mocks.MockProcessedPhotoWriter) {
+				m.EXPECT().PutObject(gomock.Any(), gomock.Any(), expectedKey, gomock.Any(), "image/jpeg").Return(nil)
+			},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().UpdateWatermarkedKey(gomock.Any(), testPhotoID, expectedKey).Return(nil)
+			},
+			wantFailures: 0,
+		},
+		{
 			// EventStore is called first — a DynamoDB failure goes to batchItemFailures
 			// before any S3 I/O is attempted.
 			name:    "EventStore error — message in batchItemFailures",
 			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key),
 			setupEventStore: func(m *mocks.MockEventStore) {
 				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).
-					Return("", errors.New("dynamodb: timeout"))
+					Return("", "", errors.New("dynamodb: timeout"))
 			},
 			setupReader:     func(m *mocks.MockRawPhotoReader) {},
 			setupWriter:     func(m *mocks.MockProcessedPhotoWriter) {},
@@ -105,7 +126,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			name:    "S3 GetObject error — message in batchItemFailures",
 			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key),
 			setupEventStore: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("text", nil)
+				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("text", "Event", nil)
 			},
 			setupReader: func(m *mocks.MockRawPhotoReader) {
 				m.EXPECT().GetObject(gomock.Any(), gomock.Any(), testRawS3Key).

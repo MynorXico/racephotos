@@ -98,32 +98,37 @@ type DynamoEventStore struct {
 	TableName string
 }
 
-// GetWatermarkText reads only the watermarkText field from the event record.
-func (s *DynamoEventStore) GetWatermarkText(ctx context.Context, eventId string) (string, error) {
+// GetWatermarkText reads watermarkText and name from the event record.
+// Returns both so the handler can fall back to the default when watermarkText is empty.
+func (s *DynamoEventStore) GetWatermarkText(ctx context.Context, eventId string) (string, string, error) {
 	key, err := attributevalue.MarshalMap(map[string]string{"id": eventId})
 	if err != nil {
-		return "", fmt.Errorf("GetWatermarkText: marshal key: %w", err)
+		return "", "", fmt.Errorf("GetWatermarkText: marshal key: %w", err)
 	}
 	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:                aws.String(s.TableName),
-		Key:                      key,
-		ProjectionExpression:     aws.String("#wt"),
-		ExpressionAttributeNames: map[string]string{"#wt": "watermarkText"},
+		TableName:            aws.String(s.TableName),
+		Key:                  key,
+		ProjectionExpression: aws.String("#wt, #n"),
+		ExpressionAttributeNames: map[string]string{
+			"#wt": "watermarkText",
+			"#n":  "name",
+		},
 	})
 	if err != nil {
-		return "", fmt.Errorf("GetWatermarkText: dynamodb.GetItem eventId=%s: %w", eventId, err)
+		return "", "", fmt.Errorf("GetWatermarkText: dynamodb.GetItem eventId=%s: %w", eventId, err)
 	}
 	if len(out.Item) == 0 {
-		return "", fmt.Errorf("GetWatermarkText: %w: eventId=%s", apperrors.ErrNotFound, eventId)
+		return "", "", fmt.Errorf("GetWatermarkText: %w: eventId=%s", apperrors.ErrNotFound, eventId)
 	}
 
 	var item struct {
 		WatermarkText string `dynamodbav:"watermarkText"`
+		Name          string `dynamodbav:"name"`
 	}
 	if err := attributevalue.UnmarshalMap(out.Item, &item); err != nil {
-		return "", fmt.Errorf("GetWatermarkText: unmarshal: %w", err)
+		return "", "", fmt.Errorf("GetWatermarkText: unmarshal: %w", err)
 	}
-	return item.WatermarkText, nil
+	return item.WatermarkText, item.Name, nil
 }
 
 // DynamoPhotoStore implements PhotoStore against racephotos-photos.

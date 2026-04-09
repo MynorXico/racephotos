@@ -33,12 +33,13 @@ func (m *MockEventStore) EXPECT() *MockEventStoreMockRecorder {
 }
 
 // GetWatermarkText mocks base method.
-func (m *MockEventStore) GetWatermarkText(ctx context.Context, eventId string) (string, error) {
+func (m *MockEventStore) GetWatermarkText(ctx context.Context, eventId string) (string, string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetWatermarkText", ctx, eventId)
 	ret0, _ := ret[0].(string)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
+	ret1, _ := ret[1].(string)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
 }
 
 // GetWatermarkText indicates an expected call of GetWatermarkText.
