@@ -11,7 +11,7 @@ import { PhotoStatusBadgePipe, BadgeConfig } from './photo-status-badge.pipe';
     <div style="display:flex;gap:12px;flex-wrap:wrap;padding:16px;">
       @for (status of statuses; track status) {
         @let badge = status | photoStatusBadge;
-        <span class="status-badge" [ngClass]="badge.cssClass" [style]="badgeStyle(badge)">
+        <span class="status-badge" [ngClass]="badge.cssClass">
           <mat-icon style="font-size:14px;width:14px;height:14px;">{{ badge.icon }}</mat-icon>
           {{ badge.label }}
         </span>
@@ -28,20 +28,14 @@ import { PhotoStatusBadgePipe, BadgeConfig } from './photo-status-badge.pipe';
       font-size: 12px;
       font-weight: 500;
     }
+    .badge--indexed   { background: #e8f5e9; color: #1b5e20; }
+    .badge--review    { background: #fff3e0; color: #e65100; }
+    .badge--error     { background: #fce4ec; color: #b71c1c; }
+    .badge--processing { background: #f5f5f5; color: #424242; }
   `],
 })
 class BadgeShowcaseComponent {
   readonly statuses = ['indexed', 'review_required', 'error', 'processing'];
-
-  badgeStyle(badge: BadgeConfig): string {
-    const styles: Record<string, string> = {
-      'badge--indexed': 'background:#e8f5e9;color:#1b5e20',
-      'badge--review': 'background:#fff3e0;color:#e65100',
-      'badge--error': 'background:#fce4ec;color:#b71c1c',
-      'badge--processing': 'background:#f5f5f5;color:#424242',
-    };
-    return styles[badge.cssClass] ?? '';
-  }
 }
 
 const meta: Meta<BadgeShowcaseComponent> = {

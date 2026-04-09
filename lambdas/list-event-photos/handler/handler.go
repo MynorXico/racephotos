@@ -23,9 +23,10 @@ var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 
 // validStatuses is the allowlist of accepted ?status= filter values.
 // Arbitrary strings are rejected with 400 to prevent enum probing and exposure
-// of internal states (e.g. "uploading") not intended for the gallery view.
+// of internal states not intended for the gallery view. "uploading" is
+// intentionally excluded — it is a transient upload state that the frontend
+// does not surface as a filter option.
 var validStatuses = map[string]bool{
-	"uploading":       true,
 	"processing":      true,
 	"indexed":         true,
 	"review_required": true,
