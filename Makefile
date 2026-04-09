@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark
+.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark test-watermark
 
 LAMBDAS := presign-photos photo-processor watermark search payment get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events
 
@@ -150,3 +150,15 @@ invoke-photo-processor:
 
 invoke-watermark:
 	$(call invoke_lambda,watermark,WatermarkFunction)
+
+## test-watermark: apply watermark locally and open the result — no AWS needed.
+## Usage:
+##   make test-watermark IN=/path/to/photo.jpg
+##   make test-watermark IN=/path/to/photo.jpg TEXT="My Event 2026" OUT=/tmp/result.jpg
+test-watermark:
+	@[ "$(IN)" ] || ( echo ">> IN is not set. Usage: make test-watermark IN=/path/to/photo.jpg"; exit 1 )
+	cd lambdas/watermark && go run ./cmd/test-watermark \
+	  -in "$(IN)" \
+	  -out "$(or $(OUT),/tmp/watermarked-preview.jpg)" \
+	  -text "$(or $(TEXT),RaceShots · racephotos.example.com)"
+	@echo ">> open $(or $(OUT),/tmp/watermarked-preview.jpg)"
