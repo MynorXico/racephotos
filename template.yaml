@@ -57,3 +57,32 @@ Resources:
       Environment:
         Variables:
           RACEPHOTOS_PHOTOGRAPHERS_TABLE: racephotos-photographers
+
+  PhotoProcessorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-photo-processor-local
+      Handler: bootstrap
+      CodeUri: lambdas/photo-processor/
+      MemorySize: 512
+      Environment:
+        Variables:
+          RACEPHOTOS_RAW_BUCKET: racephotos-raw-local
+          RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
+          RACEPHOTOS_BIB_INDEX_TABLE: racephotos-bib-index
+          RACEPHOTOS_WATERMARK_QUEUE_URL: http://sqs.us-east-1.localhost.localstack.cloud:4566/000000000000/racephotos-watermark
+          RACEPHOTOS_CONFIDENCE_MIN: "0.70"
+
+  WatermarkFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-watermark-local
+      Handler: bootstrap
+      CodeUri: lambdas/watermark/
+      MemorySize: 512
+      Environment:
+        Variables:
+          RACEPHOTOS_RAW_BUCKET: racephotos-raw-local
+          RACEPHOTOS_PROCESSED_BUCKET: racephotos-processed-local
+          RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
+          RACEPHOTOS_EVENTS_TABLE: racephotos-events

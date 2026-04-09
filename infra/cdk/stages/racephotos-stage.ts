@@ -9,6 +9,7 @@ import { SesStack } from '../stacks/ses-stack';
 import { PhotographerStack } from '../stacks/photographer-stack';
 import { EventStack } from '../stacks/event-stack';
 import { PhotoUploadStack } from '../stacks/photo-upload-stack';
+import { PhotoProcessingStack } from '../stacks/photo-processing-stack';
 
 interface RacePhotosStageProps extends cdk.StageProps {
   config: EnvConfig;
@@ -99,6 +100,18 @@ export class RacePhotosStage extends cdk.Stage {
     });
     photoUploadStack.addDependency(storage);
     photoUploadStack.addDependency(auth);
+
+    // PhotoProcessingStack — RS-007
+    // photo-processor Lambda (Rekognition + bib indexing) and watermark Lambda.
+    // Depends on StorageStack only (S3 buckets, tables, SQS queues).
+    const photoProcessingStack = new PhotoProcessingStack(this, 'PhotoProcessing', {
+      env: props.env,
+      config,
+      db: storage.db,
+      storage: storage.photoStorage,
+      pipeline: storage.pipeline,
+    });
+    photoProcessingStack.addDependency(storage);
 
     // FrontendStack — Angular SPA on S3 + CloudFront.
     // FrontendConstruct reads apiBaseUrl, userPoolId, and clientId from SSM via

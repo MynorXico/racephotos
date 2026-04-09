@@ -1,0 +1,8 @@
+{
+  "Records": [
+    {
+      "messageId": "msg-001",
+      "body": "{\"Records\":[{\"s3\":{\"bucket\":{\"name\":\"racephotos-raw-local\"},\"object\":{\"key\":\"local/evt-001/example-photo-id/race.jpg\"}}}]}"
+    }
+  ]
+}

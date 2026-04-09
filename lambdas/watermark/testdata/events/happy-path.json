@@ -1,0 +1,8 @@
+{
+  "Records": [
+    {
+      "messageId": "msg-wm-001",
+      "body": "{\"photoId\":\"example-photo-id\",\"eventId\":\"evt-001\",\"rawS3Key\":\"local/evt-001/example-photo-id/race.jpg\"}"
+    }
+  ]
+}

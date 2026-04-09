@@ -1,0 +1,108 @@
+package handler
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"fmt"
+	"image/jpeg"
+	"log/slog"
+
+	"github.com/aws/aws-lambda-go/events"
+
+	"github.com/racephotos/shared/models"
+)
+
+// Handler holds dependencies for the watermark Lambda.
+type Handler struct {
+	RawReader       RawPhotoReader
+	ProcessedWriter ProcessedPhotoWriter
+	Watermarker     ImageWatermarker
+	Events          EventStore
+	Photos          PhotoStore
+	ProcessedBucket string // racephotos-processed-{envName}
+}
+
+// WatermarkedS3Key returns the key used to store a watermarked photo.
+// Format: {eventId}/{photoId}/watermarked.jpg (AC5).
+// Exported so tests can assert on it directly.
+func WatermarkedS3Key(eventId, photoId string) string {
+	return fmt.Sprintf("%s/%s/watermarked.jpg", eventId, photoId)
+}
+
+// ProcessBatch handles an SQS batch with partial batch failure support (AC4).
+func (h *Handler) ProcessBatch(ctx context.Context, evt events.SQSEvent) (events.SQSEventResponse, error) {
+	var resp events.SQSEventResponse
+
+	for _, msg := range evt.Records {
+		if err := h.processMessage(ctx, msg); err != nil {
+			slog.ErrorContext(ctx, "watermark processMessage failed — adding to batchItemFailures",
+				slog.String("messageId", msg.MessageId),
+				slog.String("error", err.Error()),
+			)
+			resp.BatchItemFailures = append(resp.BatchItemFailures, events.SQSBatchItemFailure{
+				ItemIdentifier: msg.MessageId,
+			})
+		}
+	}
+
+	return resp, nil
+}
+
+func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) error {
+	var wm models.WatermarkMessage
+	if err := json.Unmarshal([]byte(msg.Body), &wm); err != nil {
+		return fmt.Errorf("processMessage: unmarshal watermark message: %w", err)
+	}
+	if wm.PhotoID == "" || wm.EventID == "" || wm.RawS3Key == "" {
+		return fmt.Errorf("processMessage: missing required fields in watermark message")
+	}
+
+	slog.InfoContext(ctx, "watermarking photo",
+		slog.String("photoId", wm.PhotoID),
+		slog.String("eventId", wm.EventID),
+	)
+
+	// Fetch watermark text first — fast DynamoDB call; fail before expensive S3 I/O.
+	watermarkText, err := h.Events.GetWatermarkText(ctx, wm.EventID)
+	if err != nil {
+		return fmt.Errorf("processMessage: GetWatermarkText eventId=%s: %w", wm.EventID, err)
+	}
+
+	// Download raw photo from private S3 bucket.
+	rawBody, err := h.RawReader.GetObject(ctx, "", wm.RawS3Key)
+	if err != nil {
+		return fmt.Errorf("processMessage: GetObject %s: %w", wm.RawS3Key, err)
+	}
+	defer rawBody.Close()
+
+	// Decode image and apply watermark (both owned by the ImageWatermarker implementation).
+	watermarked, err := h.Watermarker.ApplyTextWatermark(rawBody, watermarkText)
+	if err != nil {
+		return fmt.Errorf("processMessage: ApplyTextWatermark: %w", err)
+	}
+
+	// Encode watermarked image to JPEG.
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, watermarked, &jpeg.Options{Quality: 85}); err != nil {
+		return fmt.Errorf("processMessage: jpeg.Encode: %w", err)
+	}
+
+	// Upload to processed bucket.
+	destKey := WatermarkedS3Key(wm.EventID, wm.PhotoID)
+	if err := h.ProcessedWriter.PutObject(ctx, h.ProcessedBucket, destKey, &buf, "image/jpeg"); err != nil {
+		return fmt.Errorf("processMessage: PutObject %s: %w", destKey, err)
+	}
+
+	// Update Photo record with the watermarked S3 key.
+	if err := h.Photos.UpdateWatermarkedKey(ctx, wm.PhotoID, destKey); err != nil {
+		return fmt.Errorf("processMessage: UpdateWatermarkedKey: %w", err)
+	}
+
+	slog.InfoContext(ctx, "watermark applied",
+		slog.String("photoId", wm.PhotoID),
+		slog.String("destKey", destKey),
+	)
+
+	return nil
+}

@@ -1,0 +1,14 @@
+{
+  "TextDetections": [
+    {
+      "DetectedText": "101",
+      "Type": "LINE",
+      "Confidence": 98.5
+    },
+    {
+      "DetectedText": "101",
+      "Type": "WORD",
+      "Confidence": 98.5
+    }
+  ]
+}

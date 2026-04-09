@@ -15,7 +15,7 @@ When a photo lands in the raw S3 bucket, it triggers an async processing pipelin
 - [ ] AC2: Given the photo-processor Lambda receives a message, when it runs successfully, then: Rekognition `DetectText` is called once; detected bib numbers above `RACEPHOTOS_CONFIDENCE_MIN` are extracted; the Photo record is updated with `status="indexed"` (bibs found) or `status="review_required"` (no bibs), `bibNumbers`, `rekognitionConfidence`; one BibIndex record per detected bib is written to the bib-index table; a message is published to the watermark SQS queue.
 - [ ] AC3: Given Rekognition returns an error, when the Lambda processes the message, then the Photo record is updated with `status="error"` and the error is logged. The message is NOT retried (returned as successfully processed) to prevent billing for known-bad photos.
 - [ ] AC4: Given multiple photos are in the SQS batch, when one fails, then only that message is returned in `batchItemFailures` — other messages are processed successfully (partial batch failure pattern).
-- [ ] AC5: Given the watermark Lambda receives a message `{ photoId, eventId, rawS3Key, watermarkText }`, when it runs successfully, then: the raw photo is downloaded from the private S3 bucket; a text watermark is drawn onto the image using `github.com/fogleman/gg`; the watermarked copy is stored at `racephotos-processed-{envName}/{eventId}/{photoId}/watermarked.jpg`; the Photo record is updated with `watermarkedS3Key`.
+- [ ] AC5: Given the watermark Lambda receives a message `{ photoId, eventId, rawS3Key }`, when it runs successfully, then: the raw photo is downloaded from the private S3 bucket; `watermarkText` is read from the `racephotos-events` table by `eventId`; a text watermark is drawn onto the image using `github.com/fogleman/gg` (see ADR-0009); the watermarked copy is stored at `racephotos-processed-{envName}/{eventId}/{photoId}/watermarked.jpg`; the Photo record is updated with `watermarkedS3Key`.
 - [ ] AC6: Given `RACEPHOTOS_ENV=local`, when the photo-processor Lambda initialises, then a file-backed Rekognition mock is used instead of the real service, reading responses from `testdata/rekognition-responses/{photoId}.json` if present, otherwise returning zero detections.
 - [ ] AC7: Given a message exceeds the DLQ `maxReceiveCount` (3), then it moves to the appropriate DLQ and the DLQ CloudWatch alarm fires.
 
@@ -37,7 +37,7 @@ When a photo lands in the raw S3 bucket, it triggers an async processing pipelin
       DetectText(ctx context.Context, input *rekognition.DetectTextInput, optFns ...func(*rekognition.Options)) (*rekognition.DetectTextOutput, error)
   }
   type PhotoStore interface {
-      GetPhotoByS3Key(ctx context.Context, rawS3Key string) (*models.Photo, error)
+      GetPhotoById(ctx context.Context, id string) (*models.Photo, error)
       UpdatePhotoStatus(ctx context.Context, id string, update models.PhotoStatusUpdate) error
   }
   type BibIndexStore interface {
@@ -57,6 +57,12 @@ When a photo lands in the raw S3 bucket, it triggers an async processing pipelin
   }
   type ImageWatermarker interface {
       ApplyTextWatermark(img image.Image, text string) (image.Image, error)
+  }
+  type EventStore interface {
+      GetWatermarkText(ctx context.Context, eventId string) (string, error)
+  }
+  type PhotoStore interface {
+      UpdateWatermarkedKey(ctx context.Context, photoId, watermarkedS3Key string) error
   }
   ```
 - New model: `shared/models/bib_entry.go`
@@ -87,7 +93,7 @@ When a photo lands in the raw S3 bucket, it triggers an async processing pipelin
   ```
 - CDK: `ProcessingPipelineConstruct` (from RS-001) wires both Lambda event source mappings; each Lambda wrapped with `ObservabilityConstruct`; DLQ + CloudWatch alarm (`ApproximateNumberOfMessagesVisible > 0`) required on both queues
 - IAM: photo-processor needs `rekognition:DetectText`, `s3:GetObject` (raw bucket), `dynamodb:UpdateItem` (photos table), `dynamodb:BatchWriteItem` (bib-index table), `sqs:SendMessage` (watermark queue); watermark Lambda needs `s3:GetObject` (raw bucket), `s3:PutObject` (processed bucket), `dynamodb:UpdateItem` (photos table), `dynamodb:GetItem` (events table)
-- `.env.example`: add `RACEPHOTOS_BIB_INDEX_TABLE`, `RACEPHOTOS_WATERMARK_QUEUE_URL`, `RACEPHOTOS_PROCESSED_BUCKET`, `RACEPHOTOS_CONFIDENCE_MIN`
+- `.env.example`: add `RACEPHOTOS_BIB_INDEX_TABLE`, `RACEPHOTOS_WATERMARK_QUEUE_URL`, `RACEPHOTOS_PROCESSED_BUCKET`, `RACEPHOTOS_CONFIDENCE_MIN`, `RACEPHOTOS_EVENTS_TABLE`
 
 ## Definition of Done
 
