@@ -16,6 +16,17 @@ import (
 
 const defaultPageSize = 50
 
+// validStatuses is the allowlist of accepted ?status= filter values.
+// Arbitrary strings are rejected with 400 to prevent enum probing and exposure
+// of internal states (e.g. "uploading") not intended for the gallery view.
+var validStatuses = map[string]bool{
+	"uploading":       true,
+	"processing":      true,
+	"indexed":         true,
+	"review_required": true,
+	"error":           true,
+}
+
 // PhotoStore abstracts the photo listing query on the photos table GSI.
 type PhotoStore interface {
 	ListPhotosByEvent(ctx context.Context, eventID, filter, cursor string, limit int) ([]models.Photo, string, error)
@@ -76,6 +87,9 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	filter := event.QueryStringParameters["status"]
+	if filter != "" && !validStatuses[filter] {
+		return errResponse(400, "invalid status filter"), nil
+	}
 	cursor := event.QueryStringParameters["cursor"]
 	limit := defaultPageSize
 	if lStr := event.QueryStringParameters["limit"]; lStr != "" {

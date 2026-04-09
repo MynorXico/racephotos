@@ -31,7 +31,8 @@ func main() {
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
-	cfg, err := config.LoadDefaultConfig(context.Background())
+	// cold-start: no request context available yet; context.TODO() is intentional here.
+	cfg, err := config.LoadDefaultConfig(context.TODO())
 	if err != nil {
 		slog.Error("failed to load AWS config", slog.String("error", err.Error()))
 		os.Exit(1)

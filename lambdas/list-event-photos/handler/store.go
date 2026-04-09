@@ -15,10 +15,7 @@ import (
 	"github.com/racephotos/shared/models"
 )
 
-const (
-	photosGSIName = "eventId-uploadedAt-index"
-	eventsTable   = ""
-)
+const photosGSIName = "eventId-uploadedAt-index"
 
 // ErrInvalidCursor is returned when the cursor query parameter cannot be decoded.
 var ErrInvalidCursor = errors.New("invalid cursor")

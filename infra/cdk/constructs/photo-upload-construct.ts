@@ -128,8 +128,16 @@ export class PhotoUploadConstruct extends Construct {
       },
     });
 
-    // Grant Query on the photos table GSI and GetItem on the events table.
-    photosTable.grant(this.listEventPhotosFn, 'dynamodb:Query');
+    // Grant Query scoped to the specific GSI only (not the full table or other indexes).
+    // Using an explicit PolicyStatement instead of photosTable.grant() to avoid granting
+    // access to future GSIs that may contain sensitive data (e.g. runner-email-index).
+    this.listEventPhotosFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:Query'],
+      resources: [
+        photosTable.tableArn,
+        `${photosTable.tableArn}/index/eventId-uploadedAt-index`,
+      ],
+    }));
     eventsTable.grant(this.listEventPhotosFn, 'dynamodb:GetItem');
 
     new ObservabilityConstruct(this, 'ListEventPhotosObs', {
