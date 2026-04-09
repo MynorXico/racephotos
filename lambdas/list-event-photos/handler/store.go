@@ -35,11 +35,25 @@ type DynamoPhotoLister struct {
 	TableName string
 }
 
+// filterMultiplier controls the DynamoDB page size used when a status filter is
+// active. Because DynamoDB applies Limit before FilterExpression, a page of N
+// evaluated items may return far fewer matching items. We over-fetch by this
+// factor and loop until we have enough results or exhaust the GSI partition.
+const filterMultiplier = 5
+
 // ListPhotosByEvent queries photos for an event sorted by uploadedAt DESC.
 // If filter is non-empty only photos with that status are returned.
 // cursor is a base64-encoded JSON representation of the DynamoDB LastEvaluatedKey.
 // Returns the photos, the next cursor (empty string when no more pages exist), and any error.
 func (s *DynamoPhotoLister) ListPhotosByEvent(ctx context.Context, eventID, filter, cursor string, limit int) ([]models.Photo, string, error) {
+	// When a FilterExpression is active, use a larger internal page size and loop
+	// to collect at least `limit` matching items — DynamoDB counts Limit before
+	// filtering, so each page may return far fewer items than requested.
+	internalLimit := int32(limit)
+	if filter != "" {
+		internalLimit = int32(limit * filterMultiplier)
+	}
+
 	input := &dynamodb.QueryInput{
 		TableName:              aws.String(s.TableName),
 		IndexName:              aws.String(photosGSIName),
@@ -48,7 +62,7 @@ func (s *DynamoPhotoLister) ListPhotosByEvent(ctx context.Context, eventID, filt
 			":eid": &types.AttributeValueMemberS{Value: eventID},
 		},
 		ScanIndexForward: aws.Bool(false), // uploadedAt DESC
-		Limit:            aws.Int32(int32(limit)),
+		Limit:            aws.Int32(internalLimit),
 	}
 
 	if filter != "" {
@@ -58,30 +72,66 @@ func (s *DynamoPhotoLister) ListPhotosByEvent(ctx context.Context, eventID, filt
 	}
 
 	if cursor != "" {
-		lek, err := decodeCursor(cursor)
+		// Validate that the cursor's embedded eventId matches the requested event
+		// before passing it to DynamoDB, to prevent tampered cursors from jumping
+		// to positions in other events' GSI partitions.
+		lek, err := decodeCursor(cursor, eventID)
 		if err != nil {
 			return nil, "", ErrInvalidCursor
 		}
 		input.ExclusiveStartKey = lek
 	}
 
-	out, err := s.Client.Query(ctx, input)
-	if err != nil {
-		return nil, "", fmt.Errorf("ListPhotosByEvent: dynamodb Query: %w", err)
-	}
-
 	var photos []models.Photo
-	for _, item := range out.Items {
-		var p models.Photo
-		if err := attributevalue.UnmarshalMap(item, &p); err != nil {
-			return nil, "", fmt.Errorf("ListPhotosByEvent: unmarshal: %w", err)
+	var lastKey map[string]types.AttributeValue
+
+	for {
+		out, err := s.Client.Query(ctx, input)
+		if err != nil {
+			return nil, "", fmt.Errorf("ListPhotosByEvent: dynamodb Query: %w", err)
 		}
-		photos = append(photos, p)
+		for _, item := range out.Items {
+			var p models.Photo
+			if err := attributevalue.UnmarshalMap(item, &p); err != nil {
+				return nil, "", fmt.Errorf("ListPhotosByEvent: unmarshal: %w", err)
+			}
+			photos = append(photos, p)
+			if len(photos) >= limit {
+				break
+			}
+		}
+		lastKey = out.LastEvaluatedKey
+		// Stop when we have enough photos or DynamoDB has no more data.
+		if len(photos) >= limit || len(lastKey) == 0 {
+			break
+		}
+		// Continue from where DynamoDB stopped.
+		input.ExclusiveStartKey = lastKey
 	}
 
+	// Trim to exactly the requested limit.
+	if len(photos) > limit {
+		photos = photos[:limit]
+	}
+
+	// Encode the cursor from the last photo's GSI key attributes so the next
+	// page resumes immediately after the last item we returned — not after the
+	// last item DynamoDB evaluated, which could be further ahead.
 	var nextCursor string
-	if len(out.LastEvaluatedKey) > 0 {
-		nc, err := encodeCursor(out.LastEvaluatedKey)
+	if len(lastKey) > 0 {
+		var cursorKey map[string]types.AttributeValue
+		if len(photos) > 0 {
+			// Resume from the last item we actually returned.
+			last := photos[len(photos)-1]
+			cursorKey = map[string]types.AttributeValue{
+				"id":         &types.AttributeValueMemberS{Value: last.ID},
+				"eventId":    &types.AttributeValueMemberS{Value: last.EventID},
+				"uploadedAt": &types.AttributeValueMemberS{Value: last.UploadedAt},
+			}
+		} else {
+			cursorKey = lastKey
+		}
+		nc, err := encodeCursor(cursorKey)
 		if err != nil {
 			return nil, "", fmt.Errorf("ListPhotosByEvent: encodeCursor: %w", err)
 		}
@@ -98,7 +148,8 @@ type DynamoEventReader struct {
 }
 
 // GetEventPhotographerID returns the photographerID for the given eventID.
-// Returns errEventNotFound if the event does not exist.
+// Returns ErrEventNotFound if the event does not exist.
+// Returns an error (not ErrEventNotFound) if the record is malformed (missing photographerId).
 func (s *DynamoEventReader) GetEventPhotographerID(ctx context.Context, eventID string) (string, error) {
 	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.TableName),
@@ -119,10 +170,16 @@ func (s *DynamoEventReader) GetEventPhotographerID(ctx context.Context, eventID 
 	if err := attributevalue.UnmarshalMap(out.Item, &ev); err != nil {
 		return "", fmt.Errorf("GetEventPhotographerID: unmarshal: %w", err)
 	}
+	// Guard against a malformed record with a present-but-empty photographerId.
+	// An empty owner would silently 403 every legitimate request, which is harder
+	// to diagnose than a 500 + error log.
+	if ev.PhotographerID == "" {
+		return "", fmt.Errorf("GetEventPhotographerID: event %s has no photographerId attribute", eventID)
+	}
 	return ev.PhotographerID, nil
 }
 
-// encodeCursor serialises a DynamoDB LastEvaluatedKey to a base64-encoded JSON string.
+// encodeCursor serialises a DynamoDB key map to a base64-encoded JSON string.
 func encodeCursor(key map[string]types.AttributeValue) (string, error) {
 	m := make(map[string]interface{})
 	for k, v := range key {
@@ -142,8 +199,10 @@ func encodeCursor(key map[string]types.AttributeValue) (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b), nil
 }
 
-// decodeCursor deserialises a base64-encoded cursor back to a DynamoDB key map.
-func decodeCursor(cursor string) (map[string]types.AttributeValue, error) {
+// decodeCursor deserialises a base64-encoded cursor and validates that its
+// embedded eventId matches the expected eventID to prevent tampered cursors
+// from jumping to positions in other events' GSI partitions.
+func decodeCursor(cursor, eventID string) (map[string]types.AttributeValue, error) {
 	b, err := base64.RawURLEncoding.DecodeString(cursor)
 	if err != nil {
 		return nil, fmt.Errorf("decodeCursor: base64 decode: %w", err)
@@ -161,6 +220,15 @@ func decodeCursor(cursor string) (map[string]types.AttributeValue, error) {
 		} else {
 			return nil, fmt.Errorf("decodeCursor: unrecognised type for key %s", k)
 		}
+	}
+	// Validate that the cursor belongs to the requested event.
+	eid, ok := key["eventId"]
+	if !ok {
+		return nil, fmt.Errorf("decodeCursor: missing eventId")
+	}
+	s, ok := eid.(*types.AttributeValueMemberS)
+	if !ok || s.Value != eventID {
+		return nil, fmt.Errorf("decodeCursor: eventId mismatch")
 	}
 	return key, nil
 }

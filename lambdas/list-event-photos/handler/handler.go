@@ -58,6 +58,17 @@ type listPhotosResponse struct {
 	NextCursor string      `json:"nextCursor"`
 }
 
+type ownerResult struct {
+	id  string
+	err error
+}
+
+type listResult struct {
+	photos     []models.Photo
+	nextCursor string
+	err        error
+}
+
 // Handle processes an API Gateway v2 HTTP request.
 func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	photographerID, ok := extractSub(event)
@@ -68,22 +79,6 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	eventID := event.PathParameters["id"]
 	if eventID == "" {
 		return errResponse(400, "missing event id"), nil
-	}
-
-	// Ownership check.
-	ownerID, err := h.Events.GetEventPhotographerID(ctx, eventID)
-	if err != nil {
-		if errors.Is(err, ErrEventNotFound) {
-			return errResponse(404, "event not found"), nil
-		}
-		slog.ErrorContext(ctx, "GetEventPhotographerID failed",
-			slog.String("eventID", eventID),
-			slog.String("error", err.Error()),
-		)
-		return errResponse(500, "internal server error"), nil
-	}
-	if ownerID != photographerID {
-		return errResponse(403, "forbidden"), nil
 	}
 
 	filter := event.QueryStringParameters["status"]
@@ -98,20 +93,54 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 	}
 
-	photos, nextCursor, err := h.Photos.ListPhotosByEvent(ctx, eventID, filter, cursor, limit)
-	if err != nil {
-		if errors.Is(err, ErrInvalidCursor) {
+	// Launch the ownership check and photo listing concurrently. Both are
+	// independent DynamoDB calls; running them in parallel reduces wall-clock
+	// latency to max(GetItem, Query) instead of their sum.
+	ownerCh := make(chan ownerResult, 1)
+	listCh := make(chan listResult, 1)
+
+	go func() {
+		id, err := h.Events.GetEventPhotographerID(ctx, eventID)
+		ownerCh <- ownerResult{id: id, err: err}
+	}()
+
+	go func() {
+		photos, nc, err := h.Photos.ListPhotosByEvent(ctx, eventID, filter, cursor, limit)
+		listCh <- listResult{photos: photos, nextCursor: nc, err: err}
+	}()
+
+	// Evaluate ownership first; discard the list result if unauthorised.
+	ownerRes := <-ownerCh
+	if ownerRes.err != nil {
+		<-listCh // drain to prevent goroutine leak
+		if errors.Is(ownerRes.err, ErrEventNotFound) {
+			return errResponse(404, "event not found"), nil
+		}
+		slog.ErrorContext(ctx, "GetEventPhotographerID failed",
+			slog.String("eventID", eventID),
+			slog.String("error", ownerRes.err.Error()),
+		)
+		return errResponse(500, "internal server error"), nil
+	}
+	if ownerRes.id != photographerID {
+		<-listCh // drain to prevent goroutine leak
+		return errResponse(403, "forbidden"), nil
+	}
+
+	listRes := <-listCh
+	if listRes.err != nil {
+		if errors.Is(listRes.err, ErrInvalidCursor) {
 			return errResponse(400, "invalid cursor"), nil
 		}
 		slog.ErrorContext(ctx, "ListPhotosByEvent failed",
 			slog.String("eventID", eventID),
-			slog.String("error", err.Error()),
+			slog.String("error", listRes.err.Error()),
 		)
 		return errResponse(500, "internal server error"), nil
 	}
 
-	items := make([]photoItem, 0, len(photos))
-	for _, p := range photos {
+	items := make([]photoItem, 0, len(listRes.photos))
+	for _, p := range listRes.photos {
 		item := photoItem{
 			ID:          p.ID,
 			Status:      p.Status,
@@ -131,7 +160,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 
 	return jsonResponse(200, listPhotosResponse{
 		Photos:     items,
-		NextCursor: nextCursor,
+		NextCursor: listRes.nextCursor,
 	})
 }
 
@@ -174,8 +203,11 @@ func jsonResponse(statusCode int, body any) (events.APIGatewayV2HTTPResponse, er
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: statusCode,
 		Headers: map[string]string{
-			"Content-Type":  "application/json",
-			"Cache-Control": "no-store",
+			"Content-Type": "application/json",
+			// private: browser may cache; no-transform: disallow proxy modification.
+			// 5-second TTL absorbs rapid refreshes during upload bursts without serving stale data.
+			// no-store is intentionally NOT set on success responses — only on errors.
+			"Cache-Control": "private, max-age=5, no-transform",
 		},
 		Body: string(b),
 	}, nil

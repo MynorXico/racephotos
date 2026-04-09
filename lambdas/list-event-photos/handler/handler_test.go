@@ -214,14 +214,28 @@ func TestHandler_Handle(t *testing.T) {
 			wantCode:   401,
 		},
 		{
+			name:       "unknown status value — returns 400",
+			sub:        "photographer-1",
+			eventID:    "event-1",
+			status:     "unknown_status",
+			mockEvents: func(m *mocks.MockEventStore) {},
+			mockPhotos: func(m *mocks.MockPhotoStore) {},
+			wantCode:   400,
+		},
+		{
 			name:    "event not found — returns 404",
 			sub:     "photographer-1",
 			eventID: "event-missing",
 			mockEvents: func(m *mocks.MockEventStore) {
 				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-missing").Return("", handler.ErrEventNotFound)
 			},
-			mockPhotos: func(m *mocks.MockPhotoStore) {},
-			wantCode:   404,
+			// ListPhotosByEvent is launched concurrently with the ownership check;
+			// its result is discarded when ownership fails. Allow any call.
+			mockPhotos: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, "", nil).AnyTimes()
+			},
+			wantCode: 404,
 		},
 		{
 			name:    "caller does not own event — returns 403",
@@ -230,8 +244,12 @@ func TestHandler_Handle(t *testing.T) {
 			mockEvents: func(m *mocks.MockEventStore) {
 				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("photographer-2", nil)
 			},
-			mockPhotos: func(m *mocks.MockPhotoStore) {},
-			wantCode:   403,
+			// ListPhotosByEvent is launched concurrently; result discarded after 403.
+			mockPhotos: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, "", nil).AnyTimes()
+			},
+			wantCode: 403,
 		},
 		{
 			name:    "event store error — returns 500",
@@ -240,8 +258,12 @@ func TestHandler_Handle(t *testing.T) {
 			mockEvents: func(m *mocks.MockEventStore) {
 				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("", errors.New("ddb failure"))
 			},
-			mockPhotos: func(m *mocks.MockPhotoStore) {},
-			wantCode:   500,
+			// ListPhotosByEvent is launched concurrently; result discarded after 500.
+			mockPhotos: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).
+					Return(nil, "", nil).AnyTimes()
+			},
+			wantCode: 500,
 		},
 		{
 			name:    "photo store error — returns 500",

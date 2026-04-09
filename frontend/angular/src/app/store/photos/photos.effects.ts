@@ -3,7 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { of } from 'rxjs';
-import { catchError, map, switchMap, withLatestFrom } from 'rxjs/operators';
+import { catchError, map, switchMap, takeUntil, withLatestFrom } from 'rxjs/operators';
 
 import { AppConfigService } from '../../core/config/app-config.service';
 import { Photo, PhotosActions } from './photos.actions';
@@ -73,6 +73,15 @@ export class PhotosEffects {
             `${this.apiBase}/events/${eventId}/photos?${params.toString()}`,
           )
           .pipe(
+            // Cancel this in-flight request if the user changes the filter or
+            // triggers a full reload. Without this, a stale loadNextPage response
+            // arriving after the reducer has reset photos:[] would append wrong-filter
+            // items to the fresh list (silent data corruption).
+            takeUntil(
+              this.actions$.pipe(
+                ofType(PhotosActions.loadPhotos, PhotosActions.filterByStatus),
+              ),
+            ),
             map((res) =>
               PhotosActions.loadNextPageSuccess({
                 photos: res.photos,
