@@ -86,6 +86,17 @@ func (s *DynamoPhotoLister) ListPhotosByEvent(ctx context.Context, eventID, filt
 	var lastKey map[string]types.AttributeValue
 
 	for {
+		// Recompute the page size each iteration: only ask DynamoDB to evaluate
+		// enough items to satisfy the remaining need. This avoids over-reading
+		// on pages beyond the first when only a few items are still needed.
+		if filter != "" {
+			remaining := limit - len(photos)
+			if remaining < 1 {
+				remaining = 1
+			}
+			input.Limit = aws.Int32(int32(remaining * filterMultiplier))
+		}
+
 		out, err := s.Client.Query(ctx, input)
 		if err != nil {
 			return nil, "", fmt.Errorf("ListPhotosByEvent: dynamodb Query: %w", err)
