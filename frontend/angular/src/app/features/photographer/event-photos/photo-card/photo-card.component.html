@@ -31,7 +31,7 @@
         [ngClass]="badge.cssClass"
         [attr.aria-label]="'Status: ' + badge.label"
       >
-        <mat-icon class="badge-icon">{{ badge.icon }}</mat-icon>
+        <mat-icon aria-hidden="true" class="badge-icon">{{ badge.icon }}</mat-icon>
         {{ badge.label }}
       </span>
 

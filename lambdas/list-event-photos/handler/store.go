@@ -41,6 +41,12 @@ type DynamoPhotoLister struct {
 // factor and loop until we have enough results or exhaust the GSI partition.
 const filterMultiplier = 5
 
+// maxFilterIterations caps the number of DynamoDB Query rounds when a filter is
+// active. This bounds RCU consumption for pathological cases (e.g. an event
+// where 0% of photos match the requested status). The caller receives whatever
+// results were found plus a cursor to resume from the current position.
+const maxFilterIterations = 10
+
 // ListPhotosByEvent queries photos for an event sorted by uploadedAt DESC.
 // If filter is non-empty only photos with that status are returned.
 // cursor is a base64-encoded JSON representation of the DynamoDB LastEvaluatedKey.
@@ -85,7 +91,13 @@ func (s *DynamoPhotoLister) ListPhotosByEvent(ctx context.Context, eventID, filt
 	var photos []models.Photo
 	var lastKey map[string]types.AttributeValue
 
-	for {
+	for iter := 0; ; iter++ {
+		// Safety cap: stop after maxFilterIterations rounds so that a filter
+		// matching very few items cannot burn unbounded RCUs. Return whatever
+		// was found plus the current lastKey as a cursor so the caller can resume.
+		if filter != "" && iter >= maxFilterIterations {
+			break
+		}
 		// Recompute the page size each iteration: only ask DynamoDB to evaluate
 		// enough items to satisfy the remaining need. This avoids over-reading
 		// on pages beyond the first when only a few items are still needed.
