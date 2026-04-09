@@ -1,12 +1,33 @@
 import { createActionGroup, emptyProps, props } from '@ngrx/store';
 
-// Stub — implemented in RS-008 (search page)
+export type PhotoStatus = 'processing' | 'indexed' | 'review_required' | 'error';
+
+export interface Photo {
+  id: string;
+  status: PhotoStatus;
+  thumbnailUrl: string | null;
+  bibNumbers: string[];
+  uploadedAt: string;
+  errorReason: string | null;
+}
+
 export const PhotosActions = createActionGroup({
   source: 'Photos',
   events: {
-    'Search By Bib': props<{ eventId: string; bibNumber: string }>(),
-    'Search Success': props<{ photos: unknown[] }>(),
-    'Search Failure': props<{ error: string }>(),
-    'Clear Results': emptyProps(),
+    /** Initial load or reload after filter change. Resets the photos list. */
+    'Load Photos': props<{ eventId: string }>(),
+    'Load Photos Success': props<{ photos: Photo[]; nextCursor: string | null }>(),
+    'Load Photos Failure': props<{ error: string }>(),
+
+    /** Load the next page and append to the existing list. */
+    'Load Next Page': props<{ eventId: string; cursor: string }>(),
+    'Load Next Page Success': props<{ photos: Photo[]; nextCursor: string | null }>(),
+    'Load Next Page Failure': props<{ error: string }>(),
+
+    /** Change the active status filter. Triggers Load Photos after resetting the list. */
+    'Filter By Status': props<{ eventId: string; status: PhotoStatus | null }>(),
+
+    /** Reset the slice on navigation away. */
+    'Clear Photos': emptyProps(),
   },
 });

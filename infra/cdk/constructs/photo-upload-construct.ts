@@ -26,28 +26,36 @@ interface PhotoUploadConstructProps {
    * The Cognito JWT authorizer ID (from SSM valueForStringParameter).
    */
   httpAuthorizerId: string;
+  /**
+   * CloudFront distribution domain for the processed (watermarked) bucket.
+   * Injected into list-event-photos Lambda as RACEPHOTOS_PHOTO_CDN_DOMAIN.
+   */
+  cdnDomainName: string;
 }
 
 /**
- * PhotoUploadConstruct — RS-006
+ * PhotoUploadConstruct — RS-006, RS-008
  *
- * Creates the presign-photos Lambda and registers its route:
- *   POST /events/{eventId}/photos/presign  (Cognito JWT required)
+ * Creates:
+ *   - presign-photos Lambda  POST /events/{eventId}/photos/presign  (Cognito JWT required)
+ *   - list-event-photos Lambda  GET /events/{id}/photos  (Cognito JWT required)
  *
  * IAM grants:
  *   - s3:PutObject on the raw bucket (photographer uploads go direct to S3)
  *   - dynamodb:BatchWriteItem on the photos table (creates Photo records)
- *   - dynamodb:GetItem on the events table (ownership check)
+ *   - dynamodb:GetItem on the events table (ownership check — both Lambdas)
+ *   - dynamodb:Query on the photos table GSI (list-event-photos)
  *
- * AC: RS-006 AC1, AC2, AC3, AC9, AC10
+ * AC: RS-006 AC1, AC2, AC3, AC9, AC10 / RS-008 AC1, AC2
  */
 export class PhotoUploadConstruct extends Construct {
   readonly presignPhotosFn: lambda.Function;
+  readonly listEventPhotosFn: lambda.Function;
 
   constructor(scope: Construct, id: string, props: PhotoUploadConstructProps) {
     super(scope, id);
 
-    const { config, rawBucket, photosTable, eventsTable, httpApiId, httpAuthorizerId } = props;
+    const { config, rawBucket, photosTable, eventsTable, httpApiId, httpAuthorizerId, cdnDomainName } = props;
 
     // Import the HTTP API by ID — same pattern as EventConstruct (RS-005).
     const httpApi = apigatewayv2.HttpApi.fromHttpApiAttributes(this, 'HttpApi', { httpApiId });
@@ -100,6 +108,44 @@ export class PhotoUploadConstruct extends Construct {
       integration: new integrations.HttpLambdaIntegration(
         'PresignPhotosIntegration',
         this.presignPhotosFn,
+      ),
+      authorizer: jwtAuthorizer,
+    });
+
+    // ── list-event-photos Lambda ──────────────────────────────────────────────
+    this.listEventPhotosFn = new lambda.Function(this, 'ListEventPhotosFn', {
+      functionName: `racephotos-list-event-photos-${config.envName}`,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
+      architecture: lambda.Architecture.ARM_64,
+      handler: 'bootstrap',
+      memorySize: 256,
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/list-event-photos')),
+      environment: {
+        RACEPHOTOS_ENV: config.envName,
+        RACEPHOTOS_PHOTOS_TABLE: photosTable.tableName,
+        RACEPHOTOS_EVENTS_TABLE: eventsTable.tableName,
+        RACEPHOTOS_PHOTO_CDN_DOMAIN: cdnDomainName,
+      },
+    });
+
+    // Grant Query on the photos table GSI and GetItem on the events table.
+    photosTable.grant(this.listEventPhotosFn, 'dynamodb:Query');
+    eventsTable.grant(this.listEventPhotosFn, 'dynamodb:GetItem');
+
+    new ObservabilityConstruct(this, 'ListEventPhotosObs', {
+      lambda: this.listEventPhotosFn,
+      logRetentionDays: config.photoRetentionDays,
+    });
+
+    new apigatewayv2.HttpRoute(this, 'ListEventPhotosRoute', {
+      httpApi,
+      routeKey: apigatewayv2.HttpRouteKey.with(
+        '/events/{id}/photos',
+        apigatewayv2.HttpMethod.GET,
+      ),
+      integration: new integrations.HttpLambdaIntegration(
+        'ListEventPhotosIntegration',
+        this.listEventPhotosFn,
       ),
       authorizer: jwtAuthorizer,
     });

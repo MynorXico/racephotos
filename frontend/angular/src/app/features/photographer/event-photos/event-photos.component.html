@@ -1,0 +1,129 @@
+<div class="event-photos-container">
+
+  <!-- Breadcrumb / page header -->
+  <div class="page-header">
+    <div class="header-row">
+      <button
+        mat-icon-button
+        [routerLink]="['/photographer/events', eventId]"
+        aria-label="Back to event details"
+      >
+        <mat-icon>arrow_back</mat-icon>
+      </button>
+      <h1 class="mat-headline-small">Event Photos</h1>
+    </div>
+
+    @if (eventsLoading() || !selectedEvent()) {
+      <div class="event-name-skeleton shimmer"></div>
+    } @else {
+      <p class="mat-body-medium event-name-subtitle">{{ selectedEvent()!.name }}</p>
+    }
+  </div>
+
+  <!-- Filter chip row -->
+  <mat-chip-listbox
+    class="filter-chips"
+    aria-label="Filter photos by status"
+    [value]="activeFilter()"
+    (change)="onFilterChip($event.value)"
+  >
+    @for (chip of filterChips; track chip.value) {
+      <mat-chip-option [value]="chip.value">
+        @if (chip.value === 'error') {
+          <mat-icon matChipAvatar class="error-chip-icon">error_outline</mat-icon>
+        }
+        {{ chip.label }}
+      </mat-chip-option>
+    }
+  </mat-chip-listbox>
+
+  <!-- Accessible live region for filter results -->
+  <span class="visually-hidden" aria-live="polite" role="status">
+    @if (!loading()) { Showing {{ photoCount() }} photos }
+  </span>
+
+  <!-- Results summary -->
+  @if (!isInitialLoading()) {
+    <p class="mat-body-medium results-summary">
+      <strong>{{ photoCount() }}</strong> photos
+    </p>
+  }
+
+  <!-- Photo grid / states -->
+
+  @if (isInitialLoading()) {
+    <!-- Loading skeleton -->
+    <div class="photo-grid" role="list" aria-label="Loading photos" aria-busy="true">
+      @for (i of skeletonCards; track i) {
+        <div class="skeleton-card" aria-hidden="true">
+          <div class="skeleton-thumbnail shimmer"></div>
+          <div class="skeleton-meta">
+            <div class="skeleton-badge shimmer"></div>
+            <div class="skeleton-bibs shimmer"></div>
+          </div>
+        </div>
+      }
+    </div>
+
+  } @else if (error()) {
+    <!-- Error state -->
+    <div class="state-block" role="alert" aria-live="assertive">
+      <mat-icon class="state-icon state-icon--error">cloud_off</mat-icon>
+      <p class="mat-title-medium">Could not load photos</p>
+      <p class="mat-body-medium state-body">Something went wrong. Please try again.</p>
+      <button mat-stroked-button color="warn" (click)="onRetry()" aria-label="Retry loading photos">
+        Retry
+      </button>
+    </div>
+
+  } @else if (photos().length === 0) {
+    <!-- Empty state -->
+    <div class="state-block" aria-live="polite">
+      <mat-icon class="state-icon">photo_library</mat-icon>
+      <p class="mat-title-medium">
+        @if (activeFilter()) {
+          No {{ filterLabel(activeFilter()) }} photos
+        } @else {
+          No photos yet
+        }
+      </p>
+      <p class="mat-body-medium state-body">
+        @if (activeFilter()) {
+          Try selecting a different filter.
+        } @else {
+          Photos appear here once uploaded and processed.
+        }
+      </p>
+    </div>
+
+  } @else {
+    <!-- Loaded photo grid -->
+    <div class="photo-grid" role="list">
+      @for (photo of photos(); track photo.id) {
+        <app-photo-card [photo]="photo" />
+      }
+    </div>
+
+    <!-- Load more -->
+    @if (hasMorePages() || isLoadMoreInFlight()) {
+      <div class="load-more-row">
+        @if (isLoadMoreInFlight()) {
+          <div role="status" aria-label="Loading more photos" class="load-more-spinner">
+            <mat-spinner diameter="32" mode="indeterminate" />
+            <span class="mat-body-medium">Loading more&hellip;</span>
+          </div>
+        } @else {
+          <button
+            mat-stroked-button
+            (click)="onLoadMore()"
+            aria-label="Load more photos"
+          >
+            <mat-icon>expand_more</mat-icon>
+            Load more
+          </button>
+        }
+      </div>
+    }
+  }
+
+</div>

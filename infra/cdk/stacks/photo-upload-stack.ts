@@ -52,6 +52,7 @@ export class PhotoUploadStack extends cdk.Stack {
       eventsTable: db.eventsTable,
       httpApiId,
       httpAuthorizerId,
+      cdnDomainName: storage.cdnDomainName,
     });
   }
 }

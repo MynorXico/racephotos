@@ -4,6 +4,8 @@ import { provideEffects } from '@ngrx/effects';
 import { authGuard } from './core/auth/auth.guard';
 import { photoUploadFeature } from './store/photo-upload/photo-upload.reducer';
 import { PhotoUploadEffects } from './store/photo-upload/photo-upload.effects';
+import { photosFeature } from './store/photos/photos.reducer';
+import { PhotosEffects } from './store/photos/photos.effects';
 
 export const routes: Routes = [
   {
@@ -54,6 +56,14 @@ export const routes: Routes = [
             (m) => m.EventUploadComponent,
           ),
         providers: [provideState(photoUploadFeature), provideEffects(PhotoUploadEffects)],
+      },
+      {
+        path: 'events/:id/photos',
+        loadComponent: () =>
+          import('./features/photographer/event-photos/event-photos.component').then(
+            (m) => m.EventPhotosComponent,
+          ),
+        providers: [provideState(photosFeature), provideEffects(PhotosEffects)],
       },
       {
         path: 'events/:id',

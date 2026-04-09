@@ -1,6 +1,6 @@
-.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark
+.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark test-watermark invoke-list-event-photos
 
-LAMBDAS := presign-photos photo-processor watermark search payment get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events
+LAMBDAS := presign-photos photo-processor watermark search payment get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events list-event-photos
 
 # Run all tests
 test: test-unit test-integration
@@ -150,3 +150,17 @@ invoke-photo-processor:
 
 invoke-watermark:
 	$(call invoke_lambda,watermark,WatermarkFunction)
+
+invoke-list-event-photos:
+	$(call invoke_lambda,list-event-photos,ListEventPhotosFunction)
+
+# Preview the watermark locally without deploying.
+# Usage:
+#   make test-watermark IN=photo.jpg
+#   make test-watermark IN=photo.jpg OUT=out.jpg TEXT="MyEvent · racephotos.example.com"
+test-watermark:
+	@[ "$(IN)" ] || ( echo ">> IN is not set. Usage: make $@ IN=photo.jpg"; exit 1 )
+	cd lambdas/watermark && go run ./cmd/test-watermark \
+	  -in "$(abspath $(IN))" \
+	  -out "$(or $(OUT),$(abspath $(IN))-watermarked.jpg)" \
+	  -text "$(or $(TEXT),MyEvent · racephotos.example.com)"

@@ -1,0 +1,72 @@
+<mat-card appearance="outlined" class="photo-card">
+  <!-- Thumbnail -->
+  <div class="thumbnail-container">
+    @if (photo.thumbnailUrl && !imageError()) {
+      <img
+        [src]="photo.thumbnailUrl"
+        alt=""
+        class="thumbnail-img"
+        (error)="onImageError()"
+      />
+    } @else if (!photo.thumbnailUrl) {
+      <div class="thumbnail-placeholder" aria-label="Thumbnail not yet available">
+        <mat-icon class="placeholder-icon">hourglass_top</mat-icon>
+        <span class="mat-body-small placeholder-label">Processing</span>
+      </div>
+    } @else {
+      <div class="thumbnail-placeholder" aria-label="Thumbnail unavailable">
+        <mat-icon class="placeholder-icon">broken_image</mat-icon>
+        <span class="mat-body-small placeholder-label">Unavailable</span>
+      </div>
+    }
+  </div>
+
+  <!-- Content strip -->
+  <mat-card-content class="card-content">
+    <!-- Row 1: badge + error tooltip -->
+    @let badge = photo.status | photoStatusBadge;
+    <div class="badge-row">
+      <span
+        class="status-badge"
+        [ngClass]="badge.cssClass"
+        [attr.aria-label]="'Status: ' + badge.label"
+      >
+        <mat-icon class="badge-icon">{{ badge.icon }}</mat-icon>
+        {{ badge.label }}
+      </span>
+
+      @if (photo.status === 'error') {
+        <button
+          mat-icon-button
+          class="error-info-btn"
+          [matTooltip]="errorTooltip"
+          matTooltipShowDelay="0"
+          aria-label="View error details for this photo"
+        >
+          <mat-icon>info_outline</mat-icon>
+        </button>
+      }
+    </div>
+
+    <!-- Row 2: bib numbers -->
+    <div
+      class="bib-row mat-body-small"
+      [matTooltip]="bibLabel"
+      [matTooltipDisabled]="photo.bibNumbers.length <= 3"
+    >
+      @if (photo.bibNumbers.length > 0) {
+        Bibs:&nbsp;
+        @for (bib of photo.bibNumbers; track bib; let last = $last) {
+          <strong>{{ bib }}</strong>@if (!last) {, }
+        }
+      } @else {
+        <em>No bibs detected</em>
+      }
+    </div>
+
+    <!-- Row 3: timestamp (hidden on mobile via CSS) -->
+    <div class="timestamp-row mat-body-small card-timestamp">
+      {{ photo.uploadedAt | date: 'MMM d, y, h:mm a' }}
+    </div>
+  </mat-card-content>
+</mat-card>

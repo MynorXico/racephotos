@@ -31,4 +31,7 @@ type Photo struct {
 	UploadedAt            string   `dynamodbav:"uploadedAt"                      json:"uploadedAt"`
 	ConvertedS3Key        string   `dynamodbav:"convertedS3Key,omitempty"        json:"convertedS3Key,omitempty"`
 	OriginalFormat        string   `dynamodbav:"originalFormat,omitempty"        json:"originalFormat,omitempty"`
+	// ErrorReason is set by the processing Lambda when Status is "error".
+	// Surfaced to photographers in the event photos gallery (RS-008).
+	ErrorReason string `dynamodbav:"errorReason,omitempty"           json:"errorReason,omitempty"`
 }
