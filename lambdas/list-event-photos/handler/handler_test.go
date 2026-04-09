@@ -18,6 +18,11 @@ import (
 
 const testCdnDomain = "d1234.cloudfront.net"
 
+// testEventID and testEventMissingID are valid UUIDs — the handler validates
+// eventID format before any DynamoDB call.
+const testEventID = "550e8400-e29b-41d4-a716-446655440001"
+const testEventMissingID = "550e8400-e29b-41d4-a716-000000000099"
+
 func makeEvent(sub, eventID, status, cursor string) events.APIGatewayV2HTTPRequest {
 	req := events.APIGatewayV2HTTPRequest{
 		PathParameters:        map[string]string{"id": eventID},
@@ -44,7 +49,7 @@ func makeEvent(sub, eventID, status, cursor string) events.APIGatewayV2HTTPReque
 func TestHandler_Handle(t *testing.T) {
 	indexedPhoto := models.Photo{
 		ID:               "photo-1",
-		EventID:          "event-1",
+		EventID:          testEventID,
 		Status:           "indexed",
 		WatermarkedS3Key: "processed/photo-1.jpg",
 		BibNumbers:       []string{"101"},
@@ -52,7 +57,7 @@ func TestHandler_Handle(t *testing.T) {
 	}
 	errorPhoto := models.Photo{
 		ID:          "photo-2",
-		EventID:     "event-1",
+		EventID:     testEventID,
 		Status:      "error",
 		BibNumbers:  nil,
 		UploadedAt:  "2026-04-01T09:00:00Z",
@@ -60,7 +65,7 @@ func TestHandler_Handle(t *testing.T) {
 	}
 	processingPhoto := models.Photo{
 		ID:         "photo-3",
-		EventID:    "event-1",
+		EventID:    testEventID,
 		Status:     "processing",
 		BibNumbers: nil,
 		UploadedAt: "2026-04-01T08:00:00Z",
@@ -80,12 +85,12 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "happy path — returns photos with thumbnailUrl",
 			sub:     "photographer-1",
-			eventID: "event-1",
+			eventID: testEventID,
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("photographer-1", nil)
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-1", nil)
 			},
 			mockPhotos: func(m *mocks.MockPhotoStore) {
-				m.EXPECT().ListPhotosByEvent(gomock.Any(), "event-1", "", "", 50).
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), testEventID, "", "", 50).
 					Return([]models.Photo{indexedPhoto}, "next-cursor", nil)
 			},
 			wantCode: 200,
@@ -113,12 +118,12 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "photo with no watermark — thumbnailUrl is null",
 			sub:     "photographer-1",
-			eventID: "event-1",
+			eventID: testEventID,
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("photographer-1", nil)
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-1", nil)
 			},
 			mockPhotos: func(m *mocks.MockPhotoStore) {
-				m.EXPECT().ListPhotosByEvent(gomock.Any(), "event-1", "", "", 50).
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), testEventID, "", "", 50).
 					Return([]models.Photo{processingPhoto}, "", nil)
 			},
 			wantCode: 200,
@@ -136,12 +141,12 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "error photo — includes errorReason",
 			sub:     "photographer-1",
-			eventID: "event-1",
+			eventID: testEventID,
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("photographer-1", nil)
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-1", nil)
 			},
 			mockPhotos: func(m *mocks.MockPhotoStore) {
-				m.EXPECT().ListPhotosByEvent(gomock.Any(), "event-1", "", "", 50).
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), testEventID, "", "", 50).
 					Return([]models.Photo{errorPhoto}, "", nil)
 			},
 			wantCode: 200,
@@ -159,13 +164,13 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "with status filter — passes filter to store",
 			sub:     "photographer-1",
-			eventID: "event-1",
+			eventID: testEventID,
 			status:  "error",
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("photographer-1", nil)
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-1", nil)
 			},
 			mockPhotos: func(m *mocks.MockPhotoStore) {
-				m.EXPECT().ListPhotosByEvent(gomock.Any(), "event-1", "error", "", 50).
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), testEventID, "error", "", 50).
 					Return([]models.Photo{errorPhoto}, "", nil)
 			},
 			wantCode: 200,
@@ -173,13 +178,13 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "with cursor — passes cursor to store",
 			sub:     "photographer-1",
-			eventID: "event-1",
+			eventID: testEventID,
 			cursor:  "cursor-xyz",
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("photographer-1", nil)
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-1", nil)
 			},
 			mockPhotos: func(m *mocks.MockPhotoStore) {
-				m.EXPECT().ListPhotosByEvent(gomock.Any(), "event-1", "", "cursor-xyz", 50).
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), testEventID, "", "cursor-xyz", 50).
 					Return([]models.Photo{}, "", nil)
 			},
 			wantCode: 200,
@@ -187,12 +192,12 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "empty results — returns empty array not null",
 			sub:     "photographer-1",
-			eventID: "event-1",
+			eventID: testEventID,
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("photographer-1", nil)
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-1", nil)
 			},
 			mockPhotos: func(m *mocks.MockPhotoStore) {
-				m.EXPECT().ListPhotosByEvent(gomock.Any(), "event-1", "", "", 50).
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), testEventID, "", "", 50).
 					Return(nil, "", nil)
 			},
 			wantCode: 200,
@@ -208,7 +213,7 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:       "missing JWT sub — returns 401",
 			sub:        "",
-			eventID:    "event-1",
+			eventID:    testEventID,
 			mockEvents: func(m *mocks.MockEventStore) {},
 			mockPhotos: func(m *mocks.MockPhotoStore) {},
 			wantCode:   401,
@@ -216,8 +221,16 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:       "unknown status value — returns 400",
 			sub:        "photographer-1",
-			eventID:    "event-1",
+			eventID:    "550e8400-e29b-41d4-a716-446655440000",
 			status:     "unknown_status",
+			mockEvents: func(m *mocks.MockEventStore) {},
+			mockPhotos: func(m *mocks.MockPhotoStore) {},
+			wantCode:   400,
+		},
+		{
+			name:       "non-UUID event id — returns 400",
+			sub:        "photographer-1",
+			eventID:    "not-a-uuid",
 			mockEvents: func(m *mocks.MockEventStore) {},
 			mockPhotos: func(m *mocks.MockPhotoStore) {},
 			wantCode:   400,
@@ -225,9 +238,9 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "event not found — returns 404",
 			sub:     "photographer-1",
-			eventID: "event-missing",
+			eventID: testEventMissingID,
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-missing").Return("", handler.ErrEventNotFound)
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventMissingID).Return("", handler.ErrEventNotFound)
 			},
 			// ListPhotosByEvent is launched concurrently with the ownership check;
 			// its result is discarded when ownership fails. Allow any call.
@@ -240,9 +253,9 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "caller does not own event — returns 403",
 			sub:     "photographer-1",
-			eventID: "event-1",
+			eventID: testEventID,
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("photographer-2", nil)
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-2", nil)
 			},
 			// ListPhotosByEvent is launched concurrently; result discarded after 403.
 			mockPhotos: func(m *mocks.MockPhotoStore) {
@@ -254,9 +267,9 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "event store error — returns 500",
 			sub:     "photographer-1",
-			eventID: "event-1",
+			eventID: testEventID,
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("", errors.New("ddb failure"))
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("", errors.New("ddb failure"))
 			},
 			// ListPhotosByEvent is launched concurrently; result discarded after 500.
 			mockPhotos: func(m *mocks.MockPhotoStore) {
@@ -268,12 +281,12 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "photo store error — returns 500",
 			sub:     "photographer-1",
-			eventID: "event-1",
+			eventID: testEventID,
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("photographer-1", nil)
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-1", nil)
 			},
 			mockPhotos: func(m *mocks.MockPhotoStore) {
-				m.EXPECT().ListPhotosByEvent(gomock.Any(), "event-1", "", "", 50).
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), testEventID, "", "", 50).
 					Return(nil, "", errors.New("ddb failure"))
 			},
 			wantCode: 500,
@@ -281,13 +294,13 @@ func TestHandler_Handle(t *testing.T) {
 		{
 			name:    "invalid cursor — returns 400",
 			sub:     "photographer-1",
-			eventID: "event-1",
+			eventID: testEventID,
 			cursor:  "bad-cursor",
 			mockEvents: func(m *mocks.MockEventStore) {
-				m.EXPECT().GetEventPhotographerID(gomock.Any(), "event-1").Return("photographer-1", nil)
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-1", nil)
 			},
 			mockPhotos: func(m *mocks.MockPhotoStore) {
-				m.EXPECT().ListPhotosByEvent(gomock.Any(), "event-1", "", "bad-cursor", 50).
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), testEventID, "", "bad-cursor", 50).
 					Return(nil, "", handler.ErrInvalidCursor)
 			},
 			wantCode: 400,

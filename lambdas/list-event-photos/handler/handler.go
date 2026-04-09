@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"regexp"
 	"strconv"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -15,6 +16,10 @@ import (
 )
 
 const defaultPageSize = 50
+
+// uuidRE validates that an event ID is a standard UUID (case-insensitive).
+// This prevents pathological strings from reaching DynamoDB key lookups.
+var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
 // validStatuses is the allowlist of accepted ?status= filter values.
 // Arbitrary strings are rejected with 400 to prevent enum probing and exposure
@@ -77,8 +82,8 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	eventID := event.PathParameters["id"]
-	if eventID == "" {
-		return errResponse(400, "missing event id"), nil
+	if eventID == "" || !uuidRE.MatchString(eventID) {
+		return errResponse(400, "missing or invalid event id"), nil
 	}
 
 	filter := event.QueryStringParameters["status"]
