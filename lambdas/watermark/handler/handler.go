@@ -70,9 +70,10 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 	}
 
 	// Download raw photo from private S3 bucket.
+	// rawS3Key is never included in log or error strings (CLAUDE.md — private bucket paths must not be logged).
 	rawBody, err := h.RawReader.GetObject(ctx, "", wm.RawS3Key)
 	if err != nil {
-		return fmt.Errorf("processMessage: GetObject %s: %w", wm.RawS3Key, err)
+		return fmt.Errorf("processMessage: GetObject photoId=%s: %w", wm.PhotoID, err)
 	}
 	defer rawBody.Close()
 
@@ -89,8 +90,10 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 	}
 
 	// Upload to processed bucket.
+	// bytes.NewReader is an io.ReadSeeker — S3PhotoWriter can seek to determine the
+	// content length without a second io.ReadAll copy.
 	destKey := WatermarkedS3Key(wm.EventID, wm.PhotoID)
-	if err := h.ProcessedWriter.PutObject(ctx, h.ProcessedBucket, destKey, &buf, "image/jpeg"); err != nil {
+	if err := h.ProcessedWriter.PutObject(ctx, h.ProcessedBucket, destKey, bytes.NewReader(buf.Bytes()), "image/jpeg"); err != nil {
 		return fmt.Errorf("processMessage: PutObject %s: %w", destKey, err)
 	}
 

@@ -36,6 +36,8 @@ type DynamoPhotoStore struct {
 }
 
 // GetPhotoById retrieves a Photo record by its primary key.
+// Uses a consistent read to avoid eventual-consistency misses immediately after upload
+// (the upload Lambda writes the record before the S3 PUT that triggers this Lambda).
 // Returns apperrors.ErrNotFound when the item does not exist.
 func (s *DynamoPhotoStore) GetPhotoById(ctx context.Context, id string) (*models.Photo, error) {
 	key, err := attributevalue.MarshalMap(map[string]string{"id": id})
@@ -43,8 +45,9 @@ func (s *DynamoPhotoStore) GetPhotoById(ctx context.Context, id string) (*models
 		return nil, fmt.Errorf("GetPhotoById: marshal key: %w", err)
 	}
 	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(s.TableName),
-		Key:       key,
+		TableName:      aws.String(s.TableName),
+		Key:            key,
+		ConsistentRead: aws.Bool(true),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("GetPhotoById: dynamodb.GetItem: %w", err)
@@ -59,19 +62,18 @@ func (s *DynamoPhotoStore) GetPhotoById(ctx context.Context, id string) (*models
 	return &photo, nil
 }
 
-// UpdatePhotoStatus writes a partial update to a Photo record using UpdateItem
-// with an expression that only touches the fields in PhotoStatusUpdate.
+// UpdatePhotoStatus writes a partial update to a Photo record.
+// All attribute names are aliased via ExpressionAttributeNames to guard against
+// DynamoDB reserved-word collisions (CLAUDE.md mandate).
 func (s *DynamoPhotoStore) UpdatePhotoStatus(ctx context.Context, id string, update models.PhotoStatusUpdate) error {
 	key, err := attributevalue.MarshalMap(map[string]string{"id": id})
 	if err != nil {
 		return fmt.Errorf("UpdatePhotoStatus: marshal key: %w", err)
 	}
 
-	exprNames := map[string]string{
-		"#s": "status",
-	}
+	exprNames := map[string]string{"#st": "status"}
 	exprValues := map[string]types.AttributeValue{}
-	setExpr := "SET #s = :status"
+	setExpr := "SET #st = :status"
 
 	statusVal, err := attributevalue.Marshal(update.Status)
 	if err != nil {
@@ -85,8 +87,8 @@ func (s *DynamoPhotoStore) UpdatePhotoStatus(ctx context.Context, id string, upd
 			return fmt.Errorf("UpdatePhotoStatus: marshal bibNumbers: %w", err)
 		}
 		exprValues[":bibs"] = bibVal
-		exprNames["#b"] = "bibNumbers"
-		setExpr += ", #b = :bibs"
+		exprNames["#bn"] = "bibNumbers"
+		setExpr += ", #bn = :bibs"
 	}
 
 	if update.RekognitionConfidence > 0 {
@@ -95,8 +97,8 @@ func (s *DynamoPhotoStore) UpdatePhotoStatus(ctx context.Context, id string, upd
 			return fmt.Errorf("UpdatePhotoStatus: marshal confidence: %w", err)
 		}
 		exprValues[":conf"] = confVal
-		exprNames["#c"] = "rekognitionConfidence"
-		setExpr += ", #c = :conf"
+		exprNames["#rc"] = "rekognitionConfidence"
+		setExpr += ", #rc = :conf"
 	}
 
 	_, err = s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{

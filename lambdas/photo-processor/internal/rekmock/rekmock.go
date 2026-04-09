@@ -15,6 +15,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/service/rekognition"
 )
@@ -33,7 +34,24 @@ func (d *FileBackedDetector) DetectText(ctx context.Context, input *rekognition.
 	}
 
 	photoID := extractPhotoID(*input.Image.S3Object.Name)
-	path := filepath.Join(d.TestdataDir, photoID+".json")
+	candidatePath := filepath.Join(d.TestdataDir, photoID+".json")
+
+	// Guard against path traversal: reject any path that escapes TestdataDir.
+	absDir, err := filepath.Abs(d.TestdataDir)
+	if err != nil {
+		return &rekognition.DetectTextOutput{}, nil
+	}
+	absPath, err := filepath.Abs(candidatePath)
+	if err != nil {
+		return &rekognition.DetectTextOutput{}, nil
+	}
+	if !strings.HasPrefix(absPath, absDir+string(filepath.Separator)) {
+		slog.InfoContext(ctx, "rekmock: path traversal attempt rejected",
+			slog.String("photoId", photoID),
+		)
+		return &rekognition.DetectTextOutput{}, nil
+	}
+	path := candidatePath
 
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {

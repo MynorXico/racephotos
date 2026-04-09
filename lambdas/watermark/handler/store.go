@@ -54,19 +54,35 @@ type S3PhotoWriter struct {
 }
 
 // PutObject uploads body to bucket/key with the given content type.
+// If body implements io.ReadSeeker (e.g. *bytes.Reader), the length is determined
+// by seeking — no extra copy. Otherwise the body is read into a buffer.
 func (w *S3PhotoWriter) PutObject(ctx context.Context, bucket, key string, body io.Reader, contentType string) error {
-	// S3 PutObject needs a ReaderAt/Seeker or the content length. Read into a
-	// buffer to get the length, which also satisfies the SDK's content-length requirement.
-	data, err := io.ReadAll(body)
-	if err != nil {
-		return fmt.Errorf("S3PhotoWriter.PutObject: read body: %w", err)
+	var r io.Reader
+	var n int64
+
+	if rs, ok := body.(io.ReadSeeker); ok {
+		size, err := rs.Seek(0, io.SeekEnd)
+		if err != nil {
+			return fmt.Errorf("S3PhotoWriter.PutObject: seek end: %w", err)
+		}
+		if _, err = rs.Seek(0, io.SeekStart); err != nil {
+			return fmt.Errorf("S3PhotoWriter.PutObject: seek start: %w", err)
+		}
+		r, n = rs, size
+	} else {
+		data, err := io.ReadAll(body)
+		if err != nil {
+			return fmt.Errorf("S3PhotoWriter.PutObject: read body: %w", err)
+		}
+		r, n = bytes.NewReader(data), int64(len(data))
 	}
-	_, err = w.Client.PutObject(ctx, &s3.PutObjectInput{
+
+	_, err := w.Client.PutObject(ctx, &s3.PutObjectInput{
 		Bucket:        aws.String(bucket),
 		Key:           aws.String(key),
-		Body:          bytes.NewReader(data),
+		Body:          r,
 		ContentType:   aws.String(contentType),
-		ContentLength: aws.Int64(int64(len(data))),
+		ContentLength: aws.Int64(n),
 	})
 	if err != nil {
 		return fmt.Errorf("S3PhotoWriter.PutObject bucket=%s key=%s: %w", bucket, key, err)
@@ -89,9 +105,10 @@ func (s *DynamoEventStore) GetWatermarkText(ctx context.Context, eventId string)
 		return "", fmt.Errorf("GetWatermarkText: marshal key: %w", err)
 	}
 	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName:            aws.String(s.TableName),
-		Key:                  key,
-		ProjectionExpression: aws.String("watermarkText"),
+		TableName:                aws.String(s.TableName),
+		Key:                      key,
+		ProjectionExpression:     aws.String("#wt"),
+		ExpressionAttributeNames: map[string]string{"#wt": "watermarkText"},
 	})
 	if err != nil {
 		return "", fmt.Errorf("GetWatermarkText: dynamodb.GetItem eventId=%s: %w", eventId, err)
@@ -128,7 +145,11 @@ func (s *DynamoPhotoStore) UpdateWatermarkedKey(ctx context.Context, photoId, wa
 	_, err = s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:        aws.String(s.TableName),
 		Key:              key,
-		UpdateExpression: aws.String("SET watermarkedS3Key = :wk"),
+		UpdateExpression: aws.String("SET #wk = :wk"),
+		// ConditionExpression prevents silent ghost-record creation if photoId does not exist.
+		// DynamoDB UpdateItem upserts by default; attribute_exists(id) makes it fail-fast instead.
+		ConditionExpression:      aws.String("attribute_exists(id)"),
+		ExpressionAttributeNames: map[string]string{"#wk": "watermarkedS3Key"},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":wk": val,
 		},

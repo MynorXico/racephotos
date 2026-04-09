@@ -173,6 +173,52 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupWmQueue:    func(m *mocks.MockWatermarkQueue) {},
 			wantFailures:    1,
 		},
+		{
+			// TC-027 / domain rule 10: on SQS redelivery the photo may already be
+			// indexed; we must not call Rekognition again.
+			name: "domain rule 10: already-indexed photo — Rekognition skipped",
+			sqsBody: s3NotifBody("racephotos-raw-local", testRawS3Key),
+			setupDetector: func(m *mocks.MockTextDetector) {
+				// DetectText must NOT be called
+			},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {
+				already := testPhoto()
+				already.Status = "indexed"
+				m.EXPECT().GetPhotoById(gomock.Any(), testPhotoID).Return(already, nil)
+				// UpdatePhotoStatus must NOT be called
+			},
+			setupBibIndex: func(m *mocks.MockBibIndexStore) {},
+			setupWmQueue:  func(m *mocks.MockWatermarkQueue) {},
+			wantFailures:  0, // acked — idempotent
+		},
+		{
+			// TC-003 / domain rule 9: S3 event envelope with two records — both must be
+			// processed; neither is silently dropped.
+			name: "domain rule 9: two S3 records in one SQS message — both processed",
+			sqsBody: func() string {
+				key2 := "local/evt-aaa/photo-ccc/race.jpg"
+				return fmt.Sprintf(`{"Records":[`+
+					`{"s3":{"bucket":{"name":"racephotos-raw-local"},"object":{"key":%q}}},`+
+					`{"s3":{"bucket":{"name":"racephotos-raw-local"},"object":{"key":%q}}}`+
+					`]}`, testRawS3Key, key2)
+			}(),
+			setupDetector: func(m *mocks.MockTextDetector) {
+				m.EXPECT().DetectText(gomock.Any(), gomock.Any()).Return(&rekognition.DetectTextOutput{}, nil).Times(2)
+			},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().GetPhotoById(gomock.Any(), testPhotoID).Return(testPhoto(), nil)
+				m.EXPECT().GetPhotoById(gomock.Any(), "photo-ccc").Return(&models.Photo{
+					ID: "photo-ccc", EventID: testEventID, Status: "processing", RawS3Key: "local/evt-aaa/photo-ccc/race.jpg",
+				}, nil)
+				m.EXPECT().UpdatePhotoStatus(gomock.Any(), testPhotoID, gomock.Any()).Return(nil)
+				m.EXPECT().UpdatePhotoStatus(gomock.Any(), "photo-ccc", gomock.Any()).Return(nil)
+			},
+			setupBibIndex: func(m *mocks.MockBibIndexStore) {},
+			setupWmQueue: func(m *mocks.MockWatermarkQueue) {
+				m.EXPECT().SendWatermarkMessage(gomock.Any(), gomock.Any()).Return(nil).Times(2)
+			},
+			wantFailures: 0,
+		},
 	}
 
 	for _, tc := range tests {

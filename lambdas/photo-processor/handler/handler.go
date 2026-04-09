@@ -63,8 +63,12 @@ func (h *Handler) ProcessBatch(ctx context.Context, evt events.SQSEvent) (events
 // processMessage handles a single SQS message. Returns a non-nil error only for
 // infrastructure failures that should trigger a retry (partial batch failure).
 // Rekognition errors write status=error and return nil (ack).
+//
+// S3 event notifications technically allow multiple records per message. We process
+// all of them; if any record fails with an infrastructure error the whole SQS message
+// is added to batchItemFailures (retried). A Rekognition error on one record does not
+// affect the others — it is acked in-place (domain rule 10 / AC3).
 func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) error {
-	// Parse the S3 notification envelope.
 	var ev s3Event
 	if err := json.Unmarshal([]byte(msg.Body), &ev); err != nil {
 		return fmt.Errorf("processMessage: unmarshal S3 event: %w", err)
@@ -72,28 +76,50 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 	if len(ev.Records) == 0 {
 		return fmt.Errorf("processMessage: S3 event has no records")
 	}
-	rec := ev.Records[0]
+
+	for i, rec := range ev.Records {
+		if err := h.processS3Record(ctx, rec); err != nil {
+			return fmt.Errorf("processMessage: record[%d]: %w", i, err)
+		}
+	}
+	return nil
+}
+
+// processS3Record processes a single S3 ObjectCreated record. Returns a non-nil
+// error only for infrastructure failures (DynamoDB, SQS). Rekognition errors are
+// acked by writing status=error and returning nil.
+func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error {
 	rawS3Key := rec.S3.Object.Key
 
 	// Parse photoId from S3 key: {envName}/{eventId}/{photoId}/{filename}
 	parts := strings.Split(rawS3Key, "/")
 	if len(parts) < 4 {
-		return fmt.Errorf("processMessage: unexpected S3 key format: %q", rawS3Key)
+		return fmt.Errorf("unexpected S3 key format: %q", rawS3Key)
 	}
 	photoID := parts[2]
 
 	slog.InfoContext(ctx, "processing photo",
 		slog.String("photoId", photoID),
-		slog.String("rawS3Key", rawS3Key),
 	)
 
-	// Fetch the Photo record to get eventId and RawS3Key.
+	// Fetch the Photo record to get eventId and current status.
 	photo, err := h.Photos.GetPhotoById(ctx, photoID)
 	if err != nil {
-		return fmt.Errorf("processMessage: GetPhotoById %s: %w", photoID, err)
+		return fmt.Errorf("GetPhotoById %s: %w", photoID, err)
 	}
 
-	// Call Rekognition. On error: write status=error and ack (domain rule 10 / AC3).
+	// Domain rule 10: Rekognition is called exactly once per photo.
+	// SQS provides at-least-once delivery, so a redelivered message could re-invoke
+	// DetectText on an already-processed photo. Skip if status has moved past "processing".
+	if photo.Status != "processing" {
+		slog.InfoContext(ctx, "photo already processed — skipping Rekognition",
+			slog.String("photoId", photoID),
+			slog.String("status", photo.Status),
+		)
+		return nil
+	}
+
+	// Call Rekognition. On error: write status=error and ack (AC3).
 	out, rekErr := h.Detector.DetectText(ctx, &rekognition.DetectTextInput{
 		Image: &types.Image{
 			S3Object: &types.S3Object{
@@ -110,7 +136,7 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 		if updateErr := h.Photos.UpdatePhotoStatus(ctx, photoID, models.PhotoStatusUpdate{
 			Status: "error",
 		}); updateErr != nil {
-			return fmt.Errorf("processMessage: UpdatePhotoStatus (error): %w", updateErr)
+			return fmt.Errorf("UpdatePhotoStatus (error) %s: %w", photoID, updateErr)
 		}
 		return nil // ack — do not retry Rekognition errors
 	}
@@ -128,7 +154,7 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 	}
 
 	if err := h.Photos.UpdatePhotoStatus(ctx, photoID, update); err != nil {
-		return fmt.Errorf("processMessage: UpdatePhotoStatus: %w", err)
+		return fmt.Errorf("UpdatePhotoStatus %s: %w", photoID, err)
 	}
 
 	// Write one BibEntry per detected bib (fan-out — ADR-0003).
@@ -141,7 +167,7 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 			}
 		}
 		if err := h.BibIndex.WriteBibEntries(ctx, entries); err != nil {
-			return fmt.Errorf("processMessage: WriteBibEntries: %w", err)
+			return fmt.Errorf("WriteBibEntries %s: %w", photoID, err)
 		}
 	}
 
@@ -152,7 +178,7 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 		EventID:  photo.EventID,
 		RawS3Key: rawS3Key,
 	}); err != nil {
-		return fmt.Errorf("processMessage: SendWatermarkMessage: %w", err)
+		return fmt.Errorf("SendWatermarkMessage %s: %w", photoID, err)
 	}
 
 	slog.InfoContext(ctx, "photo processed",

@@ -81,10 +81,10 @@ export class ProcessingPipelineConstruct extends Construct {
     this.watermarkQueue = new sqs.Queue(this, 'WatermarkQueue', {
       queueName: 'racephotos-watermark',
       encryption,
-      // 2-minute visibility timeout: S3 GET + in-process image watermark + S3 PUT
-      // for a typical event JPEG completes well under 60s. 120s gives Lambda cold-start
-      // headroom without letting a failed message stay invisible for too long.
-      visibilityTimeout: cdk.Duration.seconds(120),
+      // 6-minute visibility timeout: batch size 10 × ~30s per image (S3 GET + decode
+      // + gg watermark + JPEG encode + S3 PUT) = ~300s sequential worst case.
+      // 360s gives headroom without letting a failed message stay invisible too long.
+      visibilityTimeout: cdk.Duration.seconds(360),
       deadLetterQueue: {
         queue: this.watermarkDlq,
         maxReceiveCount: 3,
