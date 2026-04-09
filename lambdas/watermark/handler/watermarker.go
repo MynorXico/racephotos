@@ -22,6 +22,16 @@ const (
 	// watermarkOpacity is the alpha of the white watermark text (0–255).
 	// 80 ≈ 31% opacity — visible enough to deter theft, light enough to preview the photo.
 	watermarkOpacity uint8 = 80
+
+	// Font size is clamped to [watermarkMinFontSize, watermarkMaxFontSize] points,
+	// scaled at watermarkFontSizeRatio of the larger image dimension.
+	watermarkMinFontSize  = 24.0
+	watermarkMaxFontSize  = 120.0
+	watermarkFontSizeRatio = 0.05
+
+	// Tile spacing multipliers relative to measured text dimensions.
+	watermarkColSpacingRatio = 2.0 // horizontal gap = textWidth  × ratio
+	watermarkRowSpacingRatio = 3.5 // vertical gap   = textHeight × ratio
 )
 
 // watermarkTextColor is the semi-transparent white used for diagonal text tiles.
@@ -49,10 +59,10 @@ func (w *GgWatermarker) ApplyTextWatermark(src io.Reader, text string) (image.Im
 	// Draw the source image as the base layer.
 	dc.DrawImage(img, 0, 0)
 
-	// Font size scales with the larger image dimension: ~5%, clamped to [24, 120] pts.
+	// Font size scales with the larger image dimension, clamped to a useful range.
 	// Using max(width, height) keeps the watermark proportional for both portrait
 	// and landscape orientations at the same resolution.
-	fontSize := math.Max(24, math.Min(math.Max(imgW, imgH)*0.05, 120))
+	fontSize := math.Max(watermarkMinFontSize, math.Min(math.Max(imgW, imgH)*watermarkFontSizeRatio, watermarkMaxFontSize))
 
 	if err := dc.LoadFontFace(watermarkFontPath, fontSize); err != nil {
 		slog.Warn("watermarker: could not load font — falling back to built-in",
@@ -77,8 +87,8 @@ func (w *GgWatermarker) ApplyTextWatermark(src io.Reader, text string) (image.Im
 		// than entering an infinite loop (zero rowSpacing would never advance y).
 		return img, nil
 	}
-	colSpacing := textW * 2.0 // horizontal gap between columns
-	rowSpacing := textH * 3.5 // vertical gap between rows
+	colSpacing := textW * watermarkColSpacingRatio // horizontal gap between columns
+	rowSpacing := textH * watermarkRowSpacingRatio // vertical gap between rows
 
 	// Half-diagonal: the maximum distance from centre to any corner.
 	halfDiag := math.Sqrt(imgW*imgW+imgH*imgH) / 2.0
