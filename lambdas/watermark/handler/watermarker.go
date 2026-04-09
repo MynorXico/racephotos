@@ -49,8 +49,10 @@ func (w *GgWatermarker) ApplyTextWatermark(src io.Reader, text string) (image.Im
 	// Draw the source image as the base layer.
 	dc.DrawImage(img, 0, 0)
 
-	// Font size scales with image width: ~5% of width, clamped to [24, 120] pts.
-	fontSize := math.Max(24, math.Min(imgW*0.05, 120))
+	// Font size scales with the larger image dimension: ~5%, clamped to [24, 120] pts.
+	// Using max(width, height) keeps the watermark proportional for both portrait
+	// and landscape orientations at the same resolution.
+	fontSize := math.Max(24, math.Min(math.Max(imgW, imgH)*0.05, 120))
 
 	if err := dc.LoadFontFace(watermarkFontPath, fontSize); err != nil {
 		slog.Warn("watermarker: could not load font — falling back to built-in",

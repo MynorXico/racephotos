@@ -17,6 +17,13 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Fprintln(os.Stderr, "error:", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	inPath := flag.String("in", "", "path to input photo (JPEG or PNG)")
 	outPath := flag.String("out", "watermarked.jpg", "path to write watermarked JPEG")
 	text := flag.String("text", "RaceShots · racephotos.example.com", "watermark text")
@@ -24,36 +31,32 @@ func main() {
 	flag.Parse()
 
 	if *inPath == "" {
-		fmt.Fprintln(os.Stderr, "error: -in is required")
 		flag.Usage()
-		os.Exit(1)
+		return fmt.Errorf("-in is required")
 	}
 
 	f, err := os.Open(*inPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: open %s: %v\n", *inPath, err)
-		os.Exit(1)
+		return fmt.Errorf("open %s: %w", *inPath, err)
 	}
 	defer f.Close()
 
 	wm := &handler.GgWatermarker{}
 	result, err := wm.ApplyTextWatermark(f, *text)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: ApplyTextWatermark: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("ApplyTextWatermark: %w", err)
 	}
 
 	out, err := os.Create(*outPath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error: create %s: %v\n", *outPath, err)
-		os.Exit(1)
+		return fmt.Errorf("create %s: %w", *outPath, err)
 	}
 	defer out.Close()
 
 	if err := jpeg.Encode(out, result, &jpeg.Options{Quality: *quality}); err != nil {
-		fmt.Fprintf(os.Stderr, "error: jpeg.Encode: %v\n", err)
-		os.Exit(1)
+		return fmt.Errorf("jpeg.Encode: %w", err)
 	}
 
 	fmt.Printf("✓ watermarked photo written to %s\n", *outPath)
+	return nil
 }
