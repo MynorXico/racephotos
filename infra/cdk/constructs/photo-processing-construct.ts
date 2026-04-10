@@ -138,8 +138,9 @@ export class PhotoProcessingConstruct extends Construct {
       // 512 MB: image decode + gg canvas rendering is memory-bound; more RAM
       // reduces GC pressure and speeds up the fog/gg pixel operations.
       memorySize: 512,
-      // Explicit 60 s timeout: batch of 10 × ~250 ms = ~2.5 s, plus S3/DDB
-      // round-trips and cold-start overhead — the 3 s default is insufficient.
+      // Explicit 60 s timeout: batch of 10 × ~3 s = ~30 s, plus S3/DDB
+      // round-trips and cold-start overhead. The watermark queue visibility
+      // timeout is 360 s (6× this value) per AWS best-practice recommendation.
       timeout: cdk.Duration.seconds(60),
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/watermark')),
       environment: {
