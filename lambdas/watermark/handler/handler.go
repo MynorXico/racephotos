@@ -98,6 +98,7 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 		if errors.As(err, &nsk) {
 			slog.WarnContext(ctx, "raw photo not found in S3 — acknowledging without retry",
 				slog.String("photoId", wm.PhotoID),
+				slog.String("eventId", wm.EventID),
 				slog.String("messageId", msg.MessageId),
 			)
 			return nil
