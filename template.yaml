@@ -86,3 +86,18 @@ Resources:
           RACEPHOTOS_PROCESSED_BUCKET: racephotos-processed-local
           RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
           RACEPHOTOS_EVENTS_TABLE: racephotos-events
+
+  ListEventPhotosFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-list-event-photos-local
+      Handler: bootstrap
+      CodeUri: lambdas/list-event-photos/
+      # list-event-photos is built for arm64 (Graviton2) — override the global x86_64.
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
+          RACEPHOTOS_EVENTS_TABLE: racephotos-events
+          RACEPHOTOS_PHOTO_CDN_DOMAIN: localhost:4566

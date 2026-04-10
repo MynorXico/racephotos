@@ -28,11 +28,11 @@ test-integration:
 	done
 
 # Build all Lambda binaries.
-# presign-photos targets ARM64 (Graviton2); all other Lambdas target x86_64.
+# presign-photos and list-event-photos target ARM64 (Graviton2); all other Lambdas target x86_64.
 # Each Lambda is built in a subshell so a failure exits immediately (|| exit 1)
 # and the working directory is never left in a corrupted state.
 # CGO_ENABLED=0 ensures static linking — avoids GLIBC version mismatches on AL2023.
-ARM64_LAMBDAS := presign-photos
+ARM64_LAMBDAS := presign-photos list-event-photos
 build:
 	@for lambda in $(LAMBDAS); do \
 		if [ -d lambdas/$$lambda ]; then \
@@ -138,7 +138,7 @@ invoke-update-photographer:
 
 define invoke_lambda
 	@[ "$(EVENT)" ] || ( echo ">> EVENT is not set. Usage: make $@ EVENT=happy-path"; exit 1 )
-	cd lambdas/$(1) && GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o bootstrap .
+	cd lambdas/$(1) && GOOS=linux GOARCH=$(if $(filter $(1),$(ARM64_LAMBDAS)),arm64,amd64) CGO_ENABLED=0 go build -o bootstrap .
 	sam local invoke $(2) \
 	  -t template.yaml \
 	  -e lambdas/$(1)/testdata/events/$(EVENT).json \
