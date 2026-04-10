@@ -116,10 +116,14 @@ export class PhotoProcessingConstruct extends Construct {
     watermarkQueue.grantSendMessages(this.photoProcessorFn);
 
     // Event source: racephotos-processing queue
+    // Cap max concurrency to prevent SQS-triggered lambdas from exhausting the
+    // account-level concurrency pool and throttling API-facing Lambdas.
+    // This is a temporary measure until the account concurrency limit is raised.
     this.photoProcessorFn.addEventSource(
       new lambdaEventSources.SqsEventSource(processingQueue, {
         batchSize: 10,
         reportBatchItemFailures: true,
+        maxConcurrency: config.sqsMaxConcurrency,
       }),
     );
 
@@ -178,10 +182,14 @@ export class PhotoProcessingConstruct extends Construct {
     photosTable.grant(this.watermarkFn, 'dynamodb:UpdateItem');
 
     // Event source: racephotos-watermark queue
+    // Cap max concurrency to prevent SQS-triggered lambdas from exhausting the
+    // account-level concurrency pool and throttling API-facing Lambdas.
+    // This is a temporary measure until the account concurrency limit is raised.
     this.watermarkFn.addEventSource(
       new lambdaEventSources.SqsEventSource(watermarkQueue, {
         batchSize: 10,
         reportBatchItemFailures: true,
+        maxConcurrency: config.sqsMaxConcurrency,
       }),
     );
 

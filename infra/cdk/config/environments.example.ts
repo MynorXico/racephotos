@@ -25,6 +25,9 @@ export const environments: Partial<Record<EnvConfig['envName'], EnvConfig>> = {
     enableDeletionProtection: false,
     domainName: 'none',
     certificateArn: 'none',
+    // Set to 3 if your account has a low Lambda concurrency limit (e.g. 10).
+    // Increase once AWS Support raises the account concurrency limit.
+    sqsMaxConcurrency: 3,
   },
   prod: {
     envName: 'prod',
@@ -36,5 +39,6 @@ export const environments: Partial<Record<EnvConfig['envName'], EnvConfig>> = {
     enableDeletionProtection: true,
     domainName: 'app.example.com',
     certificateArn: 'arn:aws:acm:us-east-1:REPLACE_WITH_ACCOUNT:certificate/REPLACE_WITH_CERT_ID',
+    sqsMaxConcurrency: 50,
   },
 };

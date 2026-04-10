@@ -13,6 +13,7 @@ const devConfig: EnvConfig = {
   watermarkStyle: 'text_overlay',
   photoRetentionDays: 90,
   enableDeletionProtection: false,
+    sqsMaxConcurrency: 3,
   domainName: 'none',
   certificateArn: 'none',
 };
@@ -22,6 +23,7 @@ const prodConfig: EnvConfig = {
   envName: 'prod',
   photoRetentionDays: 365,
   enableDeletionProtection: true,
+    sqsMaxConcurrency: 50,
 };
 
 function makeTemplate(config: EnvConfig): Template {
