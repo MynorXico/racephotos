@@ -1,7 +1,7 @@
 # Story: Add `in_progress` virtual status filter for pageable in-flight photo queries
 **ID**: RS-018
 **Epic**: Photo Processing
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
