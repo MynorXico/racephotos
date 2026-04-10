@@ -101,10 +101,14 @@ func (s *DynamoPhotoStore) UpdatePhotoStatus(ctx context.Context, id string, upd
 		setExpr += ", #rc = :conf"
 	}
 
+	// ConditionExpression prevents silent ghost-record creation if the photo was
+	// deleted between GetPhotoById and this write (defence-in-depth; mirrors the
+	// guard used in CompleteWatermark in the watermark Lambda).
 	_, err = s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:                 aws.String(s.TableName),
 		Key:                       key,
 		UpdateExpression:          aws.String(setExpr),
+		ConditionExpression:       aws.String("attribute_exists(id)"),
 		ExpressionAttributeNames:  exprNames,
 		ExpressionAttributeValues: exprValues,
 	})
