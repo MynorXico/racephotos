@@ -100,18 +100,10 @@ export class PhotoProcessingConstruct extends Construct {
       }),
     );
     // IAM: S3 read from raw bucket
-    // s3:ListBucket (bucket ARN) is required alongside s3:GetObject so that
-    // missing-key errors surface as 404 rather than 403 AccessDenied.
     this.photoProcessorFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['s3:GetObject'],
         resources: [rawBucket.arnForObjects('*')],
-      }),
-    );
-    this.photoProcessorFn.addToRolePolicy(
-      new iam.PolicyStatement({
-        actions: ['s3:ListBucket'],
-        resources: [rawBucket.bucketArn],
       }),
     );
     // IAM: DynamoDB writes
@@ -142,7 +134,7 @@ export class PhotoProcessingConstruct extends Construct {
       handler: 'bootstrap',
       // 512 MB: image decode + gg canvas rendering is memory-bound.
       // At 5,000 photos per event burst this gives ~250ms/photo — well within
-      // the 2-min watermark queue visibility timeout.
+      // the 6-min watermark queue visibility timeout (360 s).
       memorySize: 512,
       // Explicit 60 s timeout: batch of 10 × ~250 ms = ~2.5 s, plus S3/DDB
       // round-trips and cold-start overhead — the 3 s default is insufficient.
