@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"image/jpeg"
 	"log/slog"
 
 	"github.com/aws/aws-lambda-go/events"
+	s3types "github.com/aws/aws-sdk-go-v2/service/s3/types"
 
 	"github.com/racephotos/shared/models"
 )
@@ -90,6 +92,17 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 	// rawS3Key is never included in log or error strings (CLAUDE.md — private bucket paths must not be logged).
 	rawBody, err := h.RawReader.GetObject(ctx, "", wm.RawS3Key)
 	if err != nil {
+		// If the raw photo no longer exists, retrying will never succeed — ack the
+		// message and log a warning so an operator can investigate manually.
+		var nsk *s3types.NoSuchKey
+		if errors.As(err, &nsk) {
+			slog.WarnContext(ctx, "raw photo not found in S3 — acknowledging without retry",
+				slog.String("photoId", wm.PhotoID),
+				slog.String("eventId", wm.EventID),
+				slog.String("messageId", msg.MessageId),
+			)
+			return nil
+		}
 		return fmt.Errorf("processMessage: GetObject photoId=%s: %w", wm.PhotoID, err)
 	}
 	defer rawBody.Close()

@@ -63,9 +63,10 @@ export class ProcessingPipelineConstruct extends Construct {
     this.processingQueue = new sqs.Queue(this, 'ProcessingQueue', {
       queueName: 'racephotos-processing',
       encryption,
-      // 5-minute visibility timeout: gives the photo-processor Lambda (Rekognition
-      // + DynamoDB write) comfortable headroom before a message becomes re-visible.
-      visibilityTimeout: cdk.Duration.seconds(300),
+      // 6-minute visibility timeout: 6× the photo-processor Lambda timeout (60 s)
+      // per AWS SQS–Lambda best-practice recommendation to prevent duplicate
+      // processing during retries or slow Rekognition DetectText calls.
+      visibilityTimeout: cdk.Duration.seconds(360),
       deadLetterQueue: {
         queue: this.processingDlq,
         maxReceiveCount: 3,
@@ -81,9 +82,10 @@ export class ProcessingPipelineConstruct extends Construct {
     this.watermarkQueue = new sqs.Queue(this, 'WatermarkQueue', {
       queueName: 'racephotos-watermark',
       encryption,
-      // 6-minute visibility timeout: batch size 10 × ~30s per image (S3 GET + decode
-      // + gg watermark + JPEG encode + S3 PUT) = ~300s sequential worst case.
-      // 360s gives headroom without letting a failed message stay invisible too long.
+      // 6-minute visibility timeout: 6× the watermark Lambda timeout (60 s) per
+      // the AWS SQS–Lambda best-practice recommendation. At ~3 s/photo (S3 GET +
+      // decode + gg overlay + JPEG encode + S3 PUT), a full batch of 10 takes
+      // ~30 s, well within the 60 s Lambda timeout.
       visibilityTimeout: cdk.Duration.seconds(360),
       deadLetterQueue: {
         queue: this.watermarkDlq,

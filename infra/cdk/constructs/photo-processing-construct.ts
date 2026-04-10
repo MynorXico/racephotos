@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -79,6 +80,10 @@ export class PhotoProcessingConstruct extends Construct {
       architecture: lambda.Architecture.X86_64,
       handler: 'bootstrap',
       memorySize: 512,
+      // 60 s: up to 10 Rekognition DetectText calls per batch plus cold-start
+      // overhead. The processing queue visibility timeout is 360 s (6× this value)
+      // per the AWS SQS–Lambda best-practice recommendation.
+      timeout: cdk.Duration.seconds(60),
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/photo-processor')),
       environment: {
         RACEPHOTOS_ENV: config.envName,
@@ -130,10 +135,13 @@ export class PhotoProcessingConstruct extends Construct {
       runtime: lambda.Runtime.PROVIDED_AL2023,
       architecture: lambda.Architecture.X86_64,
       handler: 'bootstrap',
-      // 512 MB: image decode + gg canvas rendering is memory-bound.
-      // At 5,000 photos per event burst this gives ~250ms/photo — well within
-      // the 2-min watermark queue visibility timeout.
+      // 512 MB: image decode + gg canvas rendering is memory-bound; more RAM
+      // reduces GC pressure and speeds up the fog/gg pixel operations.
       memorySize: 512,
+      // Explicit 60 s timeout: batch of 10 × ~3 s = ~30 s, plus S3/DDB
+      // round-trips and cold-start overhead. The watermark queue visibility
+      // timeout is 360 s (6× this value) per AWS best-practice recommendation.
+      timeout: cdk.Duration.seconds(60),
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/watermark')),
       environment: {
         RACEPHOTOS_ENV: config.envName,
@@ -145,10 +153,18 @@ export class PhotoProcessingConstruct extends Construct {
     });
 
     // IAM: S3 read from raw bucket, write to processed bucket
+    // s3:ListBucket (bucket ARN) is required alongside s3:GetObject so that
+    // missing-key errors surface as 404 rather than 403 AccessDenied.
     this.watermarkFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['s3:GetObject'],
         resources: [rawBucket.arnForObjects('*')],
+      }),
+    );
+    this.watermarkFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:ListBucket'],
+        resources: [rawBucket.bucketArn],
       }),
     );
     this.watermarkFn.addToRolePolicy(
