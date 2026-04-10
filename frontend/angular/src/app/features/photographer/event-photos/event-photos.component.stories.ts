@@ -47,6 +47,11 @@ export const EmptyFiltered: Story = {
   name: 'Empty — filtered by Error',
 };
 
+// RS-018: demonstrates the In Progress filter chip and mixed processing/watermarking results.
+export const InProgressFilter: Story = {
+  name: 'In Progress filter — mixed processing + watermarking',
+};
+
 export const ErrorState: Story = {
   name: 'Error state',
 };

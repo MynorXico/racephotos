@@ -176,6 +176,38 @@ func TestHandler_Handle(t *testing.T) {
 			wantCode: 200,
 		},
 		{
+			name:    "in_progress filter — passes in_progress to store and returns mixed photos",
+			sub:     "photographer-1",
+			eventID: testEventID,
+			status:  "in_progress",
+			mockEvents: func(m *mocks.MockEventStore) {
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-1", nil)
+			},
+			mockPhotos: func(m *mocks.MockPhotoStore) {
+				watermarkingPhoto := models.Photo{
+					ID:         "photo-4",
+					EventID:    testEventID,
+					Status:     "watermarking",
+					BibNumbers: nil,
+					UploadedAt: "2026-04-01T07:00:00Z",
+				}
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), testEventID, "in_progress", "", 50).
+					Return([]models.Photo{processingPhoto, watermarkingPhoto}, "", nil)
+			},
+			wantCode: 200,
+			assertBody: func(t *testing.T, body string) {
+				var res struct {
+					Photos []struct {
+						Status string `json:"status"`
+					} `json:"photos"`
+				}
+				require.NoError(t, json.Unmarshal([]byte(body), &res))
+				require.Len(t, res.Photos, 2)
+				assert.Equal(t, "processing", res.Photos[0].Status)
+				assert.Equal(t, "watermarking", res.Photos[1].Status)
+			},
+		},
+		{
 			name:    "with cursor — passes cursor to store",
 			sub:     "photographer-1",
 			eventID: testEventID,

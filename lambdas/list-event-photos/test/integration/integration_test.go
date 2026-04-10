@@ -52,15 +52,15 @@ func TestIntegration_ListPhotosByEvent(t *testing.T) {
 			RawS3Key:         "raw/" + eventID + "/1.jpg",
 			WatermarkedS3Key: "processed/" + eventID + "/1.jpg",
 			BibNumbers:       []string{"101"},
-			UploadedAt:       time.Now().UTC().Add(-2 * time.Second).Format(time.RFC3339),
+			UploadedAt:       time.Now().UTC().Add(-3 * time.Second).Format(time.RFC3339),
 		},
 		{
-			ID:         "integ-photo-2-" + eventID,
-			EventID:    eventID,
-			Status:     "error",
-			RawS3Key:   "raw/" + eventID + "/2.jpg",
-			BibNumbers: nil,
-			UploadedAt: time.Now().UTC().Add(-1 * time.Second).Format(time.RFC3339),
+			ID:          "integ-photo-2-" + eventID,
+			EventID:     eventID,
+			Status:      "error",
+			RawS3Key:    "raw/" + eventID + "/2.jpg",
+			BibNumbers:  nil,
+			UploadedAt:  time.Now().UTC().Add(-2 * time.Second).Format(time.RFC3339),
 			ErrorReason: "Rekognition timeout",
 		},
 		{
@@ -69,7 +69,23 @@ func TestIntegration_ListPhotosByEvent(t *testing.T) {
 			Status:     "review_required",
 			RawS3Key:   "raw/" + eventID + "/3.jpg",
 			BibNumbers: []string{},
+			UploadedAt: time.Now().UTC().Add(-1 * time.Second).Format(time.RFC3339),
+		},
+		{
+			ID:         "integ-photo-4-" + eventID,
+			EventID:    eventID,
+			Status:     "processing",
+			RawS3Key:   "raw/" + eventID + "/4.jpg",
+			BibNumbers: nil,
 			UploadedAt: time.Now().UTC().Format(time.RFC3339),
+		},
+		{
+			ID:         "integ-photo-5-" + eventID,
+			EventID:    eventID,
+			Status:     "watermarking",
+			RawS3Key:   "raw/" + eventID + "/5.jpg",
+			BibNumbers: nil,
+			UploadedAt: time.Now().UTC().Add(1 * time.Second).Format(time.RFC3339),
 		},
 	}
 
@@ -98,10 +114,10 @@ func TestIntegration_ListPhotosByEvent(t *testing.T) {
 
 	store := &handler.DynamoPhotoLister{Client: client, TableName: photosTableName}
 
-	// List all — should return 3 photos.
+	// List all — should return 5 photos.
 	result, nextCursor, err := store.ListPhotosByEvent(ctx, eventID, "", "", 50)
 	require.NoError(t, err)
-	assert.Len(t, result, 3)
+	assert.Len(t, result, 5)
 	assert.Empty(t, nextCursor)
 
 	// List with status filter — should return only error photos.
@@ -110,6 +126,13 @@ func TestIntegration_ListPhotosByEvent(t *testing.T) {
 	require.Len(t, filtered, 1)
 	assert.Equal(t, "error", filtered[0].Status)
 	assert.Equal(t, "Rekognition timeout", filtered[0].ErrorReason)
+
+	// in_progress filter — should return both "processing" and "watermarking" photos.
+	inProgress, _, err := store.ListPhotosByEvent(ctx, eventID, "in_progress", "", 50)
+	require.NoError(t, err)
+	require.Len(t, inProgress, 2)
+	statuses := []string{inProgress[0].Status, inProgress[1].Status}
+	assert.ElementsMatch(t, []string{"processing", "watermarking"}, statuses)
 
 	// Pagination — limit=2 should give cursor.
 	page1, cursor, err := store.ListPhotosByEvent(ctx, eventID, "", "", 2)
@@ -120,8 +143,14 @@ func TestIntegration_ListPhotosByEvent(t *testing.T) {
 	// Second page.
 	page2, cursor2, err := store.ListPhotosByEvent(ctx, eventID, "", cursor, 2)
 	require.NoError(t, err)
-	assert.Len(t, page2, 1)
-	assert.Empty(t, cursor2)
+	assert.Len(t, page2, 2)
+	assert.NotEmpty(t, cursor2)
+
+	// Third page.
+	page3, cursor3, err := store.ListPhotosByEvent(ctx, eventID, "", cursor2, 2)
+	require.NoError(t, err)
+	assert.Len(t, page3, 1)
+	assert.Empty(t, cursor3)
 
 	// Invalid cursor returns ErrInvalidCursor.
 	_, _, err = store.ListPhotosByEvent(ctx, eventID, "", "not-valid-base64!!!", 50)

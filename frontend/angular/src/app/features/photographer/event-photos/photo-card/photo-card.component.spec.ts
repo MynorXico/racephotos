@@ -33,12 +33,13 @@ describe('PhotoCardComponent', () => {
     expect(img.src).toContain('photo-1.jpg');
   });
 
-  it('shows processing placeholder when thumbnailUrl is null', () => {
+  it('shows processing placeholder with "In progress" label when thumbnailUrl is null', () => {
     fixture.componentRef.setInput('photo', { ...basePhoto, thumbnailUrl: null, status: 'processing' });
     fixture.detectChanges();
     const placeholder: HTMLElement = fixture.nativeElement.querySelector('.thumbnail-placeholder');
     expect(placeholder).toBeTruthy();
     expect(placeholder.getAttribute('aria-label')).toBe('Thumbnail not yet available');
+    expect(placeholder.textContent).toContain('In progress');
   });
 
   it('shows watermarking shimmer when status is watermarking', () => {

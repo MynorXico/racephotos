@@ -22,16 +22,19 @@ var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 
 // validStatuses is the allowlist of accepted ?status= filter values.
 // Arbitrary strings are rejected with 400 to prevent enum probing and exposure
-// of internal states not intended for the gallery view. "uploading" is
-// intentionally excluded — it is a transient upload state that the frontend
-// does not surface as a filter option. "watermarking" is included for operator
-// use (AC6 / RS-017) but excluded from the frontend filter chip bar.
+// of internal states not intended for the gallery view.
+//
+// "uploading" is excluded — transient upload state not surfaced as a filter.
+// "in_progress" is a virtual aggregate alias (RS-018): the store expands it to
+// a compound FilterExpression matching both "processing" and "watermarking".
+// "processing" and "watermarking" remain valid for operator/debugging use.
 var validStatuses = map[string]bool{
 	models.PhotoStatusProcessing:     true,
 	models.PhotoStatusWatermarking:   true,
 	models.PhotoStatusIndexed:        true,
 	models.PhotoStatusReviewRequired: true,
 	models.PhotoStatusError:          true,
+	"in_progress":                    true,
 }
 
 // PhotoStore abstracts the photo listing query on the photos table GSI.
