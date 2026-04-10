@@ -32,17 +32,17 @@ func (m *MockPhotoStore) EXPECT() *MockPhotoStoreMockRecorder {
 	return m.recorder
 }
 
-// UpdateWatermarkedKey mocks base method.
-func (m *MockPhotoStore) UpdateWatermarkedKey(ctx context.Context, photoId, watermarkedS3Key string) error {
+// CompleteWatermark mocks base method.
+func (m *MockPhotoStore) CompleteWatermark(ctx context.Context, photoId, watermarkedS3Key, finalStatus string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateWatermarkedKey", ctx, photoId, watermarkedS3Key)
+	ret := m.ctrl.Call(m, "CompleteWatermark", ctx, photoId, watermarkedS3Key, finalStatus)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// UpdateWatermarkedKey indicates an expected call of UpdateWatermarkedKey.
-func (mr *MockPhotoStoreMockRecorder) UpdateWatermarkedKey(ctx, photoId, watermarkedS3Key interface{}) *gomock.Call {
+// CompleteWatermark indicates an expected call of CompleteWatermark.
+func (mr *MockPhotoStoreMockRecorder) CompleteWatermark(ctx, photoId, watermarkedS3Key, finalStatus interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateWatermarkedKey",
-		reflect.TypeOf((*MockPhotoStore)(nil).UpdateWatermarkedKey), ctx, photoId, watermarkedS3Key)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CompleteWatermark",
+		reflect.TypeOf((*MockPhotoStore)(nil).CompleteWatermark), ctx, photoId, watermarkedS3Key, finalStatus)
 }

@@ -8,6 +8,12 @@
         class="thumbnail-img"
         (error)="onImageError()"
       />
+    } @else if (photo.status === 'watermarking') {
+      <!-- RS-017: shimmer skeleton while watermark Lambda is applying the overlay -->
+      <div class="thumbnail-watermarking" aria-label="Finalizing watermark…" aria-busy="true">
+        <mat-icon class="watermarking-icon" aria-hidden="true">autorenew</mat-icon>
+        <span class="mat-body-small thumbnail-watermarking-label">Finalizing watermark…</span>
+      </div>
     } @else if (!photo.thumbnailUrl) {
       <div class="thumbnail-placeholder" aria-label="Thumbnail not yet available">
         <mat-icon class="placeholder-icon">hourglass_top</mat-icon>

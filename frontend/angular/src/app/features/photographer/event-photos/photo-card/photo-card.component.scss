@@ -44,6 +44,52 @@ $amber-text: #e65100;
   color: var(--mat-sys-on-surface-variant);
 }
 
+// ── Watermarking shimmer (RS-017) ─────────────────────────────────────────────
+
+.thumbnail-watermarking {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+
+  // Subtle pulse shimmer to signal in-progress state.
+  animation: shimmer-pulse 2s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes shimmer-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.6; }
+}
+
+.watermarking-icon {
+  font-size: 32px;
+  width: 32px;
+  height: 32px;
+  animation: spin 2s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.thumbnail-watermarking-label {
+  color: var(--mat-sys-on-secondary-container);
+}
+
 // ── Content strip ────────────────────────────────────────────────────────────
 
 .card-content {
@@ -83,6 +129,11 @@ $amber-text: #e65100;
   &.badge--processing {
     background: var(--mat-sys-surface-variant);
     color: var(--mat-sys-on-surface-variant);
+  }
+
+  &.badge--watermarking {
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
   }
 }
 

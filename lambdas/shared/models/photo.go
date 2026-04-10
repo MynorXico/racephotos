@@ -6,8 +6,9 @@ package models
 //
 //	"uploading"       — Photo record created; S3 PUT not yet confirmed (RS-006)
 //	"processing"      — Picked up by photo-processor Lambda (RS-007)
-//	"indexed"         — Rekognition complete, bib numbers extracted (RS-007)
-//	"review_required" — Rekognition found no confident bib numbers (RS-007)
+//	"watermarking"    — Rekognition complete, queued for watermark Lambda (RS-017)
+//	"indexed"         — Watermark applied, thumbnailUrl guaranteed present (RS-017)
+//	"review_required" — Watermark applied, no confident bib numbers found (RS-017)
 //	"error"           — Processing or conversion failed (RS-007, RS-015)
 //
 // Note: "uploading" extends the four statuses defined in PRODUCT_CONTEXT.md.
