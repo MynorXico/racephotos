@@ -163,7 +163,9 @@ func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error 
 			slog.String("status", photo.Status),
 		)
 		// Derive finalStatus from stored BibNumbers so Rekognition is not re-called.
-		return h.driveDownstream(ctx, photo, photo.RawS3Key, finalStatusFromBibs(photo.BibNumbers))
+		// Use rawS3Key (URL-decoded from the current event) for consistency with
+		// the normal processing path — avoids relying on the DynamoDB-stored value.
+		return h.driveDownstream(ctx, photo, rawS3Key, finalStatusFromBibs(photo.BibNumbers))
 	}
 
 	// Call Rekognition. On error: write status=error and ack (AC3).
