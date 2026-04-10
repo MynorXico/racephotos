@@ -150,6 +150,17 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			wantFailures:    1,
 		},
 		{
+			// Security: finalStatus allowlist enforced — only "indexed" and "review_required" accepted.
+			name:    "invalid finalStatus — message in batchItemFailures",
+			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "watermarking"),
+			setupReader:     func(m *mocks.MockRawPhotoReader) {},
+			setupWriter:     func(m *mocks.MockProcessedPhotoWriter) {},
+			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
+			setupEventStore: func(m *mocks.MockEventStore) {},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
+			wantFailures:    1,
+		},
+		{
 			name:    "malformed SQS body — message in batchItemFailures",
 			sqsBody: "not-json",
 			setupReader:     func(m *mocks.MockRawPhotoReader) {},

@@ -43,7 +43,7 @@ func (r *S3PhotoReader) GetObject(ctx context.Context, _ string, key string) (io
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("S3PhotoReader.GetObject key=%s: %w", key, err)
+		return nil, fmt.Errorf("S3PhotoReader.GetObject: %w", err)
 	}
 	return out.Body, nil
 }
@@ -85,7 +85,7 @@ func (w *S3PhotoWriter) PutObject(ctx context.Context, bucket, key string, body 
 		ContentLength: aws.Int64(n),
 	})
 	if err != nil {
-		return fmt.Errorf("S3PhotoWriter.PutObject bucket=%s key=%s: %w", bucket, key, err)
+		return fmt.Errorf("S3PhotoWriter.PutObject: %w", err)
 	}
 	return nil
 }
