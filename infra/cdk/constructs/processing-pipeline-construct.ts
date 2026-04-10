@@ -82,9 +82,10 @@ export class ProcessingPipelineConstruct extends Construct {
     this.watermarkQueue = new sqs.Queue(this, 'WatermarkQueue', {
       queueName: 'racephotos-watermark',
       encryption,
-      // 6-minute visibility timeout: batch size 10 × ~30s per image (S3 GET + decode
-      // + gg watermark + JPEG encode + S3 PUT) = ~300s sequential worst case.
-      // 360s gives headroom without letting a failed message stay invisible too long.
+      // 6-minute visibility timeout: 6× the watermark Lambda timeout (60 s) per
+      // the AWS SQS–Lambda best-practice recommendation. At ~3 s/photo (S3 GET +
+      // decode + gg overlay + JPEG encode + S3 PUT), a full batch of 10 takes
+      // ~30 s, well within the 60 s Lambda timeout.
       visibilityTimeout: cdk.Duration.seconds(360),
       deadLetterQueue: {
         queue: this.watermarkDlq,

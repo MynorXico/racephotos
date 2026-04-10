@@ -135,9 +135,8 @@ export class PhotoProcessingConstruct extends Construct {
       runtime: lambda.Runtime.PROVIDED_AL2023,
       architecture: lambda.Architecture.X86_64,
       handler: 'bootstrap',
-      // 512 MB: image decode + gg canvas rendering is memory-bound.
-      // At 5,000 photos per event burst this gives ~250ms/photo — well within
-      // the 6-min watermark queue visibility timeout (360 s).
+      // 512 MB: image decode + gg canvas rendering is memory-bound; more RAM
+      // reduces GC pressure and speeds up the fog/gg pixel operations.
       memorySize: 512,
       // Explicit 60 s timeout: batch of 10 × ~250 ms = ~2.5 s, plus S3/DDB
       // round-trips and cold-start overhead — the 3 s default is insufficient.
