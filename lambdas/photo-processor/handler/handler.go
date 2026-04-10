@@ -96,8 +96,8 @@ func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error 
 	rawS3Key, err := url.QueryUnescape(rec.S3.Object.Key)
 	if err != nil {
 		// Malformed encoding is a permanent error — ack rather than retry.
+		// rawKey is intentionally omitted — private bucket paths must not be logged (CLAUDE.md).
 		slog.ErrorContext(ctx, "processS3Record: failed to decode S3 key",
-			slog.String("rawKey", rec.S3.Object.Key),
 			slog.String("error", err.Error()),
 		)
 		return nil
