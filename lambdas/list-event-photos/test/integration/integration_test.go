@@ -134,6 +134,28 @@ func TestIntegration_ListPhotosByEvent(t *testing.T) {
 	statuses := []string{inProgress[0].Status, inProgress[1].Status}
 	assert.ElementsMatch(t, []string{"processing", "watermarking"}, statuses)
 
+	// in_progress pagination — limit=1 should page through both in-flight photos
+	// using the cursor re-anchoring path. This verifies that the cursor returned
+	// after page 1 resumes from the last returned photo (not from DynamoDB's
+	// LastEvaluatedKey, which may have advanced past non-matching items).
+	ipPage1, ipCursor, err := store.ListPhotosByEvent(ctx, eventID, "in_progress", "", 1)
+	require.NoError(t, err)
+	require.Len(t, ipPage1, 1)
+	assert.NotEmpty(t, ipCursor, "expected a cursor after first in_progress page")
+	assert.Contains(t, []string{"processing", "watermarking"}, ipPage1[0].Status)
+
+	ipPage2, ipCursor2, err := store.ListPhotosByEvent(ctx, eventID, "in_progress", ipCursor, 1)
+	require.NoError(t, err)
+	require.Len(t, ipPage2, 1)
+	assert.Contains(t, []string{"processing", "watermarking"}, ipPage2[0].Status)
+	assert.NotEqual(t, ipPage1[0].ID, ipPage2[0].ID, "page 2 must not repeat page 1 photo")
+
+	// There are exactly 2 in_progress photos — page 3 must be empty with no cursor.
+	ipPage3, ipCursor3, err := store.ListPhotosByEvent(ctx, eventID, "in_progress", ipCursor2, 1)
+	require.NoError(t, err)
+	assert.Empty(t, ipPage3)
+	assert.Empty(t, ipCursor3)
+
 	// Pagination — limit=2 should give cursor.
 	page1, cursor, err := store.ListPhotosByEvent(ctx, eventID, "", "", 2)
 	require.NoError(t, err)

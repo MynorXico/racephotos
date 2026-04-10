@@ -139,6 +139,14 @@ describe('EventPhotosComponent', () => {
     );
   });
 
+  it('dispatches Filter By Status with in_progress when In Progress chip is selected', () => {
+    dispatchSpy.calls.reset();
+    component.onFilterChip('in_progress');
+    expect(dispatchSpy).toHaveBeenCalledWith(
+      PhotosActions.filterByStatus({ eventId: 'event-1', status: 'in_progress' }),
+    );
+  });
+
   it('dispatches Load Next Page on load-more click', () => {
     store.overrideSelector(selectNextCursor, 'cursor-abc');
     store.refreshState();
