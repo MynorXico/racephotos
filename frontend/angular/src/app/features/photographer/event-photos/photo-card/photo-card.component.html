@@ -1,14 +1,9 @@
 <mat-card appearance="outlined" class="photo-card">
   <!-- Thumbnail -->
+  <!-- Branch order follows UX spec §1.3: watermarking checked first so the shimmer
+       takes priority even if thumbnailUrl is unexpectedly non-null (defensive rendering). -->
   <div class="thumbnail-container">
-    @if (photo.thumbnailUrl && !imageError()) {
-      <img
-        [src]="photo.thumbnailUrl"
-        alt=""
-        class="thumbnail-img"
-        (error)="onImageError()"
-      />
-    } @else if (photo.status === 'watermarking') {
+    @if (photo.status === 'watermarking') {
       <!-- RS-017: shimmer skeleton while watermark Lambda is applying the overlay -->
       <div class="thumbnail-watermarking" aria-label="Finalizing watermark…" role="img">
         <!-- Inner label is aria-hidden: the outer container's aria-label is authoritative -->
@@ -17,6 +12,13 @@
           <span class="mat-body-small placeholder-label">Finalizing watermark…</span>
         </div>
       </div>
+    } @else if (photo.thumbnailUrl && !imageError()) {
+      <img
+        [src]="photo.thumbnailUrl"
+        alt=""
+        class="thumbnail-img"
+        (error)="onImageError()"
+      />
     } @else if (!photo.thumbnailUrl) {
       <div class="thumbnail-placeholder" aria-label="Thumbnail not yet available">
         <mat-icon class="placeholder-icon">hourglass_top</mat-icon>
