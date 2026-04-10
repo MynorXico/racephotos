@@ -1,10 +1,10 @@
 import { createFeature, createReducer, on } from '@ngrx/store';
-import { Photo, PhotoStatus, PhotosActions } from './photos.actions';
+import { Photo, PhotoStatusFilter, PhotosActions } from './photos.actions';
 
 export interface PhotosState {
   photos: Photo[];
   nextCursor: string | null;
-  activeFilter: PhotoStatus | null;
+  activeFilter: PhotoStatusFilter | null;
   loading: boolean;
   error: string | null;
 }

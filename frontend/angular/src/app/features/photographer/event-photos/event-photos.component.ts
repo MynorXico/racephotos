@@ -15,7 +15,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
 import { NavigationTitleService } from '../../../core/services/navigation-title.service';
-import { PhotosActions, PhotoStatus } from '../../../store/photos/photos.actions';
+import { PhotosActions, PhotoStatusFilter } from '../../../store/photos/photos.actions';
 import {
   selectAllPhotos,
   selectPhotosLoading,
@@ -29,7 +29,7 @@ import { selectSelectedEvent, selectEventsLoading } from '../../../store/events/
 import { EventsActions } from '../../../store/events/events.actions';
 import { PhotoCardComponent } from './photo-card/photo-card.component';
 
-interface FilterChip { label: string; value: PhotoStatus | null }
+interface FilterChip { label: string; value: PhotoStatusFilter | null }
 
 @Component({
   selector: 'app-event-photos',
@@ -68,11 +68,11 @@ export class EventPhotosComponent implements OnDestroy {
   readonly eventId = computed(() => this.paramMap()?.get('id') ?? '');
 
   readonly filterChips: FilterChip[] = [
-    { label: 'All', value: null },
-    { label: 'Indexed', value: 'indexed' },
+    { label: 'All',             value: null           },
+    { label: 'In Progress',     value: 'in_progress'  },
+    { label: 'Indexed',         value: 'indexed'      },
     { label: 'Review Required', value: 'review_required' },
-    { label: 'Error', value: 'error' },
-    { label: 'Processing', value: 'processing' },
+    { label: 'Error',           value: 'error'        },
   ];
 
   readonly skeletonCards = Array.from({ length: 15 }, (_, i) => i);
@@ -80,7 +80,7 @@ export class EventPhotosComponent implements OnDestroy {
   readonly isInitialLoading = computed(() => this.loading() && this.photos().length === 0);
   readonly isLoadMoreInFlight = computed(() => this.loading() && this.photos().length > 0);
 
-  filterLabel(status: PhotoStatus | null): string {
+  filterLabel(status: PhotoStatusFilter | null): string {
     const chip = this.filterChips.find((c) => c.value === status);
     return chip?.label.toLowerCase() ?? '';
   }
@@ -104,7 +104,7 @@ export class EventPhotosComponent implements OnDestroy {
     this.store.dispatch(PhotosActions.clearPhotos());
   }
 
-  onFilterChip(status: PhotoStatus | null): void {
+  onFilterChip(status: PhotoStatusFilter | null): void {
     this.store.dispatch(PhotosActions.filterByStatus({ eventId: this.eventId(), status }));
   }
 

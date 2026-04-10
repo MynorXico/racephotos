@@ -28,18 +28,18 @@ describe('PhotoStatusBadgePipe', () => {
     expect(cfg.label).toBe('Error');
   });
 
-  it('returns processing badge config', () => {
+  it('returns processing badge config — label is "In Progress" (RS-018)', () => {
     const cfg = pipe.transform('processing');
     expect(cfg.cssClass).toBe('badge--processing');
     expect(cfg.icon).toBe('hourglass_top');
-    expect(cfg.label).toBe('Processing');
+    expect(cfg.label).toBe('In Progress');
   });
 
-  it('returns watermarking badge config', () => {
+  it('returns watermarking badge config — same as processing after RS-018', () => {
     const cfg = pipe.transform('watermarking');
-    expect(cfg.cssClass).toBe('badge--watermarking');
-    expect(cfg.icon).toBe('autorenew');
-    expect(cfg.label).toBe('Finalizing');
+    expect(cfg.cssClass).toBe('badge--processing');
+    expect(cfg.icon).toBe('hourglass_top');
+    expect(cfg.label).toBe('In Progress');
   });
 
   it('falls back to processing for unknown status', () => {

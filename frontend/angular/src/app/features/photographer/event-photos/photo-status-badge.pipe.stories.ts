@@ -35,7 +35,11 @@ import { PhotoStatusBadgePipe } from './photo-status-badge.pipe';
   `],
 })
 class BadgeShowcaseComponent {
-  readonly statuses = ['indexed', 'review_required', 'error', 'processing'];
+  // RS-018: processing and watermarking both render as "In Progress".
+  // The two rows are intentionally identical in appearance — the shimmer
+  // animation on watermarking card thumbnails (RS-017) provides card-level
+  // differentiation; the badge communicates filter-level grouping.
+  readonly statuses = ['indexed', 'review_required', 'error', 'processing', 'watermarking'];
 }
 
 const meta: Meta<BadgeShowcaseComponent> = {

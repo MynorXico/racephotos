@@ -1,6 +1,14 @@
 import { createActionGroup, emptyProps, props } from '@ngrx/store';
 
+/** Real DynamoDB status values — never assign 'in_progress' to a Photo object. */
 export type PhotoStatus = 'processing' | 'watermarking' | 'indexed' | 'review_required' | 'error';
+
+/**
+ * Extends PhotoStatus with virtual filter aliases accepted by the list-event-photos API.
+ * 'in_progress' is a server-side aggregate for processing + watermarking (RS-018).
+ * Use this type for filter state and API parameters, not for Photo.status.
+ */
+export type PhotoStatusFilter = PhotoStatus | 'in_progress';
 
 export interface Photo {
   id: string;
@@ -25,7 +33,7 @@ export const PhotosActions = createActionGroup({
     'Load Next Page Failure': props<{ error: string }>(),
 
     /** Change the active status filter. Triggers Load Photos after resetting the list. */
-    'Filter By Status': props<{ eventId: string; status: PhotoStatus | null }>(),
+    'Filter By Status': props<{ eventId: string; status: PhotoStatusFilter | null }>(),
 
     /** Reset the slice on navigation away. */
     'Clear Photos': emptyProps(),

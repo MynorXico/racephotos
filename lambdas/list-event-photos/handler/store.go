@@ -72,9 +72,19 @@ func (s *DynamoPhotoLister) ListPhotosByEvent(ctx context.Context, eventID, filt
 	}
 
 	if filter != "" {
-		input.FilterExpression = aws.String("#st = :status")
 		input.ExpressionAttributeNames = map[string]string{"#st": "status"}
-		input.ExpressionAttributeValues[":status"] = &types.AttributeValueMemberS{Value: filter}
+		if filter == "in_progress" {
+			// "in_progress" is a virtual filter alias — expand to a compound expression
+			// that matches both "processing" and "watermarking" DynamoDB status values.
+			// This lets the frontend issue a single paginated request for all in-flight
+			// photos without merging two independent cursors client-side (RS-018).
+			input.FilterExpression = aws.String("#st = :sp OR #st = :sw")
+			input.ExpressionAttributeValues[":sp"] = &types.AttributeValueMemberS{Value: models.PhotoStatusProcessing}
+			input.ExpressionAttributeValues[":sw"] = &types.AttributeValueMemberS{Value: models.PhotoStatusWatermarking}
+		} else {
+			input.FilterExpression = aws.String("#st = :status")
+			input.ExpressionAttributeValues[":status"] = &types.AttributeValueMemberS{Value: filter}
+		}
 	}
 
 	if cursor != "" {
