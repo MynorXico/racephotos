@@ -13,6 +13,7 @@ const localConfig: EnvConfig = {
   watermarkStyle: 'text_overlay',
   photoRetentionDays: 90,
   enableDeletionProtection: false,
+    sqsMaxConcurrency: 3,
   domainName: 'none',
   certificateArn: 'none',
 };
@@ -25,6 +26,7 @@ const devConfig: EnvConfig = {
   watermarkStyle: 'text_overlay',
   photoRetentionDays: 90,
   enableDeletionProtection: false,
+    sqsMaxConcurrency: 3,
   domainName: 'none',
   certificateArn: 'none',
 };
@@ -33,6 +35,7 @@ const prodConfig: EnvConfig = {
   ...devConfig,
   envName: 'prod',
   enableDeletionProtection: true,
+    sqsMaxConcurrency: 50,
   domainName: 'app.example.com',
   certificateArn: 'arn:aws:acm:us-east-1:000000000000:certificate/test',
 };

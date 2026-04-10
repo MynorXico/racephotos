@@ -14,6 +14,7 @@ const devConfig: EnvConfig = {
   watermarkStyle: 'text_overlay',
   photoRetentionDays: 90,
   enableDeletionProtection: false,
+    sqsMaxConcurrency: 3,
   domainName: 'none',
   certificateArn: 'none',
 };
@@ -22,6 +23,7 @@ const prodConfig: EnvConfig = {
   ...devConfig,
   envName: 'prod',
   enableDeletionProtection: true,
+    sqsMaxConcurrency: 50,
 };
 
 // SES from-address is loaded from SSM at deploy time via a CloudFormation

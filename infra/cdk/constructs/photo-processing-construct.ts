@@ -116,10 +116,14 @@ export class PhotoProcessingConstruct extends Construct {
     watermarkQueue.grantSendMessages(this.photoProcessorFn);
 
     // Event source: racephotos-processing queue
+    // maxConcurrency: 3 — temporary cap while the account-level Lambda concurrency
+    // limit is 10. Prevents photo-processor from exhausting the pool and throttling
+    // API-facing Lambdas. Remove once AWS Support raises the limit to 500+.
     this.photoProcessorFn.addEventSource(
       new lambdaEventSources.SqsEventSource(processingQueue, {
         batchSize: 10,
         reportBatchItemFailures: true,
+        maxConcurrency: config.sqsMaxConcurrency,
       }),
     );
 
@@ -178,10 +182,12 @@ export class PhotoProcessingConstruct extends Construct {
     photosTable.grant(this.watermarkFn, 'dynamodb:UpdateItem');
 
     // Event source: racephotos-watermark queue
+    // maxConcurrency: 3 — same rationale as photo-processor above.
     this.watermarkFn.addEventSource(
       new lambdaEventSources.SqsEventSource(watermarkQueue, {
         batchSize: 10,
         reportBatchItemFailures: true,
+        maxConcurrency: config.sqsMaxConcurrency,
       }),
     );
 

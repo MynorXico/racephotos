@@ -14,6 +14,14 @@ export interface EnvConfig {
   photoRetentionDays: number;
   enableDeletionProtection: boolean;
   /**
+   * Maximum concurrent Lambda instances for SQS-triggered processing functions
+   * (photo-processor and watermark). Set to a low value (e.g. 3) when the
+   * account-level Lambda concurrency limit is constrained, to prevent batch
+   * processing from starving API-facing Lambdas. Set to a higher value (e.g. 50)
+   * once AWS Support raises the account concurrency limit.
+   */
+  sqsMaxConcurrency: number;
+  /**
    * Custom domain name for the CloudFront distribution.
    * e.g. "app.dev.example.com"
    * Use "none" when no custom domain is needed — CloudFront default domain is used.
