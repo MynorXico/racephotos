@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -79,6 +80,7 @@ export class PhotoProcessingConstruct extends Construct {
       architecture: lambda.Architecture.X86_64,
       handler: 'bootstrap',
       memorySize: 512,
+      timeout: cdk.Duration.seconds(30),
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/photo-processor')),
       environment: {
         RACEPHOTOS_ENV: config.envName,
@@ -145,10 +147,18 @@ export class PhotoProcessingConstruct extends Construct {
     });
 
     // IAM: S3 read from raw bucket, write to processed bucket
+    // s3:ListBucket (bucket ARN) is required alongside s3:GetObject so that
+    // missing-key errors surface as 404 rather than 403 AccessDenied.
     this.watermarkFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['s3:GetObject'],
         resources: [rawBucket.arnForObjects('*')],
+      }),
+    );
+    this.watermarkFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:ListBucket'],
+        resources: [rawBucket.bucketArn],
       }),
     );
     this.watermarkFn.addToRolePolicy(
