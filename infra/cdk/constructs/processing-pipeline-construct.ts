@@ -63,9 +63,10 @@ export class ProcessingPipelineConstruct extends Construct {
     this.processingQueue = new sqs.Queue(this, 'ProcessingQueue', {
       queueName: 'racephotos-processing',
       encryption,
-      // 5-minute visibility timeout: gives the photo-processor Lambda (Rekognition
-      // + DynamoDB write) comfortable headroom before a message becomes re-visible.
-      visibilityTimeout: cdk.Duration.seconds(300),
+      // 6-minute visibility timeout: 6× the photo-processor Lambda timeout (60 s)
+      // per AWS SQS–Lambda best-practice recommendation to prevent duplicate
+      // processing during retries or slow Rekognition DetectText calls.
+      visibilityTimeout: cdk.Duration.seconds(360),
       deadLetterQueue: {
         queue: this.processingDlq,
         maxReceiveCount: 3,

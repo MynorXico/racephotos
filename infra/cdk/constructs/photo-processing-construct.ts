@@ -80,7 +80,10 @@ export class PhotoProcessingConstruct extends Construct {
       architecture: lambda.Architecture.X86_64,
       handler: 'bootstrap',
       memorySize: 512,
-      timeout: cdk.Duration.seconds(30),
+      // 60 s: up to 10 Rekognition DetectText calls per batch plus cold-start
+      // overhead. The processing queue visibility timeout is 360 s (6× this value)
+      // per the AWS SQS–Lambda best-practice recommendation.
+      timeout: cdk.Duration.seconds(60),
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/photo-processor')),
       environment: {
         RACEPHOTOS_ENV: config.envName,
