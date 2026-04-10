@@ -157,14 +157,22 @@ func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error 
 			slog.String("photoId", photoID),
 		)
 		return nil
-	case statusIndexed, statusReviewRequired, statusWatermarking:
-		slog.InfoContext(ctx, "photo already processed — skipping Rekognition, re-driving downstream steps",
+	case statusIndexed, statusReviewRequired:
+		// Full pipeline complete (watermark Lambda already ran CompleteWatermark).
+		// Bib entries are guaranteed to exist — they are written before the watermark
+		// message is sent. Re-driving downstream is wasteful; ack the message.
+		slog.InfoContext(ctx, "photo fully processed — acking without re-driving",
 			slog.String("photoId", photoID),
 			slog.String("status", photo.Status),
 		)
-		// Derive finalStatus from stored BibNumbers so Rekognition is not re-called.
-		// Use rawS3Key (URL-decoded from the current event) for consistency with
-		// the normal processing path — avoids relying on the DynamoDB-stored value.
+		return nil
+	case statusWatermarking:
+		// photo-processor wrote "watermarking" but may have crashed before
+		// WriteBibEntries or SendWatermarkMessage completed. Re-drive downstream
+		// idempotent steps using bib numbers already stored in the photo record.
+		slog.InfoContext(ctx, "photo in watermarking state — re-driving downstream steps",
+			slog.String("photoId", photoID),
+		)
 		return h.driveDownstream(ctx, photo, rawS3Key, finalStatusFromBibs(photo.BibNumbers))
 	}
 
