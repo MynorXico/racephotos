@@ -100,10 +100,18 @@ export class PhotoProcessingConstruct extends Construct {
       }),
     );
     // IAM: S3 read from raw bucket
+    // s3:ListBucket (bucket ARN) is required alongside s3:GetObject so that
+    // missing-key errors surface as 404 rather than 403 AccessDenied.
     this.photoProcessorFn.addToRolePolicy(
       new iam.PolicyStatement({
         actions: ['s3:GetObject'],
         resources: [rawBucket.arnForObjects('*')],
+      }),
+    );
+    this.photoProcessorFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:ListBucket'],
+        resources: [rawBucket.bucketArn],
       }),
     );
     // IAM: DynamoDB writes
@@ -136,6 +144,9 @@ export class PhotoProcessingConstruct extends Construct {
       // At 5,000 photos per event burst this gives ~250ms/photo — well within
       // the 2-min watermark queue visibility timeout.
       memorySize: 512,
+      // Explicit 60 s timeout: batch of 10 × ~250 ms = ~2.5 s, plus S3/DDB
+      // round-trips and cold-start overhead — the 3 s default is insufficient.
+      timeout: cdk.Duration.seconds(60),
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/watermark')),
       environment: {
         RACEPHOTOS_ENV: config.envName,
