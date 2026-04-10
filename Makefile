@@ -138,9 +138,7 @@ invoke-update-photographer:
 
 define invoke_lambda
 	@[ "$(EVENT)" ] || ( echo ">> EVENT is not set. Usage: make $@ EVENT=happy-path"; exit 1 )
-	cd lambdas/$(1) && \
-	  ARCH=$$(for a in $(ARM64_LAMBDAS); do [ "$(1)" = "$$a" ] && echo arm64 && exit 0; done; echo amd64) && \
-	  GOOS=linux GOARCH=$$ARCH CGO_ENABLED=0 go build -o bootstrap .
+	cd lambdas/$(1) && GOOS=linux GOARCH=$(if $(filter $(1),$(ARM64_LAMBDAS)),arm64,amd64) CGO_ENABLED=0 go build -o bootstrap .
 	sam local invoke $(2) \
 	  -t template.yaml \
 	  -e lambdas/$(1)/testdata/events/$(EVENT).json \
