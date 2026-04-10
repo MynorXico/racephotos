@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"strconv"
 	"strings"
 
@@ -89,7 +90,18 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 // error only for infrastructure failures (DynamoDB, SQS). Rekognition errors are
 // acked by writing status=error and returning nil.
 func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error {
-	rawS3Key := rec.S3.Object.Key
+	// S3 event notifications URL-encode the object key (spaces → "+", special
+	// chars → "%XX"). Decode before use so Rekognition and S3 GetObject receive
+	// the real key, not the encoded form.
+	rawS3Key, err := url.QueryUnescape(rec.S3.Object.Key)
+	if err != nil {
+		// Malformed encoding is a permanent error — ack rather than retry.
+		// rawKey is intentionally omitted — private bucket paths must not be logged (CLAUDE.md).
+		slog.ErrorContext(ctx, "processS3Record: failed to decode S3 key",
+			slog.String("error", err.Error()),
+		)
+		return nil
+	}
 
 	// Parse photoId from S3 key: {envName}/{eventId}/{photoId}/{filename}
 	parts := strings.Split(rawS3Key, "/")

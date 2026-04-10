@@ -165,6 +165,37 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			wantFailures:    1,
 		},
 		{
+			// S3 event notifications URL-encode the object key; spaces become "+"
+			// and special chars become "%XX". The handler must decode the key before
+			// passing it to Rekognition/S3, otherwise filenames with spaces (e.g.
+			// "photo (copy).jpg") cause InvalidS3ObjectException.
+			name: "URL-encoded S3 key with spaces — key decoded before use",
+			// "local/evt-aaa/photo-bbb/race photo.jpg" encoded as S3 sends it
+			sqsBody: s3NotifBody("racephotos-raw-local", "local/evt-aaa/photo-bbb/race+photo.jpg"),
+			setupDetector: func(m *mocks.MockTextDetector) {
+				m.EXPECT().DetectText(gomock.Any(), &rekognition.DetectTextInput{
+					Image: &types.Image{S3Object: &types.S3Object{
+						Bucket: aws.String("racephotos-raw-local"),
+						// Rekognition must receive the decoded key (space, not "+").
+						Name: aws.String("local/evt-aaa/photo-bbb/race photo.jpg"),
+					}},
+				}).Return(&rekognition.DetectTextOutput{}, nil)
+			},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().GetPhotoById(gomock.Any(), testPhotoID).Return(testPhoto(), nil)
+				m.EXPECT().UpdatePhotoStatus(gomock.Any(), testPhotoID, gomock.Any()).Return(nil)
+			},
+			setupBibIndex: func(m *mocks.MockBibIndexStore) {},
+			setupWmQueue: func(m *mocks.MockWatermarkQueue) {
+				m.EXPECT().SendWatermarkMessage(gomock.Any(), models.WatermarkMessage{
+					PhotoID:  testPhotoID,
+					EventID:  testEventID,
+					RawS3Key: "local/evt-aaa/photo-bbb/race photo.jpg",
+				}).Return(nil)
+			},
+			wantFailures: 0,
+		},
+		{
 			name:    "malformed SQS body — message failed",
 			sqsBody: "not-json",
 			setupDetector:   func(m *mocks.MockTextDetector) {},
