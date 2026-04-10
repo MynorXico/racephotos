@@ -33,5 +33,8 @@ module.exports = function (config) {
       },
     },
     restartOnFileChange: true,
+    // Increase timeout for Chrome startup under parallel CI load.
+    // Default 30 s is too short when backend/infra/storybook run concurrently.
+    browserNoActivityTimeout: 120000,
   });
 };
