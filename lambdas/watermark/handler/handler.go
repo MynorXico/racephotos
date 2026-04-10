@@ -71,8 +71,9 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 	if wm.PhotoID == "" || wm.EventID == "" || wm.RawS3Key == "" || wm.FinalStatus == "" {
 		return fmt.Errorf("processMessage: missing required fields in watermark message")
 	}
-	if wm.FinalStatus != "indexed" && wm.FinalStatus != "review_required" {
-		return fmt.Errorf("processMessage: invalid finalStatus %q — must be \"indexed\" or \"review_required\"", wm.FinalStatus)
+	if wm.FinalStatus != models.PhotoStatusIndexed && wm.FinalStatus != models.PhotoStatusReviewRequired {
+		return fmt.Errorf("processMessage: invalid finalStatus %q — must be %q or %q",
+			wm.FinalStatus, models.PhotoStatusIndexed, models.PhotoStatusReviewRequired)
 	}
 
 	slog.InfoContext(ctx, "watermarking photo",

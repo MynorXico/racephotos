@@ -39,12 +39,13 @@ type s3Event struct {
 	Records []s3EventRecord `json:"Records"`
 }
 
-// Photo status constants used across processing paths.
+// Photo status constants — aliases to models package constants for use within
+// this package without repeating the models.PhotoStatus prefix on every reference.
 const (
-	statusWatermarking   = "watermarking"
-	statusIndexed        = "indexed"
-	statusReviewRequired = "review_required"
-	statusError          = "error"
+	statusWatermarking   = models.PhotoStatusWatermarking
+	statusIndexed        = models.PhotoStatusIndexed
+	statusReviewRequired = models.PhotoStatusReviewRequired
+	statusError          = models.PhotoStatusError
 )
 
 // finalStatusFromBibs returns "indexed" when bib numbers were detected,

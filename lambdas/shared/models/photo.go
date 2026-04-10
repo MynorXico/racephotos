@@ -1,5 +1,18 @@
 package models
 
+// Photo status constants — used across Lambdas (photo-processor, watermark,
+// list-event-photos). Centralising them prevents typos and keeps the allowed
+// values in one place so any Lambda can validate or compare without importing
+// a sibling Lambda's internal package.
+const (
+	PhotoStatusUploading      = "uploading"
+	PhotoStatusProcessing     = "processing"
+	PhotoStatusWatermarking   = "watermarking"
+	PhotoStatusIndexed        = "indexed"
+	PhotoStatusReviewRequired = "review_required"
+	PhotoStatusError          = "error"
+)
+
 // Photo represents a race photo stored in DynamoDB.
 //
 // Status values (introduced incrementally across stories):

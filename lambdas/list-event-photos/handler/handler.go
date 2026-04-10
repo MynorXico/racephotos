@@ -27,11 +27,11 @@ var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-
 // does not surface as a filter option. "watermarking" is included for operator
 // use (AC6 / RS-017) but excluded from the frontend filter chip bar.
 var validStatuses = map[string]bool{
-	"processing":      true,
-	"watermarking":    true,
-	"indexed":         true,
-	"review_required": true,
-	"error":           true,
+	models.PhotoStatusProcessing:     true,
+	models.PhotoStatusWatermarking:   true,
+	models.PhotoStatusIndexed:        true,
+	models.PhotoStatusReviewRequired: true,
+	models.PhotoStatusError:          true,
 }
 
 // PhotoStore abstracts the photo listing query on the photos table GSI.
