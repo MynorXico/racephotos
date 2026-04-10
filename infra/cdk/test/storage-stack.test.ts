@@ -281,11 +281,11 @@ describe('ProcessingPipelineConstruct', () => {
     t.resourceCountIs('AWS::SQS::Queue', 4);
   });
 
-  test('racephotos-processing queue has 5-minute visibility timeout', () => {
+  test('racephotos-processing queue has 6-minute visibility timeout', () => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::SQS::Queue', {
       QueueName: 'racephotos-processing',
-      VisibilityTimeout: 300,
+      VisibilityTimeout: 360,
     });
   });
 
