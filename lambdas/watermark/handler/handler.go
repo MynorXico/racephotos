@@ -68,8 +68,12 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 	if err := json.Unmarshal([]byte(msg.Body), &wm); err != nil {
 		return fmt.Errorf("processMessage: unmarshal watermark message: %w", err)
 	}
-	if wm.PhotoID == "" || wm.EventID == "" || wm.RawS3Key == "" {
+	if wm.PhotoID == "" || wm.EventID == "" || wm.RawS3Key == "" || wm.FinalStatus == "" {
 		return fmt.Errorf("processMessage: missing required fields in watermark message")
+	}
+	if wm.FinalStatus != models.PhotoStatusIndexed && wm.FinalStatus != models.PhotoStatusReviewRequired {
+		return fmt.Errorf("processMessage: invalid finalStatus %q — must be %q or %q",
+			wm.FinalStatus, models.PhotoStatusIndexed, models.PhotoStatusReviewRequired)
 	}
 
 	slog.InfoContext(ctx, "watermarking photo",
@@ -127,14 +131,17 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 		return fmt.Errorf("processMessage: PutObject %s: %w", destKey, err)
 	}
 
-	// Update Photo record with the watermarked S3 key.
-	if err := h.Photos.UpdateWatermarkedKey(ctx, wm.PhotoID, destKey); err != nil {
-		return fmt.Errorf("processMessage: UpdateWatermarkedKey: %w", err)
+	// Atomically set watermarkedS3Key and the final status in a single DynamoDB
+	// UpdateItem. Using one expression prevents a partial state (key written but
+	// status still "watermarking") if the Lambda crashes mid-update (RS-017).
+	if err := h.Photos.CompleteWatermark(ctx, wm.PhotoID, destKey, wm.FinalStatus); err != nil {
+		return fmt.Errorf("processMessage: CompleteWatermark: %w", err)
 	}
 
 	slog.InfoContext(ctx, "watermark applied",
 		slog.String("photoId", wm.PhotoID),
-		slog.String("destKey", destKey),
+		slog.String("eventId", wm.EventID),
+		slog.String("finalStatus", wm.FinalStatus),
 	)
 
 	return nil

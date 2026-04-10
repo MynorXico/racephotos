@@ -1,6 +1,6 @@
 import { createActionGroup, emptyProps, props } from '@ngrx/store';
 
-export type PhotoStatus = 'processing' | 'indexed' | 'review_required' | 'error';
+export type PhotoStatus = 'processing' | 'watermarking' | 'indexed' | 'review_required' | 'error';
 
 export interface Photo {
   id: string;

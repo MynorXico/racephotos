@@ -36,8 +36,8 @@ func nopReader() io.ReadCloser {
 	return io.NopCloser(&bytes.Buffer{})
 }
 
-func watermarkMsg(photoID, eventID, rawKey string) string {
-	return `{"photoId":"` + photoID + `","eventId":"` + eventID + `","rawS3Key":"` + rawKey + `"}`
+func watermarkMsg(photoID, eventID, rawKey, finalStatus string) string {
+	return `{"photoId":"` + photoID + `","eventId":"` + eventID + `","rawS3Key":"` + rawKey + `","finalStatus":"` + finalStatus + `"}`
 }
 
 func sqsEvent(body string) events.SQSEvent {
@@ -64,9 +64,10 @@ func TestHandler_ProcessBatch(t *testing.T) {
 		wantFailures    int
 	}{
 		{
-			// Handler order: GetWatermarkText → GetObject → ApplyTextWatermark → PutObject → UpdateWatermarkedKey
-			name:    "AC5: happy path — watermark applied, photo updated",
-			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key),
+			// Handler order: GetWatermarkText → GetObject → ApplyTextWatermark → PutObject → CompleteWatermark
+			// RS-017: CompleteWatermark atomically sets watermarkedS3Key + finalStatus in one UpdateItem.
+			name:    "AC5: happy path — watermark applied, photo completed with finalStatus=indexed",
+			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "indexed"),
 			setupEventStore: func(m *mocks.MockEventStore) {
 				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("Marathon 2026 · racephotos.example.com", "Marathon 2026", nil)
 			},
@@ -81,14 +82,14 @@ func TestHandler_ProcessBatch(t *testing.T) {
 				m.EXPECT().PutObject(gomock.Any(), gomock.Any(), expectedKey, gomock.Any(), "image/jpeg").Return(nil)
 			},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {
-				m.EXPECT().UpdateWatermarkedKey(gomock.Any(), testPhotoID, expectedKey).Return(nil)
+				m.EXPECT().CompleteWatermark(gomock.Any(), testPhotoID, expectedKey, "indexed").Return(nil)
 			},
 			wantFailures: 0,
 		},
 		{
 			// TC-019: when watermarkText is empty, default to "{eventName} · racephotos.example.com".
-			name:    "TC-019: empty watermarkText — default applied",
-			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key),
+			name:    "TC-019: empty watermarkText — default applied, finalStatus=review_required",
+			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "review_required"),
 			setupEventStore: func(m *mocks.MockEventStore) {
 				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("", "City Marathon 2026", nil)
 			},
@@ -102,7 +103,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 				m.EXPECT().PutObject(gomock.Any(), gomock.Any(), expectedKey, gomock.Any(), "image/jpeg").Return(nil)
 			},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {
-				m.EXPECT().UpdateWatermarkedKey(gomock.Any(), testPhotoID, expectedKey).Return(nil)
+				m.EXPECT().CompleteWatermark(gomock.Any(), testPhotoID, expectedKey, "review_required").Return(nil)
 			},
 			wantFailures: 0,
 		},
@@ -110,7 +111,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			// EventStore is called first — a DynamoDB failure goes to batchItemFailures
 			// before any S3 I/O is attempted.
 			name:    "EventStore error — message in batchItemFailures",
-			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key),
+			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "indexed"),
 			setupEventStore: func(m *mocks.MockEventStore) {
 				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).
 					Return("", "", errors.New("dynamodb: timeout"))
@@ -124,7 +125,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 		{
 			// S3 GetObject error goes to batchItemFailures.
 			name:    "S3 GetObject error — message in batchItemFailures",
-			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key),
+			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "indexed"),
 			setupEventStore: func(m *mocks.MockEventStore) {
 				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("text", "Event", nil)
 			},
@@ -134,6 +135,28 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			},
 			setupWriter:     func(m *mocks.MockProcessedPhotoWriter) {},
 			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
+			wantFailures:    1,
+		},
+		{
+			// RS-017: missing finalStatus in message is treated as malformed — message goes to batchItemFailures.
+			name:    "missing finalStatus — message in batchItemFailures",
+			sqsBody: `{"photoId":"` + testPhotoID + `","eventId":"` + testEventID + `","rawS3Key":"` + testRawS3Key + `"}`,
+			setupReader:     func(m *mocks.MockRawPhotoReader) {},
+			setupWriter:     func(m *mocks.MockProcessedPhotoWriter) {},
+			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
+			setupEventStore: func(m *mocks.MockEventStore) {},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
+			wantFailures:    1,
+		},
+		{
+			// Security: finalStatus allowlist enforced — only "indexed" and "review_required" accepted.
+			name:    "invalid finalStatus — message in batchItemFailures",
+			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "watermarking"),
+			setupReader:     func(m *mocks.MockRawPhotoReader) {},
+			setupWriter:     func(m *mocks.MockProcessedPhotoWriter) {},
+			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
+			setupEventStore: func(m *mocks.MockEventStore) {},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
 			wantFailures:    1,
 		},

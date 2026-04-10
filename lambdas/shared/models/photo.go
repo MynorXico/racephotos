@@ -1,13 +1,27 @@
 package models
 
+// Photo status constants — used across Lambdas (photo-processor, watermark,
+// list-event-photos). Centralising them prevents typos and keeps the allowed
+// values in one place so any Lambda can validate or compare without importing
+// a sibling Lambda's internal package.
+const (
+	PhotoStatusUploading      = "uploading"
+	PhotoStatusProcessing     = "processing"
+	PhotoStatusWatermarking   = "watermarking"
+	PhotoStatusIndexed        = "indexed"
+	PhotoStatusReviewRequired = "review_required"
+	PhotoStatusError          = "error"
+)
+
 // Photo represents a race photo stored in DynamoDB.
 //
 // Status values (introduced incrementally across stories):
 //
 //	"uploading"       — Photo record created; S3 PUT not yet confirmed (RS-006)
 //	"processing"      — Picked up by photo-processor Lambda (RS-007)
-//	"indexed"         — Rekognition complete, bib numbers extracted (RS-007)
-//	"review_required" — Rekognition found no confident bib numbers (RS-007)
+//	"watermarking"    — Rekognition complete, queued for watermark Lambda (RS-017)
+//	"indexed"         — Watermark applied, thumbnailUrl guaranteed present (RS-017)
+//	"review_required" — Watermark applied, no confident bib numbers found (RS-017)
 //	"error"           — Processing or conversion failed (RS-007, RS-015)
 //
 // Note: "uploading" extends the four statuses defined in PRODUCT_CONTEXT.md.

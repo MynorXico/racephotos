@@ -58,3 +58,10 @@ export const Processing: Story = {
     photo: makePhoto({ status: 'processing', bibNumbers: [], thumbnailUrl: null }),
   },
 };
+
+// RS-017: watermarking shimmer — Rekognition done, watermark Lambda in progress.
+export const Watermarking: Story = {
+  args: {
+    photo: makePhoto({ status: 'watermarking', bibNumbers: ['42'], thumbnailUrl: null }),
+  },
+};

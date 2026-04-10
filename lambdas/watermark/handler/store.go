@@ -43,7 +43,7 @@ func (r *S3PhotoReader) GetObject(ctx context.Context, _ string, key string) (io
 		Key:    aws.String(key),
 	})
 	if err != nil {
-		return nil, fmt.Errorf("S3PhotoReader.GetObject key=%s: %w", key, err)
+		return nil, fmt.Errorf("S3PhotoReader.GetObject: %w", err)
 	}
 	return out.Body, nil
 }
@@ -85,7 +85,7 @@ func (w *S3PhotoWriter) PutObject(ctx context.Context, bucket, key string, body 
 		ContentLength: aws.Int64(n),
 	})
 	if err != nil {
-		return fmt.Errorf("S3PhotoWriter.PutObject bucket=%s key=%s: %w", bucket, key, err)
+		return fmt.Errorf("S3PhotoWriter.PutObject: %w", err)
 	}
 	return nil
 }
@@ -137,30 +137,43 @@ type DynamoPhotoStore struct {
 	TableName string
 }
 
-// UpdateWatermarkedKey writes the watermarkedS3Key field on an existing Photo record.
-func (s *DynamoPhotoStore) UpdateWatermarkedKey(ctx context.Context, photoId, watermarkedS3Key string) error {
+// CompleteWatermark atomically writes watermarkedS3Key and status in a single
+// UpdateItem expression (RS-017). This prevents a partial state where the key
+// is written but the status is still "watermarking" if the Lambda crashes
+// between two separate writes.
+//
+// finalStatus must be "indexed" or "review_required".
+func (s *DynamoPhotoStore) CompleteWatermark(ctx context.Context, photoId, watermarkedS3Key, finalStatus string) error {
 	key, err := attributevalue.MarshalMap(map[string]string{"id": photoId})
 	if err != nil {
-		return fmt.Errorf("UpdateWatermarkedKey: marshal key: %w", err)
+		return fmt.Errorf("CompleteWatermark: marshal key: %w", err)
 	}
-	val, err := attributevalue.Marshal(watermarkedS3Key)
+	keyVal, err := attributevalue.Marshal(watermarkedS3Key)
 	if err != nil {
-		return fmt.Errorf("UpdateWatermarkedKey: marshal value: %w", err)
+		return fmt.Errorf("CompleteWatermark: marshal watermarkedS3Key: %w", err)
+	}
+	statusVal, err := attributevalue.Marshal(finalStatus)
+	if err != nil {
+		return fmt.Errorf("CompleteWatermark: marshal finalStatus: %w", err)
 	}
 	_, err = s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:        aws.String(s.TableName),
 		Key:              key,
-		UpdateExpression: aws.String("SET #wk = :wk"),
+		UpdateExpression: aws.String("SET #wk = :wk, #st = :st"),
 		// ConditionExpression prevents silent ghost-record creation if photoId does not exist.
 		// DynamoDB UpdateItem upserts by default; attribute_exists(id) makes it fail-fast instead.
-		ConditionExpression:      aws.String("attribute_exists(id)"),
-		ExpressionAttributeNames: map[string]string{"#wk": "watermarkedS3Key"},
+		ConditionExpression: aws.String("attribute_exists(id)"),
+		ExpressionAttributeNames: map[string]string{
+			"#wk": "watermarkedS3Key",
+			"#st": "status",
+		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":wk": val,
+			":wk": keyVal,
+			":st": statusVal,
 		},
 	})
 	if err != nil {
-		return fmt.Errorf("UpdateWatermarkedKey: dynamodb.UpdateItem photoId=%s: %w", photoId, err)
+		return fmt.Errorf("CompleteWatermark: dynamodb.UpdateItem photoId=%s: %w", photoId, err)
 	}
 	return nil
 }

@@ -41,6 +41,18 @@ describe('PhotoCardComponent', () => {
     expect(placeholder.getAttribute('aria-label')).toBe('Thumbnail not yet available');
   });
 
+  it('shows watermarking shimmer when status is watermarking', () => {
+    fixture.componentRef.setInput('photo', { ...basePhoto, thumbnailUrl: null, status: 'watermarking' });
+    fixture.detectChanges();
+    const shimmer: HTMLElement = fixture.nativeElement.querySelector('.thumbnail-watermarking');
+    expect(shimmer).toBeTruthy();
+    expect(shimmer.getAttribute('aria-label')).toBe('Finalizing watermark…');
+    expect(shimmer.getAttribute('role')).toBe('img');
+    const label: HTMLElement = shimmer.querySelector('.thumbnail-watermarking-label')!;
+    expect(label).toBeTruthy();
+    expect(label.getAttribute('aria-hidden')).toBe('true');
+  });
+
   it('shows broken_image placeholder after image load error', () => {
     component.onImageError();
     fixture.detectChanges();

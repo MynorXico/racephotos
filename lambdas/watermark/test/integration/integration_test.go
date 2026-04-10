@@ -48,12 +48,12 @@ func TestIntegration_GetWatermarkText(t *testing.T) {
 
 	// Seed an event with watermarkText.
 	event := models.Event{
-		ID:            eventID,
+		ID:             eventID,
 		PhotographerID: "integ-photographer",
-		Name:          "Integ Marathon",
-		WatermarkText: "Integ Marathon 2026 · racephotos.example.com",
-		Status:        "active",
-		CreatedAt:     time.Now().UTC().Format(time.RFC3339),
+		Name:           "Integ Marathon",
+		WatermarkText:  "Integ Marathon 2026 · racephotos.example.com",
+		Status:         "active",
+		CreatedAt:      time.Now().UTC().Format(time.RFC3339),
 	}
 	item, err := attributevalue.MarshalMap(event)
 	require.NoError(t, err)
@@ -63,12 +63,15 @@ func TestIntegration_GetWatermarkText(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	text, err := store.GetWatermarkText(ctx, eventID)
+	watermarkText, eventName, err := store.GetWatermarkText(ctx, eventID)
 	require.NoError(t, err)
-	assert.Equal(t, "Integ Marathon 2026 · racephotos.example.com", text)
+	assert.Equal(t, "Integ Marathon 2026 · racephotos.example.com", watermarkText)
+	assert.Equal(t, "Integ Marathon", eventName)
 }
 
-func TestIntegration_UpdateWatermarkedKey(t *testing.T) {
+// TestIntegration_CompleteWatermark verifies the atomic UpdateItem that sets
+// watermarkedS3Key and status in a single expression (RS-017 AC2).
+func TestIntegration_CompleteWatermark(t *testing.T) {
 	ctx := context.Background()
 	client := newDynamoClient(t)
 
@@ -78,11 +81,11 @@ func TestIntegration_UpdateWatermarkedKey(t *testing.T) {
 	suffix := time.Now().UTC().Format(time.RFC3339Nano)
 	photoID := "integ-wm-photo-" + suffix
 
-	// Seed a photo record.
+	// Seed a photo record in "watermarking" status.
 	photo := models.Photo{
 		ID:         photoID,
 		EventID:    "integ-wm-evt-001",
-		Status:     "indexed",
+		Status:     "watermarking",
 		RawS3Key:   "local/integ-wm-evt-001/" + photoID + "/test.jpg",
 		UploadedAt: time.Now().UTC().Format(time.RFC3339),
 	}
@@ -95,10 +98,10 @@ func TestIntegration_UpdateWatermarkedKey(t *testing.T) {
 	require.NoError(t, err)
 
 	wmKey := "integ-wm-evt-001/" + photoID + "/watermarked.jpg"
-	err = store.UpdateWatermarkedKey(ctx, photoID, wmKey)
+	err = store.CompleteWatermark(ctx, photoID, wmKey, "indexed")
 	require.NoError(t, err)
 
-	// Verify.
+	// Verify both fields were set atomically.
 	key, err := attributevalue.MarshalMap(map[string]string{"id": photoID})
 	require.NoError(t, err)
 	out, err := client.GetItem(ctx, &dynamodb.GetItemInput{
@@ -111,4 +114,19 @@ func TestIntegration_UpdateWatermarkedKey(t *testing.T) {
 	var updated models.Photo
 	require.NoError(t, attributevalue.UnmarshalMap(out.Item, &updated))
 	assert.Equal(t, wmKey, updated.WatermarkedS3Key)
+	assert.Equal(t, "indexed", updated.Status)
+}
+
+// TestIntegration_CompleteWatermark_PhotoNotFound verifies that CompleteWatermark
+// fails fast when the photo does not exist (ConditionExpression: attribute_exists(id)).
+func TestIntegration_CompleteWatermark_PhotoNotFound(t *testing.T) {
+	ctx := context.Background()
+	client := newDynamoClient(t)
+
+	photosTable := "racephotos-photos"
+	store := &handler.DynamoPhotoStore{Client: client, TableName: photosTable}
+
+	err := store.CompleteWatermark(ctx, "nonexistent-photo-id", "some/key.jpg", "indexed")
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "CompleteWatermark")
 }

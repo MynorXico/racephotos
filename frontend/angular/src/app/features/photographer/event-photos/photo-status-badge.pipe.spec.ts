@@ -35,6 +35,13 @@ describe('PhotoStatusBadgePipe', () => {
     expect(cfg.label).toBe('Processing');
   });
 
+  it('returns watermarking badge config', () => {
+    const cfg = pipe.transform('watermarking');
+    expect(cfg.cssClass).toBe('badge--watermarking');
+    expect(cfg.icon).toBe('autorenew');
+    expect(cfg.label).toBe('Finalizing');
+  });
+
   it('falls back to processing for unknown status', () => {
     const cfg = pipe.transform('unknown_status');
     expect(cfg.cssClass).toBe('badge--processing');

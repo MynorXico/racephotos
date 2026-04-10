@@ -44,6 +44,53 @@ $amber-text: #e65100;
   color: var(--mat-sys-on-surface-variant);
 }
 
+// ── Watermarking shimmer (RS-017) ─────────────────────────────────────────────
+// Matches the linear-gradient sweep pattern from the UX spec (RS-017-ux-spec.md).
+
+.thumbnail-watermarking {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    var(--mat-sys-surface-variant) 25%,
+    var(--mat-sys-surface-container-high, color-mix(in srgb, var(--mat-sys-surface-variant) 60%, white)) 50%,
+    var(--mat-sys-surface-variant) 75%
+  );
+  background-size: 800px 100%;
+  animation: wm-shimmer 1.6s infinite linear;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background: var(--mat-sys-surface-variant);
+  }
+}
+
+@keyframes wm-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+// Label is bottom-aligned over the shimmer (UX-D3).
+.thumbnail-watermarking-label {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: var(--mat-sys-on-surface-variant);
+  opacity: 0.85;
+}
+
+.watermarking-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+}
+
 // ── Content strip ────────────────────────────────────────────────────────────
 
 .card-content {
@@ -83,6 +130,11 @@ $amber-text: #e65100;
   &.badge--processing {
     background: var(--mat-sys-surface-variant);
     color: var(--mat-sys-on-surface-variant);
+  }
+
+  &.badge--watermarking {
+    background: var(--mat-sys-secondary-container);
+    color: var(--mat-sys-on-secondary-container);
   }
 }
 

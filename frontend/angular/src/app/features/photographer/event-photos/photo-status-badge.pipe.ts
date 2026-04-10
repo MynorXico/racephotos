@@ -12,6 +12,7 @@ const BADGE_MAP: Record<PhotoStatus, BadgeConfig> = {
   review_required: { cssClass: 'badge--review', icon: 'rate_review', label: 'Review Required' },
   error: { cssClass: 'badge--error', icon: 'error', label: 'Error' },
   processing: { cssClass: 'badge--processing', icon: 'hourglass_top', label: 'Processing' },
+  watermarking: { cssClass: 'badge--watermarking', icon: 'autorenew', label: 'Finalizing' },
 };
 
 const FALLBACK: BadgeConfig = BADGE_MAP['processing'];

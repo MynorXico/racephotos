@@ -33,7 +33,11 @@ type EventStore interface {
 	GetWatermarkText(ctx context.Context, eventId string) (watermarkText, eventName string, err error)
 }
 
-// PhotoStore updates the watermarkedS3Key on a Photo record (racephotos-photos).
+// PhotoStore finalises a watermarked Photo record (racephotos-photos).
 type PhotoStore interface {
-	UpdateWatermarkedKey(ctx context.Context, photoId, watermarkedS3Key string) error
+	// CompleteWatermark atomically sets watermarkedS3Key and status in a single
+	// DynamoDB UpdateItem. finalStatus must be "indexed" or "review_required".
+	// Using a single expression prevents a partial state where the key is written
+	// but the status is still "watermarking" if the Lambda crashes mid-update.
+	CompleteWatermark(ctx context.Context, photoId, watermarkedS3Key, finalStatus string) error
 }

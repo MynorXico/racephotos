@@ -67,7 +67,11 @@ func TestHandler_ProcessBatch(t *testing.T) {
 		wantFailures    int
 	}{
 		{
-			name:    "AC2: bibs detected — indexed status, bib entries written, watermark queued",
+			// RS-017: photo-processor now writes "watermarking" (not "indexed") so that
+			// "indexed" always means the watermarked copy is ready. FinalStatus="indexed"
+			// is carried in the WatermarkMessage so the watermark Lambda can write the
+			// terminal status atomically with watermarkedS3Key.
+			name:    "AC2: bibs detected — watermarking status written, watermark queued with finalStatus=indexed",
 			sqsBody: s3NotifBody("racephotos-raw-local", testRawS3Key),
 			setupDetector: func(m *mocks.MockTextDetector) {
 				m.EXPECT().DetectText(gomock.Any(), gomock.Any()).Return(&rekognition.DetectTextOutput{
@@ -80,7 +84,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {
 				m.EXPECT().GetPhotoById(gomock.Any(), testPhotoID).Return(testPhoto(), nil)
 				m.EXPECT().UpdatePhotoStatus(gomock.Any(), testPhotoID, models.PhotoStatusUpdate{
-					Status:                "indexed",
+					Status:                "watermarking",
 					BibNumbers:            []string{"101"},
 					RekognitionConfidence: 95.0,
 				}).Return(nil)
@@ -92,15 +96,18 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			},
 			setupWmQueue: func(m *mocks.MockWatermarkQueue) {
 				m.EXPECT().SendWatermarkMessage(gomock.Any(), models.WatermarkMessage{
-					PhotoID:  testPhotoID,
-					EventID:  testEventID,
-					RawS3Key: testRawS3Key,
+					PhotoID:     testPhotoID,
+					EventID:     testEventID,
+					RawS3Key:    testRawS3Key,
+					FinalStatus: "indexed",
 				}).Return(nil)
 			},
 			wantFailures: 0,
 		},
 		{
-			name:    "AC2: no bibs above threshold — review_required status",
+			// RS-017: no-bib path also writes "watermarking" first; finalStatus="review_required"
+			// is carried in the WatermarkMessage.
+			name:    "AC2: no bibs above threshold — watermarking status, finalStatus=review_required",
 			sqsBody: s3NotifBody("racephotos-raw-local", testRawS3Key),
 			setupDetector: func(m *mocks.MockTextDetector) {
 				m.EXPECT().DetectText(gomock.Any(), gomock.Any()).Return(&rekognition.DetectTextOutput{
@@ -112,7 +119,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {
 				m.EXPECT().GetPhotoById(gomock.Any(), testPhotoID).Return(testPhoto(), nil)
 				m.EXPECT().UpdatePhotoStatus(gomock.Any(), testPhotoID, models.PhotoStatusUpdate{
-					Status:     "review_required",
+					Status:     "watermarking",
 					BibNumbers: []string{},
 				}).Return(nil)
 			},
@@ -120,7 +127,12 @@ func TestHandler_ProcessBatch(t *testing.T) {
 				// no entries written — no bibs above threshold
 			},
 			setupWmQueue: func(m *mocks.MockWatermarkQueue) {
-				m.EXPECT().SendWatermarkMessage(gomock.Any(), gomock.Any()).Return(nil)
+				m.EXPECT().SendWatermarkMessage(gomock.Any(), models.WatermarkMessage{
+					PhotoID:     testPhotoID,
+					EventID:     testEventID,
+					RawS3Key:    testRawS3Key,
+					FinalStatus: "review_required",
+				}).Return(nil)
 			},
 			wantFailures: 0,
 		},
@@ -188,9 +200,10 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupBibIndex: func(m *mocks.MockBibIndexStore) {},
 			setupWmQueue: func(m *mocks.MockWatermarkQueue) {
 				m.EXPECT().SendWatermarkMessage(gomock.Any(), models.WatermarkMessage{
-					PhotoID:  testPhotoID,
-					EventID:  testEventID,
-					RawS3Key: "local/evt-aaa/photo-bbb/race photo.jpg",
+					PhotoID:     testPhotoID,
+					EventID:     testEventID,
+					RawS3Key:    "local/evt-aaa/photo-bbb/race photo.jpg",
+					FinalStatus: "review_required", // no bib detections returned
 				}).Return(nil)
 			},
 			wantFailures: 0,
@@ -205,11 +218,10 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			wantFailures:    1,
 		},
 		{
-			// TC-027 / domain rule 10: on SQS redelivery the photo may already be
-			// indexed (previous execution wrote status but crashed before downstream
-			// steps). Rekognition must NOT be called again, but bib entries and the
-			// watermark message must still be re-driven using stored bib numbers.
-			name:    "domain rule 10: already-indexed photo — Rekognition skipped, downstream re-driven",
+			// TC-027 / domain rule 10: photo already in terminal "indexed" state means
+			// CompleteWatermark already ran — bib entries and watermark are both done.
+			// Rekognition must NOT be called and downstream must NOT be re-driven.
+			name:    "domain rule 10: already-indexed photo — Rekognition and downstream skipped, acked",
 			sqsBody: s3NotifBody("racephotos-raw-local", testRawS3Key),
 			setupDetector: func(m *mocks.MockTextDetector) {
 				// DetectText must NOT be called
@@ -219,20 +231,57 @@ func TestHandler_ProcessBatch(t *testing.T) {
 				already.Status = "indexed"
 				already.BibNumbers = []string{"101"}
 				m.EXPECT().GetPhotoById(gomock.Any(), testPhotoID).Return(already, nil)
+			},
+			setupBibIndex: func(m *mocks.MockBibIndexStore) {
+				// WriteBibEntries must NOT be called — pipeline already complete
+			},
+			setupWmQueue: func(m *mocks.MockWatermarkQueue) {
+				// SendWatermarkMessage must NOT be called — pipeline already complete
+			},
+			wantFailures: 0,
+		},
+		{
+			// domain rule 10: photo already in terminal "review_required" state —
+			// same as indexed: pipeline complete, ack without re-driving.
+			name:    "domain rule 10: review_required photo — Rekognition and downstream skipped, acked",
+			sqsBody: s3NotifBody("racephotos-raw-local", testRawS3Key),
+			setupDetector: func(m *mocks.MockTextDetector) {},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {
+				already := testPhoto()
+				already.Status = "review_required"
+				already.BibNumbers = []string{}
+				m.EXPECT().GetPhotoById(gomock.Any(), testPhotoID).Return(already, nil)
+			},
+			setupBibIndex: func(m *mocks.MockBibIndexStore) {},
+			setupWmQueue:  func(m *mocks.MockWatermarkQueue) {},
+			wantFailures:  0,
+		},
+		{
+			// RS-017: SQS redelivery when status is already "watermarking" (photo-processor
+			// wrote the status but crashed before sending the watermark queue message).
+			// Rekognition must NOT be called again (domain rule 10). FinalStatus is derived
+			// from stored BibNumbers: no bibs → "review_required".
+			name:    "domain rule 10: watermarking-status photo on redelivery — Rekognition skipped, finalStatus=review_required",
+			sqsBody: s3NotifBody("racephotos-raw-local", testRawS3Key),
+			setupDetector: func(m *mocks.MockTextDetector) {
+				// DetectText must NOT be called
+			},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {
+				already := testPhoto()
+				already.Status = "watermarking"
+				already.BibNumbers = []string{} // no bibs detected
+				m.EXPECT().GetPhotoById(gomock.Any(), testPhotoID).Return(already, nil)
 				// UpdatePhotoStatus must NOT be called
 			},
 			setupBibIndex: func(m *mocks.MockBibIndexStore) {
-				// bib entries are re-written (idempotent PutItem overwrite)
-				m.EXPECT().WriteBibEntries(gomock.Any(), []models.BibEntry{
-					{BibKey: "evt-aaa#101", PhotoID: testPhotoID},
-				}).Return(nil)
+				// no bibs to re-write
 			},
 			setupWmQueue: func(m *mocks.MockWatermarkQueue) {
-				// watermark message re-queued
 				m.EXPECT().SendWatermarkMessage(gomock.Any(), models.WatermarkMessage{
-					PhotoID:  testPhotoID,
-					EventID:  testEventID,
-					RawS3Key: testRawS3Key,
+					PhotoID:     testPhotoID,
+					EventID:     testEventID,
+					RawS3Key:    testRawS3Key,
+					FinalStatus: "review_required",
 				}).Return(nil)
 			},
 			wantFailures: 0,
