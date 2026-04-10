@@ -39,6 +39,24 @@ type s3Event struct {
 	Records []s3EventRecord `json:"Records"`
 }
 
+// Photo status constants used across processing paths.
+const (
+	statusWatermarking   = "watermarking"
+	statusIndexed        = "indexed"
+	statusReviewRequired = "review_required"
+	statusError          = "error"
+)
+
+// finalStatusFromBibs returns "indexed" when bib numbers were detected,
+// "review_required" otherwise. Centralises the derivation used on both
+// the normal Rekognition path and the SQS redelivery path.
+func finalStatusFromBibs(bibs []string) string {
+	if len(bibs) > 0 {
+		return statusIndexed
+	}
+	return statusReviewRequired
+}
+
 // ProcessBatch handles an SQS batch. Implements partial batch failure (AC4):
 // infrastructure errors (DynamoDB, SQS) add the message to batchItemFailures
 // so SQS retries it. Rekognition errors are acked (status=error written to
@@ -134,22 +152,18 @@ func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error 
 	//   - "error": ack — do not retry a known-bad photo.
 	//   - any other unexpected status: treat as "processing" (Rekognition not yet run).
 	switch photo.Status {
-	case "error":
+	case statusError:
 		slog.InfoContext(ctx, "photo in error state — acking without reprocessing",
 			slog.String("photoId", photoID),
 		)
 		return nil
-	case "indexed", "review_required", "watermarking":
+	case statusIndexed, statusReviewRequired, statusWatermarking:
 		slog.InfoContext(ctx, "photo already processed — skipping Rekognition, re-driving downstream steps",
 			slog.String("photoId", photoID),
 			slog.String("status", photo.Status),
 		)
 		// Derive finalStatus from stored BibNumbers so Rekognition is not re-called.
-		finalStatus := "review_required"
-		if len(photo.BibNumbers) > 0 {
-			finalStatus = "indexed"
-		}
-		return h.driveDownstream(ctx, photo, photo.RawS3Key, finalStatus)
+		return h.driveDownstream(ctx, photo, photo.RawS3Key, finalStatusFromBibs(photo.BibNumbers))
 	}
 
 	// Call Rekognition. On error: write status=error and ack (AC3).
@@ -167,7 +181,7 @@ func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error 
 			slog.String("error", rekErr.Error()),
 		)
 		if updateErr := h.Photos.UpdatePhotoStatus(ctx, photoID, models.PhotoStatusUpdate{
-			Status: "error",
+			Status: statusError,
 		}); updateErr != nil {
 			return fmt.Errorf("UpdatePhotoStatus (error) %s: %w", photoID, updateErr)
 		}
@@ -178,16 +192,13 @@ func (h *Handler) processS3Record(ctx context.Context, rec s3EventRecord) error 
 
 	// RS-017: write "watermarking" so the frontend shows a shimmer skeleton until the
 	// watermark Lambda completes. The watermark Lambda sets the terminal status atomically.
-	var finalStatus string
+	finalStatus := finalStatusFromBibs(bibs)
 	update := models.PhotoStatusUpdate{
-		Status:     "watermarking",
+		Status:     statusWatermarking,
 		BibNumbers: bibs,
 	}
 	if len(bibs) > 0 {
-		finalStatus = "indexed"
 		update.RekognitionConfidence = maxConfidence
-	} else {
-		finalStatus = "review_required"
 	}
 
 	if err := h.Photos.UpdatePhotoStatus(ctx, photoID, update); err != nil {

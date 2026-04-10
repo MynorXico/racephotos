@@ -47,7 +47,10 @@ describe('PhotoCardComponent', () => {
     const shimmer: HTMLElement = fixture.nativeElement.querySelector('.thumbnail-watermarking');
     expect(shimmer).toBeTruthy();
     expect(shimmer.getAttribute('aria-label')).toBe('Finalizing watermark…');
-    expect(shimmer.getAttribute('aria-busy')).toBe('true');
+    expect(shimmer.getAttribute('role')).toBe('img');
+    const label: HTMLElement = shimmer.querySelector('.thumbnail-watermarking-label')!;
+    expect(label).toBeTruthy();
+    expect(label.getAttribute('aria-hidden')).toBe('true');
   });
 
   it('shows broken_image placeholder after image load error', () => {

@@ -45,49 +45,50 @@ $amber-text: #e65100;
 }
 
 // ── Watermarking shimmer (RS-017) ─────────────────────────────────────────────
+// Matches the linear-gradient sweep pattern from the UX spec (RS-017-ux-spec.md).
 
 .thumbnail-watermarking {
   position: absolute;
   inset: 0;
+  overflow: hidden;
+  background: linear-gradient(
+    90deg,
+    var(--mat-sys-surface-variant) 25%,
+    var(--mat-sys-surface-container-high, color-mix(in srgb, var(--mat-sys-surface-variant) 60%, white)) 50%,
+    var(--mat-sys-surface-variant) 75%
+  );
+  background-size: 800px 100%;
+  animation: wm-shimmer 1.6s infinite linear;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background: var(--mat-sys-surface-variant);
+  }
+}
+
+@keyframes wm-shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+// Label is bottom-aligned over the shimmer (UX-D3).
+.thumbnail-watermarking-label {
+  position: absolute;
+  bottom: 8px;
+  left: 0;
+  right: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 4px;
-  background: var(--mat-sys-secondary-container);
-  color: var(--mat-sys-on-secondary-container);
-
-  // Subtle pulse shimmer to signal in-progress state.
-  animation: shimmer-pulse 2s ease-in-out infinite;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-}
-
-@keyframes shimmer-pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.6; }
+  color: var(--mat-sys-on-surface-variant);
+  opacity: 0.85;
 }
 
 .watermarking-icon {
-  font-size: 32px;
-  width: 32px;
-  height: 32px;
-  animation: spin 2s linear infinite;
-
-  @media (prefers-reduced-motion: reduce) {
-    animation: none;
-  }
-}
-
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to   { transform: rotate(360deg); }
-}
-
-.thumbnail-watermarking-label {
-  color: var(--mat-sys-on-secondary-container);
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
 }
 
 // ── Content strip ────────────────────────────────────────────────────────────
