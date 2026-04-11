@@ -92,29 +92,16 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 
 	evRes := <-evCh
 	if evRes.err != nil {
+		// bibCh is buffered (capacity 1) so the bib goroutine can write without
+		// blocking even after we return — no explicit drain needed to prevent a
+		// goroutine leak.
 		if errors.Is(evRes.err, apperrors.ErrNotFound) {
-			// Drain the bib goroutine to prevent a goroutine leak; log any
-			// secondary error at WARN so concurrent failures are observable.
-			if bibRes := <-bibCh; bibRes.err != nil {
-				slog.WarnContext(ctx, "GetPhotoIDsByBib also failed during event 404",
-					slog.String("eventID", eventID),
-					slog.String("error", bibRes.err.Error()),
-				)
-			}
 			return errResponse(404, "event not found"), nil
 		}
 		slog.ErrorContext(ctx, "GetEvent failed",
 			slog.String("eventID", eventID),
 			slog.String("error", evRes.err.Error()),
 		)
-		// Drain the bib goroutine to prevent a goroutine leak; log any
-		// secondary error at WARN so concurrent failures are observable.
-		if bibRes := <-bibCh; bibRes.err != nil {
-			slog.WarnContext(ctx, "GetPhotoIDsByBib also failed during GetEvent error",
-				slog.String("eventID", eventID),
-				slog.String("error", bibRes.err.Error()),
-			)
-		}
 		return errResponse(500, "internal server error"), nil
 	}
 
@@ -162,9 +149,9 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 		item := photoItem{
 			PhotoID:        p.ID,
-			// TrimPrefix guards against an S3 key with a leading slash, which
-			// would produce a double-slash URL (https://domain.com//path).
-			WatermarkedURL: "https://" + h.CdnDomain + "/" + strings.TrimPrefix(p.WatermarkedS3Key, "/"),
+			// TrimLeft strips all leading slashes — TrimPrefix removes only one,
+			// leaving double-slash URLs if a key begins with "//".
+			WatermarkedURL: "https://" + h.CdnDomain + "/" + strings.TrimLeft(p.WatermarkedS3Key, "/"),
 		}
 		if p.CapturedAt != "" {
 			item.CapturedAt = &p.CapturedAt
