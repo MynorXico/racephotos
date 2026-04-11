@@ -1,0 +1,43 @@
+<h2 id="photo-detail-title" class="visually-hidden">Photo detail</h2>
+
+<div mat-dialog-content class="dialog-content">
+  <button
+    mat-icon-button
+    class="close-btn"
+    aria-label="Close photo detail"
+    (click)="onClose()"
+  >
+    <mat-icon>close</mat-icon>
+  </button>
+
+  <div class="image-container">
+    @if (!imageError()) {
+      <img
+        [src]="data.photo.watermarkedUrl"
+        alt="Large watermarked race photo"
+        class="detail-img"
+        (error)="onImageError()"
+      />
+    } @else {
+      <div class="image-error-placeholder">
+        <mat-icon class="error-icon">broken_image</mat-icon>
+      </div>
+    }
+  </div>
+
+  <div class="detail-content">
+    <p class="price-label">Price: <strong>{{ data.currency }} {{ data.pricePerPhoto }}</strong></p>
+    <p class="watermark-notice">Watermark will be removed after purchase</p>
+  </div>
+</div>
+
+<div mat-dialog-actions class="dialog-actions">
+  <button
+    mat-raised-button
+    color="primary"
+    class="purchase-btn"
+    (click)="onPurchase()"
+  >
+    Purchase this photo
+  </button>
+</div>

@@ -6,6 +6,8 @@ import { photoUploadFeature } from './store/photo-upload/photo-upload.reducer';
 import { PhotoUploadEffects } from './store/photo-upload/photo-upload.effects';
 import { photosFeature } from './store/photos/photos.reducer';
 import { PhotosEffects } from './store/photos/photos.effects';
+import { runnerPhotosFeature } from './store/runner-photos/runner-photos.reducer';
+import { RunnerPhotosEffects } from './store/runner-photos/runner-photos.effects';
 
 export const routes: Routes = [
   {
@@ -85,6 +87,15 @@ export const routes: Routes = [
         pathMatch: 'full',
       },
     ],
+  },
+  // Public runner-facing event search page — no auth guard
+  {
+    path: 'events/:id',
+    loadComponent: () =>
+      import('./events/event-search/event-search.component').then(
+        (m) => m.EventSearchComponent,
+      ),
+    providers: [provideState(runnerPhotosFeature), provideEffects(RunnerPhotosEffects)],
   },
   {
     path: '',

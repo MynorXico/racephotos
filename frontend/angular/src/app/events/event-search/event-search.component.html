@@ -1,0 +1,99 @@
+<main class="search-page" aria-label="Find your race photos">
+
+  <!-- Event header -->
+  <header class="event-header">
+    @if (eventLoading()) {
+      <div class="event-header-skeleton" aria-hidden="true"></div>
+    } @else if (selectedEvent()) {
+      <h1 class="event-title">{{ selectedEvent()!.name }}</h1>
+    } @else {
+      <h1 class="event-title">Find your photos</h1>
+    }
+  </header>
+
+  <!-- Search form -->
+  <section class="search-section" aria-label="Bib search form">
+    <form class="bib-form" (ngSubmit)="onSubmit()" novalidate>
+      <mat-form-field appearance="outline" class="bib-field">
+        <mat-label>Bib number</mat-label>
+        <input
+          matInput
+          type="text"
+          inputmode="numeric"
+          pattern="[0-9]*"
+          [formControl]="bibControl"
+          placeholder="e.g. 1234"
+          autocomplete="off"
+        />
+        <mat-icon matSuffix>search</mat-icon>
+        @if (bibControl.hasError('required') && bibControl.touched) {
+          <mat-error>Bib number is required</mat-error>
+        } @else if (bibControl.hasError('pattern') && bibControl.touched) {
+          <mat-error>Bib must be 1–6 digits</mat-error>
+        }
+      </mat-form-field>
+
+      <button
+        mat-raised-button
+        color="primary"
+        type="submit"
+        class="search-btn"
+        [disabled]="loading()"
+      >
+        @if (loading()) {
+          <mat-progress-spinner diameter="20" mode="indeterminate" />
+        } @else {
+          Search
+        }
+      </button>
+    </form>
+  </section>
+
+  <!-- Results area -->
+  <section class="results-section" aria-live="polite" aria-atomic="false">
+
+    <!-- Skeleton loader -->
+    @if (loading()) {
+      <div class="skeleton-grid" aria-label="Loading photos" aria-busy="true">
+        @for (card of skeletonCards; track $index) {
+          <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton-img"></div>
+            <div class="skeleton-line skeleton-line--short"></div>
+            <div class="skeleton-line skeleton-line--btn"></div>
+          </div>
+        }
+      </div>
+    }
+
+    <!-- Error state -->
+    @else if (error()) {
+      <div class="state-container" role="alert">
+        <mat-icon class="state-icon state-icon--error">error_outline</mat-icon>
+        <p class="state-message">Something went wrong. Please try again.</p>
+        <button mat-stroked-button color="primary" (click)="onRetry()">Retry</button>
+      </div>
+    }
+
+    <!-- No results -->
+    @else if (hasSearched() && !hasResults()) {
+      <div class="state-container" role="status">
+        <mat-icon class="state-icon">photo_library</mat-icon>
+        <p class="state-message">No photos found for bib {{ searchedBib() }}</p>
+        <p class="state-hint">Check the number and try again, or contact the event organiser.</p>
+      </div>
+    }
+
+    <!-- Results grid -->
+    @else if (hasResults()) {
+      <app-runner-photo-grid
+        [photos]="photos()"
+        [pricePerPhoto]="selectedEvent()!.pricePerPhoto"
+        [currency]="selectedEvent()!.currency"
+        [searchedBib]="searchedBib() ?? ''"
+        (photoSelected)="onPhotoSelected($event)"
+      />
+    }
+
+  </section>
+
+</main>

@@ -101,3 +101,16 @@ Resources:
           RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
           RACEPHOTOS_EVENTS_TABLE: racephotos-events
           RACEPHOTOS_PHOTO_CDN_DOMAIN: localhost:4566
+
+  SearchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-search-local
+      Handler: bootstrap
+      CodeUri: lambdas/search/
+      Environment:
+        Variables:
+          RACEPHOTOS_BIB_INDEX_TABLE: racephotos-bib-index
+          RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
+          RACEPHOTOS_EVENTS_TABLE: racephotos-events
+          RACEPHOTOS_PHOTO_CDN_DOMAIN: localhost:4566
