@@ -1,6 +1,7 @@
 import { Meta, StoryObj, moduleMetadata } from '@storybook/angular';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MAT_DIALOG_DATA, MatDialogRef } from '@angular/material/dialog';
+import { EMPTY } from 'rxjs';
 import { provideMockStore } from '@ngrx/store/testing';
 
 import { PhotoDetailComponent, PhotoDetailDialogData } from './photo-detail.component';
@@ -15,6 +16,12 @@ const dialogData: PhotoDetailDialogData = {
   currency: 'USD',
 };
 
+// Minimal MatDialogRef stub for Storybook — close() and afterClosed() are no-ops.
+const noopDialogRef = {
+  afterClosed: () => EMPTY,
+  close: (_result?: unknown) => undefined,
+};
+
 const meta: Meta<PhotoDetailComponent> = {
   title: 'Runner/Photo Search/PhotoDetailComponent',
   component: PhotoDetailComponent,
@@ -24,7 +31,7 @@ const meta: Meta<PhotoDetailComponent> = {
       providers: [
         provideMockStore(),
         { provide: MAT_DIALOG_DATA, useValue: dialogData },
-        { provide: MatDialogRef, useValue: { afterClosed: () => ({ subscribe: () => {} }), close: () => {} } },
+        { provide: MatDialogRef, useValue: noopDialogRef },
       ],
     }),
   ],
@@ -43,7 +50,7 @@ export const HighPrice: Story = {
           provide: MAT_DIALOG_DATA,
           useValue: { ...dialogData, pricePerPhoto: 49.99, currency: 'EUR' },
         },
-        { provide: MatDialogRef, useValue: { afterClosed: () => ({ subscribe: () => {} }), close: () => {} } },
+        { provide: MatDialogRef, useValue: noopDialogRef },
       ],
     }),
   ],
@@ -62,7 +69,7 @@ export const ImageError: Story = {
             photo: { ...dialogData.photo, watermarkedUrl: 'https://broken.example.com/img.jpg' },
           },
         },
-        { provide: MatDialogRef, useValue: { afterClosed: () => ({ subscribe: () => {} }), close: () => {} } },
+        { provide: MatDialogRef, useValue: noopDialogRef },
       ],
     }),
   ],

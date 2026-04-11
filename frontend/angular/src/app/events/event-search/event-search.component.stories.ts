@@ -7,7 +7,6 @@ import { provideEffects } from '@ngrx/effects';
 import { of } from 'rxjs';
 
 import { EventSearchComponent } from './event-search.component';
-import { runnerPhotosFeature } from '../../store/runner-photos/runner-photos.reducer';
 
 const mockRoute: Partial<ActivatedRoute> = {
   paramMap: of(convertToParamMap({ id: 'event-123' })),
