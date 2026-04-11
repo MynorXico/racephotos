@@ -1,64 +1,174 @@
+// ── Page shell ────────────────────────────────────────────────────────────────
+
 .search-page {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 24px 16px 48px;
-}
-
-// --- Event header ---
-
-.event-header {
-  margin-bottom: 24px;
-}
-
-.event-title {
-  margin: 0;
-  font-size: 1.75rem;
-  font-weight: 700;
-  line-height: 1.2;
-}
-
-.event-header-skeleton {
-  height: 2rem;
-  width: 60%;
-  max-width: 400px;
-  border-radius: 4px;
-  background: var(--mat-sys-surface-container-highest);
-  animation: pulse 1.4s ease-in-out infinite;
-}
-
-// --- Search form ---
-
-.search-section {
-  margin-bottom: 32px;
-}
-
-.bib-form {
+  min-height: 100vh;
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
+  flex-direction: column;
 }
 
-.bib-field {
-  flex: 1 1 200px;
-  max-width: 320px;
-}
+// ── Hero ─────────────────────────────────────────────────────────────────────
 
-.search-btn {
-  min-height: 56px;   // align with outline form-field
-  min-width: 100px;
+.hero {
+  background: linear-gradient(
+    135deg,
+    var(--mat-sys-primary) 0%,
+    var(--mat-sys-tertiary) 100%
+  );
+  color: var(--mat-sys-on-primary);
+  padding: 48px 24px 56px;
   display: flex;
-  align-items: center;
   justify-content: center;
 }
 
-// --- Results ---
-
-.results-section {
-  min-height: 200px;
+.hero-content {
+  width: 100%;
+  max-width: 640px;
+  text-align: center;
 }
 
-// Skeleton grid mirrors the photo grid layout
+.hero-title {
+  margin: 0 0 8px;
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+  color: var(--mat-sys-on-primary);
+
+  @media (min-width: 768px) {
+    font-size: 2.5rem;
+  }
+}
+
+.hero-meta {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 0 0 16px;
+  font-size: 0.9rem;
+  opacity: 0.85;
+  color: var(--mat-sys-on-primary);
+}
+
+.hero-meta-icon {
+  font-size: 16px;
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+
+.hero-subtitle {
+  margin: 0 0 28px;
+  font-size: 1rem;
+  opacity: 0.9;
+  color: var(--mat-sys-on-primary);
+}
+
+// Skeleton lines in hero
+.hero-skeleton-title {
+  height: 2.5rem;
+  width: 70%;
+  margin: 0 auto 12px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.25);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+.hero-skeleton-meta {
+  height: 1rem;
+  width: 40%;
+  margin: 0 auto 24px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.2);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+// ── Search bar ────────────────────────────────────────────────────────────────
+
+.search-bar-wrap {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--mat-sys-surface);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+}
+
+.bib-field {
+  flex: 1;
+
+  // Force the form-field background to match the card
+  .mat-mdc-text-field-wrapper {
+    background: var(--mat-sys-surface-container-low);
+  }
+}
+
+.bib-prefix-icon {
+  font-size: 20px;
+  width: 20px;
+  height: 20px;
+  color: var(--mat-sys-on-surface-variant);
+  margin-right: 4px;
+}
+
+.search-btn {
+  min-height: 56px;     // align with outline form-field height
+  min-width: 110px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 600;
+  background: var(--mat-sys-primary);
+  color: var(--mat-sys-on-primary);
+}
+
+.search-btn-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+
+  mat-icon {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+
+  &--hidden {
+    display: none;
+  }
+}
+
+// ── Results section ───────────────────────────────────────────────────────────
+
+.results-section {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+
+  @media (min-width: 768px) {
+    padding: 40px 24px 80px;
+  }
+
+  @media (min-width: 1280px) {
+    padding: 48px 32px 96px;
+  }
+}
+
+.results-header {
+  margin-bottom: 20px;
+}
+
+.results-count {
+  margin: 0;
+  font-size: 0.95rem;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+// ── Skeleton loader ───────────────────────────────────────────────────────────
 
 .skeleton-grid {
   display: grid;
@@ -76,10 +186,10 @@
 }
 
 .skeleton-card {
-  border-radius: 8px;
+  border-radius: 12px;
   overflow: hidden;
   background: var(--mat-sys-surface-container);
-  padding-bottom: 12px;
+  padding-bottom: 14px;
 }
 
 .skeleton-img {
@@ -96,74 +206,72 @@
   background: var(--mat-sys-surface-container-highest);
   animation: pulse 1.4s ease-in-out infinite;
 
-  &--short {
-    width: 40%;
+  &--price {
+    width: 35%;
   }
 
   &--btn {
-    width: 80%;
-    height: 36px;
-    margin-top: 8px;
-    border-radius: 4px;
+    width: 85%;
+    height: 40px;
+    margin-top: 10px;
+    border-radius: 8px;
   }
 }
 
-// --- Empty / error states ---
+// ── Empty / error states ──────────────────────────────────────────────────────
 
 .state-container {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 48px 16px;
+  padding: 64px 24px;
   text-align: center;
-  gap: 8px;
+  gap: 12px;
 }
 
-.state-icon {
-  font-size: 64px;
-  width: 64px;
-  height: 64px;
-  color: var(--mat-sys-on-surface-variant);
+.state-icon-wrap {
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: var(--mat-sys-secondary-container);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  mat-icon {
+    font-size: 36px;
+    width: 36px;
+    height: 36px;
+    color: var(--mat-sys-on-secondary-container);
+  }
 
   &--error {
-    color: var(--mat-sys-error);
+    background: var(--mat-sys-error-container);
+
+    mat-icon {
+      color: var(--mat-sys-on-error-container);
+    }
   }
 }
 
-.state-message {
-  margin: 8px 0 0;
-  font-size: 1.125rem;
-  font-weight: 500;
+.state-title {
+  margin: 4px 0 0;
+  font-size: 1.25rem;
+  font-weight: 600;
 }
 
 .state-hint {
-  margin: 4px 0 0;
-  font-size: 0.875rem;
+  margin: 0;
+  font-size: 0.9rem;
   color: var(--mat-sys-on-surface-variant);
+  max-width: 400px;
+  line-height: 1.6;
 }
 
-// --- Animation ---
+// ── Animation ─────────────────────────────────────────────────────────────────
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
-// --- Responsive ---
-
-@media (min-width: 768px) {
-  .search-page {
-    padding: 32px 24px 64px;
-  }
-
-  .event-title {
-    font-size: 2rem;
-  }
-}
-
-@media (min-width: 1280px) {
-  .search-page {
-    padding: 40px 32px 80px;
-  }
+  50% { opacity: 0.45; }
 }

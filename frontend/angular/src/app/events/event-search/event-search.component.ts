@@ -17,6 +17,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatDividerModule } from '@angular/material/divider';
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
@@ -51,6 +52,7 @@ import { MatDialogRef } from '@angular/material/dialog';
     MatInputModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    MatDividerModule,
     RunnerPhotoGridComponent,
   ],
   templateUrl: './event-search.component.html',

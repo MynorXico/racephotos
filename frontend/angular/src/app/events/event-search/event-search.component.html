@@ -1,52 +1,70 @@
 <main class="search-page" aria-label="Find your race photos">
 
-  <!-- Event header -->
-  <header class="event-header">
-    @if (eventLoading()) {
-      <div class="event-header-skeleton" aria-hidden="true"></div>
-    } @else if (selectedEvent()) {
-      <h1 class="event-title">{{ selectedEvent()!.name }}</h1>
-    } @else {
-      <h1 class="event-title">Find your photos</h1>
-    }
-  </header>
+  <!-- Hero banner -->
+  <section class="hero">
+    <div class="hero-content">
 
-  <!-- Search form -->
-  <section class="search-section" aria-label="Bib search form">
-    <form class="bib-form" (ngSubmit)="onSubmit()" novalidate>
-      <mat-form-field appearance="outline" class="bib-field">
-        <mat-label>Bib number</mat-label>
-        <input
-          matInput
-          type="text"
-          inputmode="numeric"
-          pattern="[0-9]*"
-          [formControl]="bibControl"
-          placeholder="e.g. 1234"
-          autocomplete="off"
-        />
-        <mat-icon matSuffix>search</mat-icon>
-        @if (bibControl.hasError('required') && bibControl.touched) {
-          <mat-error>Bib number is required</mat-error>
-        } @else if (bibControl.hasError('pattern') && bibControl.touched) {
-          <mat-error>Bib must be 1–6 digits</mat-error>
-        }
-      </mat-form-field>
+      @if (eventLoading()) {
+        <div class="hero-skeleton-title" aria-hidden="true"></div>
+        <div class="hero-skeleton-meta" aria-hidden="true"></div>
+      } @else if (selectedEvent()) {
+        <h1 class="hero-title">{{ selectedEvent()!.name }}</h1>
+        <p class="hero-meta">
+          <mat-icon class="hero-meta-icon" aria-hidden="true">calendar_today</mat-icon>
+          {{ selectedEvent()!.date }}
+          @if (selectedEvent()!.location) {
+            &nbsp;·&nbsp;
+            <mat-icon class="hero-meta-icon" aria-hidden="true">place</mat-icon>
+            {{ selectedEvent()!.location }}
+          }
+        </p>
+      } @else {
+        <h1 class="hero-title">Find your race photos</h1>
+      }
 
-      <button
-        mat-raised-button
-        color="primary"
-        type="submit"
-        class="search-btn"
-        [disabled]="loading()"
-      >
-        @if (loading()) {
-          <mat-progress-spinner diameter="20" mode="indeterminate" />
-        } @else {
-          Search
-        }
-      </button>
-    </form>
+      <p class="hero-subtitle">Enter your bib number to find your photos from this event.</p>
+
+      <!-- Search bar inside hero -->
+      <div class="search-bar-wrap" aria-label="Bib search form">
+        <mat-form-field appearance="outline" class="bib-field">
+          <mat-label>Bib number</mat-label>
+          <mat-icon matPrefix class="bib-prefix-icon" aria-hidden="true">tag</mat-icon>
+          <input
+            matInput
+            type="text"
+            inputmode="numeric"
+            pattern="[0-9]*"
+            [formControl]="bibControl"
+            placeholder="e.g. 1234"
+            autocomplete="off"
+            (keydown.enter)="onSubmit()"
+          />
+          @if (bibControl.hasError('required') && bibControl.touched) {
+            <mat-error>Bib number is required</mat-error>
+          } @else if (bibControl.hasError('pattern') && bibControl.touched) {
+            <mat-error>Bib must be 1–6 digits</mat-error>
+          }
+        </mat-form-field>
+
+        <button
+          mat-flat-button
+          class="search-btn"
+          type="button"
+          (click)="onSubmit()"
+          [disabled]="loading()"
+          aria-label="Search photos"
+        >
+          @if (loading()) {
+            <mat-spinner diameter="20" />
+          }
+          <span class="search-btn-label" [class.search-btn-label--hidden]="loading()">
+            <mat-icon>search</mat-icon>
+            Search
+          </span>
+        </button>
+      </div>
+
+    </div>
   </section>
 
   <!-- Results area -->
@@ -58,7 +76,7 @@
         @for (card of skeletonCards; track $index) {
           <div class="skeleton-card" aria-hidden="true">
             <div class="skeleton-img"></div>
-            <div class="skeleton-line skeleton-line--short"></div>
+            <div class="skeleton-line skeleton-line--price"></div>
             <div class="skeleton-line skeleton-line--btn"></div>
           </div>
         }
@@ -68,23 +86,36 @@
     <!-- Error state -->
     @else if (error()) {
       <div class="state-container" role="alert">
-        <mat-icon class="state-icon state-icon--error">error_outline</mat-icon>
-        <p class="state-message">Something went wrong. Please try again.</p>
-        <button mat-stroked-button color="primary" (click)="onRetry()">Retry</button>
+        <div class="state-icon-wrap state-icon-wrap--error">
+          <mat-icon>error_outline</mat-icon>
+        </div>
+        <h2 class="state-title">Something went wrong</h2>
+        <p class="state-hint">We couldn't load photos. Please try again.</p>
+        <button mat-flat-button color="primary" (click)="onRetry()">Try again</button>
       </div>
     }
 
     <!-- No results -->
     @else if (hasSearched() && !hasResults()) {
       <div class="state-container" role="status">
-        <mat-icon class="state-icon">photo_library</mat-icon>
-        <p class="state-message">No photos found for bib {{ searchedBib() }}</p>
-        <p class="state-hint">Check the number and try again, or contact the event organiser.</p>
+        <div class="state-icon-wrap">
+          <mat-icon>photo_camera</mat-icon>
+        </div>
+        <h2 class="state-title">No photos found for bib {{ searchedBib() }}</h2>
+        <p class="state-hint">
+          Photos may still be processing — check back in a few minutes,<br>
+          or contact the event organiser if you believe this is a mistake.
+        </p>
       </div>
     }
 
     <!-- Results grid -->
     @else if (hasResults()) {
+      <div class="results-header">
+        <p class="results-count">
+          {{ photos().length }} photo{{ photos().length === 1 ? '' : 's' }} found for bib <strong>{{ searchedBib() }}</strong>
+        </p>
+      </div>
       <app-runner-photo-grid
         [photos]="photos()"
         [pricePerPhoto]="selectedEvent()!.pricePerPhoto"
