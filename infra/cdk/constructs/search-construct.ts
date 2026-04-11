@@ -1,4 +1,5 @@
 import * as path from 'path';
+import * as cdk from 'aws-cdk-lib';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
@@ -60,9 +61,12 @@ export class SearchConstruct extends Construct {
     this.searchFn = new lambda.Function(this, 'SearchFn', {
       functionName: `racephotos-search-${config.envName}`,
       runtime: lambda.Runtime.PROVIDED_AL2023,
-      architecture: lambda.Architecture.X86_64,
+      architecture: lambda.Architecture.ARM_64,
       handler: 'bootstrap',
       memorySize: 256,
+      // Explicit timeout aligned with the 500ms p99 target; 10s gives headroom
+      // for DynamoDB retries (UnprocessedKeys) without risking a 15-minute default.
+      timeout: cdk.Duration.seconds(10),
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/search')),
       environment: {
         RACEPHOTOS_ENV: config.envName,

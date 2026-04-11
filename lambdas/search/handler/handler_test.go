@@ -174,6 +174,56 @@ func TestHandler_Handle(t *testing.T) {
 			wantCode:   400,
 		},
 		{
+			name:       "bib with special characters (log injection attempt) — returns 400",
+			eventID:    testEventID,
+			bib:        "101\ninjected",
+			mockBib:    func(m *mocks.MockBibIndexStore) {},
+			mockPhotos: func(m *mocks.MockPhotoStore) {},
+			mockEvents: func(m *mocks.MockEventStore) {},
+			wantCode:   400,
+		},
+		{
+			name:       "bib exceeding 8 characters — returns 400",
+			eventID:    testEventID,
+			bib:        "123456789",
+			mockBib:    func(m *mocks.MockBibIndexStore) {},
+			mockPhotos: func(m *mocks.MockPhotoStore) {},
+			mockEvents: func(m *mocks.MockEventStore) {},
+			wantCode:   400,
+		},
+		{
+			name:    "malformed WatermarkedS3Key is silently skipped",
+			eventID: testEventID,
+			bib:     "101",
+			mockBib: func(m *mocks.MockBibIndexStore) {
+				m.EXPECT().GetPhotoIDsByBib(gomock.Any(), testEventID, "101").
+					Return([]string{"photo-bad", "photo-1"}, nil)
+			},
+			mockPhotos: func(m *mocks.MockPhotoStore) {
+				badKeyPhoto := models.Photo{
+					ID:               "photo-bad",
+					Status:           models.PhotoStatusIndexed,
+					WatermarkedS3Key: "https://evil.com/redirect",
+				}
+				m.EXPECT().BatchGetPhotos(gomock.Any(), []string{"photo-bad", "photo-1"}).
+					Return([]models.Photo{badKeyPhoto, indexedPhoto}, nil)
+			},
+			mockEvents: func(m *mocks.MockEventStore) {
+				m.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+			},
+			wantCode: 200,
+			assertBody: func(t *testing.T, body string) {
+				var res struct {
+					Photos []struct {
+						PhotoID string `json:"photoId"`
+					} `json:"photos"`
+				}
+				require.NoError(t, json.Unmarshal([]byte(body), &res))
+				require.Len(t, res.Photos, 1, "photo with malformed S3 key must be skipped")
+				assert.Equal(t, "photo-1", res.Photos[0].PhotoID)
+			},
+		},
+		{
 			name:       "invalid event id format — returns 400",
 			eventID:    "not-a-uuid",
 			bib:        "101",

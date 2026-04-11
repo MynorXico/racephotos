@@ -18,6 +18,16 @@ import (
 // This prevents pathological strings from reaching DynamoDB key lookups.
 var uuidRE = regexp.MustCompile(`(?i)^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`)
 
+// bibRE validates a bib number: 1–8 alphanumeric characters.
+// Road-race bibs are typically 1–5 digits; 8 chars accommodates letter suffixes.
+// This prevents log injection (newlines, control chars) and unbounded DynamoDB key construction.
+var bibRE = regexp.MustCompile(`^[0-9A-Za-z]{1,8}$`)
+
+// safeS3KeyRE accepts only the characters that a well-formed watermarked S3 key may contain.
+// This guards against a tampered DynamoDB record injecting an open-redirect URL into the
+// watermarkedUrl field returned to runners.
+var safeS3KeyRE = regexp.MustCompile(`^[A-Za-z0-9/_.\-]+$`)
+
 // Handler holds dependencies for GET /events/{id}/photos/search.
 type Handler struct {
 	BibIndex  BibIndexStore
@@ -59,8 +69,8 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	bib := event.QueryStringParameters["bib"]
-	if bib == "" {
-		return errResponse(400, "missing required parameter: bib"), nil
+	if bib == "" || !bibRE.MatchString(bib) {
+		return errResponse(400, "missing or invalid bib number"), nil
 	}
 
 	// Run GetEvent and GetPhotoIDsByBib concurrently — both are independent reads.
@@ -95,7 +105,6 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	if bibRes.err != nil {
 		slog.ErrorContext(ctx, "GetPhotoIDsByBib failed",
 			slog.String("eventID", eventID),
-			slog.String("bib", bib),
 			slog.String("error", bibRes.err.Error()),
 		)
 		return errResponse(500, "internal server error"), nil
@@ -120,10 +129,18 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(500, "internal server error"), nil
 	}
 
-	// Filter: only indexed photos with a watermark applied (AC4).
+	// Filter: only indexed photos with a valid watermark key (AC4).
+	// WatermarkedS3Key is validated against safeS3KeyRE before URL construction
+	// to prevent a tampered DynamoDB record from injecting an arbitrary URL.
 	items := make([]photoItem, 0, len(photos))
 	for _, p := range photos {
 		if p.Status != models.PhotoStatusIndexed || p.WatermarkedS3Key == "" {
+			continue
+		}
+		if !safeS3KeyRE.MatchString(p.WatermarkedS3Key) {
+			slog.WarnContext(ctx, "skipping photo with malformed WatermarkedS3Key",
+				slog.String("photoID", p.ID),
+			)
 			continue
 		}
 		item := photoItem{
@@ -169,11 +186,13 @@ func jsonResponse(statusCode int, body any) (events.APIGatewayV2HTTPResponse, er
 		slog.Error("jsonResponse: marshal failed", slog.String("error", err.Error()))
 		return errResponse(500, "internal server error"), nil
 	}
+	// no-store: search results change as photos finish processing; caching would
+	// cause runners to see a stale empty result when photos become available.
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: statusCode,
 		Headers: map[string]string{
 			"Content-Type":  "application/json",
-			"Cache-Control": "public, max-age=10, no-transform",
+			"Cache-Control": "no-store",
 		},
 		Body: string(b),
 	}, nil

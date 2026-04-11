@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -12,6 +13,9 @@ import (
 	"github.com/racephotos/shared/apperrors"
 	"github.com/racephotos/shared/models"
 )
+
+// batchGetItemMax is the DynamoDB API hard limit for BatchGetItem key count.
+const batchGetItemMax = 100
 
 // ── Business-logic interfaces ─────────────────────────────────────────────────
 
@@ -51,7 +55,7 @@ type DynamoItemGetter interface {
 
 // DynamoBibIndexReader implements BibIndexStore using the racephotos-bib-index table.
 //
-// Access pattern: PK="{eventID}#{bibNumber}" — returns all photoId SK values.
+// Access pattern: PK="{eventID}#{bibNumber}" — returns only the photoId SK attribute.
 // One item per (event, bib, photo) written by the photo-processor Lambda (RS-007).
 type DynamoBibIndexReader struct {
 	Client    DynamoBibQuerier
@@ -67,12 +71,17 @@ func (s *DynamoBibIndexReader) GetPhotoIDsByBib(ctx context.Context, eventID, bi
 	var lastKey map[string]types.AttributeValue
 
 	for {
+		// KeyConditionExpression uses a named placeholder (:bk) — the user-supplied
+		// bib value is placed exclusively in ExpressionAttributeValues, never
+		// concatenated into the expression string. No injection risk.
+		// ProjectionExpression returns only photoId to minimise RCU consumption.
 		input := &dynamodb.QueryInput{
 			TableName:              aws.String(s.TableName),
 			KeyConditionExpression: aws.String("bibKey = :bk"),
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":bk": &types.AttributeValueMemberS{Value: bibKey},
 			},
+			ProjectionExpression: aws.String("photoId"),
 		}
 		if len(lastKey) > 0 {
 			input.ExclusiveStartKey = lastKey
@@ -104,9 +113,10 @@ func (s *DynamoBibIndexReader) GetPhotoIDsByBib(ctx context.Context, eventID, bi
 
 // DynamoPhotoBatchGetter implements PhotoStore using DynamoDB BatchGetItem.
 //
-// BatchGetItem is limited to 100 items per call. For v1 (typically 5–20 photos
-// per bib per event) this is never exceeded. Unprocessed keys are logged but
-// not retried — the caller receives whatever photos were returned.
+// Requests are chunked into slices of batchGetItemMax (100) to respect the
+// DynamoDB API hard limit. UnprocessedKeys from DynamoDB throttling are retried
+// up to 3 times before returning an error — partial results are never silently
+// returned to the caller.
 type DynamoPhotoBatchGetter struct {
 	Client    DynamoBatchGetter
 	TableName string
@@ -119,35 +129,79 @@ func (s *DynamoPhotoBatchGetter) BatchGetPhotos(ctx context.Context, ids []strin
 		return nil, nil
 	}
 
-	keys := make([]map[string]types.AttributeValue, 0, len(ids))
+	var allPhotos []models.Photo
+
+	// Chunk ids into batches of at most batchGetItemMax to respect the API limit.
+	for i := 0; i < len(ids); i += batchGetItemMax {
+		end := i + batchGetItemMax
+		if end > len(ids) {
+			end = len(ids)
+		}
+		chunk := ids[i:end]
+
+		photos, err := s.batchGetChunk(ctx, chunk)
+		if err != nil {
+			return nil, err
+		}
+		allPhotos = append(allPhotos, photos...)
+	}
+
+	return allPhotos, nil
+}
+
+// batchGetChunk fetches a single batch of at most batchGetItemMax photo IDs,
+// retrying UnprocessedKeys up to 3 times.
+func (s *DynamoPhotoBatchGetter) batchGetChunk(ctx context.Context, ids []string) ([]models.Photo, error) {
+	remaining := make([]map[string]types.AttributeValue, 0, len(ids))
 	for _, id := range ids {
-		keys = append(keys, map[string]types.AttributeValue{
+		remaining = append(remaining, map[string]types.AttributeValue{
 			"id": &types.AttributeValueMemberS{Value: id},
 		})
 	}
 
-	out, err := s.Client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
-		RequestItems: map[string]types.KeysAndAttributes{
-			s.TableName: {Keys: keys},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("BatchGetPhotos: dynamodb BatchGetItem: %w", err)
-	}
+	var photos []models.Photo
+	const maxRetries = 3
 
-	items, ok := out.Responses[s.TableName]
-	if !ok {
-		return nil, nil
-	}
-
-	photos := make([]models.Photo, 0, len(items))
-	for _, item := range items {
-		var p models.Photo
-		if err := attributevalue.UnmarshalMap(item, &p); err != nil {
-			return nil, fmt.Errorf("BatchGetPhotos: unmarshal: %w", err)
+	for attempt := 0; attempt <= maxRetries; attempt++ {
+		out, err := s.Client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
+			RequestItems: map[string]types.KeysAndAttributes{
+				s.TableName: {Keys: remaining},
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("BatchGetPhotos: dynamodb BatchGetItem: %w", err)
 		}
-		photos = append(photos, p)
+
+		if items, ok := out.Responses[s.TableName]; ok {
+			for _, item := range items {
+				var p models.Photo
+				if err := attributevalue.UnmarshalMap(item, &p); err != nil {
+					return nil, fmt.Errorf("BatchGetPhotos: unmarshal: %w", err)
+				}
+				photos = append(photos, p)
+			}
+		}
+
+		// No unprocessed keys — done.
+		unproc, hasUnproc := out.UnprocessedKeys[s.TableName]
+		if !hasUnproc || len(unproc.Keys) == 0 {
+			break
+		}
+
+		remaining = unproc.Keys
+		if attempt == maxRetries {
+			slog.WarnContext(ctx, "BatchGetPhotos: unprocessed keys remain after max retries",
+				"count", len(remaining),
+				"table", s.TableName,
+			)
+			return nil, fmt.Errorf("BatchGetPhotos: %d keys unprocessed after %d retries", len(remaining), maxRetries)
+		}
+		slog.WarnContext(ctx, "BatchGetPhotos: retrying unprocessed keys",
+			"count", len(remaining),
+			"attempt", attempt+1,
+		)
 	}
+
 	return photos, nil
 }
 
@@ -159,12 +213,15 @@ type DynamoEventGetter struct {
 
 // GetEvent returns the event record for the given id.
 // Returns apperrors.ErrNotFound when no item exists.
+// Uses strongly consistent reads to avoid a stale-read 404 race when an event
+// is created and its search URL is shared immediately (e.g. QR code at registration).
 func (s *DynamoEventGetter) GetEvent(ctx context.Context, id string) (*models.Event, error) {
 	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
 		TableName: aws.String(s.TableName),
 		Key: map[string]types.AttributeValue{
 			"id": &types.AttributeValueMemberS{Value: id},
 		},
+		ConsistentRead: aws.Bool(true),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("GetEvent: dynamodb GetItem: %w", err)
@@ -178,4 +235,3 @@ func (s *DynamoEventGetter) GetEvent(ctx context.Context, id string) (*models.Ev
 	}
 	return &ev, nil
 }
-

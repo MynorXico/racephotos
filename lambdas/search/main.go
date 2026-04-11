@@ -62,8 +62,9 @@ func main() {
 		CdnDomain: cdnDomain,
 	}
 
-	slog.Info("search Lambda starting",
-		slog.String("env", env),
+	// Log env only at INFO; table names are infra-topology detail logged at DEBUG.
+	slog.Info("search Lambda starting", slog.String("env", env))
+	slog.Debug("search Lambda config",
 		slog.String("bibIndexTable", bibIndexTable),
 		slog.String("photosTable", photosTable),
 		slog.String("eventsTable", eventsTable),
