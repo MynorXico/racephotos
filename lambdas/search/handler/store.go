@@ -17,6 +17,17 @@ import (
 // batchGetItemMax is the DynamoDB API hard limit for BatchGetItem key count.
 const batchGetItemMax = 100
 
+// bibIndexQueryPageLimit is the maximum number of items fetched per Query page
+// on the bib-index table.  Kept well below the 1 MB page limit for predictable
+// latency on the hot path.
+const bibIndexQueryPageLimit = 500
+
+// bibIndexMaxResults is the total cap on photo IDs returned for a single
+// bib+event lookup.  Typical v1 race events produce 5–20 photos per bib;
+// 500 is a generous safety limit for pathological data or adversarial input on
+// this public endpoint.  A warning is logged when the cap is reached.
+const bibIndexMaxResults = 500
+
 // ── Business-logic interfaces ─────────────────────────────────────────────────
 
 // BibIndexStore abstracts the bib-index fan-out table query.
@@ -65,6 +76,11 @@ type DynamoBibIndexReader struct {
 // GetPhotoIDsByBib returns all photoId values associated with the given
 // eventID + bibNumber pair.  The result may be empty when no photos have been
 // tagged with that bib in the event.
+//
+// At most bibIndexMaxResults IDs are returned.  A warning is logged when the cap
+// is reached so that unusually large result sets can be investigated; the caller
+// receives a truncated but usable list.  Each Query page is capped at
+// bibIndexQueryPageLimit items for predictable per-page latency.
 func (s *DynamoBibIndexReader) GetPhotoIDsByBib(ctx context.Context, eventID, bibNumber string) ([]string, error) {
 	bibKey := eventID + "#" + bibNumber
 	var photoIDs []string
@@ -82,6 +98,7 @@ func (s *DynamoBibIndexReader) GetPhotoIDsByBib(ctx context.Context, eventID, bi
 				":bk": &types.AttributeValueMemberS{Value: bibKey},
 			},
 			ProjectionExpression: aws.String("photoId"),
+			Limit:                aws.Int32(bibIndexQueryPageLimit),
 		}
 		if len(lastKey) > 0 {
 			input.ExclusiveStartKey = lastKey
@@ -101,6 +118,13 @@ func (s *DynamoBibIndexReader) GetPhotoIDsByBib(ctx context.Context, eventID, bi
 				continue
 			}
 			photoIDs = append(photoIDs, sv.Value)
+			if len(photoIDs) >= bibIndexMaxResults {
+				slog.WarnContext(ctx, "GetPhotoIDsByBib: result cap reached; truncating",
+					"eventID", eventID,
+					"cap", bibIndexMaxResults,
+				)
+				return photoIDs, nil
+			}
 		}
 		lastKey = out.LastEvaluatedKey
 		if len(lastKey) == 0 {
@@ -165,7 +189,19 @@ func (s *DynamoPhotoBatchGetter) batchGetChunk(ctx context.Context, ids []string
 	for attempt := 0; attempt <= maxRetries; attempt++ {
 		out, err := s.Client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
 			RequestItems: map[string]types.KeysAndAttributes{
-				s.TableName: {Keys: remaining},
+				s.TableName: {
+					Keys: remaining,
+					// Fetch only the four fields consumed by the handler — id, status,
+					// watermarkedS3Key, capturedAt.  id and status are reserved words in
+					// DynamoDB expression syntax and must be aliased.  Omitting rawS3Key
+					// and other large attributes reduces RCU cost and keeps PII off the
+					// runner-facing hot path.
+					ProjectionExpression: aws.String("#sid, #status, watermarkedS3Key, capturedAt"),
+					ExpressionAttributeNames: map[string]string{
+						"#sid":    "id",
+						"#status": "status",
+					},
+				},
 			},
 		})
 		if err != nil {
