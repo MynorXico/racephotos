@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"regexp"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 
@@ -63,7 +64,9 @@ type bibResult struct {
 
 // Handle processes an API Gateway v2 HTTP request.
 func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
-	eventID := event.PathParameters["id"]
+	// Normalise to lowercase — UUIDs are case-insensitive but DynamoDB PKs are
+	// case-sensitive; events are stored with lowercase IDs.
+	eventID := strings.ToLower(event.PathParameters["id"])
 	if eventID == "" || !uuidRE.MatchString(eventID) {
 		return errResponse(400, "missing or invalid event id"), nil
 	}
@@ -159,7 +162,9 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 		item := photoItem{
 			PhotoID:        p.ID,
-			WatermarkedURL: "https://" + h.CdnDomain + "/" + p.WatermarkedS3Key,
+			// TrimPrefix guards against an S3 key with a leading slash, which
+			// would produce a double-slash URL (https://domain.com//path).
+			WatermarkedURL: "https://" + h.CdnDomain + "/" + strings.TrimPrefix(p.WatermarkedS3Key, "/"),
 		}
 		if p.CapturedAt != "" {
 			item.CapturedAt = &p.CapturedAt
