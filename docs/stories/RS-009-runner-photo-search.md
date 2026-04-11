@@ -2,7 +2,7 @@
 
 **ID**: RS-009
 **Epic**: Search / Frontend
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
