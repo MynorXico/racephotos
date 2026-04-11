@@ -1,5 +1,6 @@
 import {
   Component,
+  DestroyRef,
   OnDestroy,
   OnInit,
   inject,
@@ -17,7 +18,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
 
 import { RunnerPhotosActions } from '../../store/runner-photos/runner-photos.actions';
@@ -61,6 +62,7 @@ export class EventSearchComponent implements OnInit, OnDestroy {
   private readonly dialog = inject(MatDialog);
   private readonly titleService = inject(Title);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly _destroyRef = inject(DestroyRef);
 
   readonly bibControl = new FormControl('', [
     Validators.required,
@@ -122,10 +124,13 @@ export class EventSearchComponent implements OnInit, OnDestroy {
           maxWidth: '720px',
           width: '90vw',
         });
-        this.dialogRef.afterClosed().subscribe(() => {
-          this.store.dispatch(RunnerPhotosActions.deselectPhoto());
-          this.dialogRef = null;
-        });
+        this.dialogRef
+          .afterClosed()
+          .pipe(takeUntilDestroyed(this._destroyRef))
+          .subscribe(() => {
+            this.store.dispatch(RunnerPhotosActions.deselectPhoto());
+            this.dialogRef = null;
+          });
       } else if (!photo && this.dialogRef) {
         this.dialogRef.close();
         this.dialogRef = null;

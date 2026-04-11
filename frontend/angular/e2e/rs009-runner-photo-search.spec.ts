@@ -58,26 +58,26 @@ test.describe('RS-009 — Bib input validation (AC3)', () => {
     const input = page.getByLabel('Bib number');
     await input.fill('abc');
     await input.press('Tab');
-    await expect(page.getByText(/bib must be 1.6 digits/i)).toBeVisible();
+    await expect(page.getByText(/bib must be 1–6 digits/i)).toBeVisible();
   });
 
   test('bib longer than 6 digits shows validation error', async ({ page }) => {
     const input = page.getByLabel('Bib number');
     await input.fill('1234567');
     await input.press('Tab');
-    await expect(page.getByText(/bib must be 1.6 digits/i)).toBeVisible();
+    await expect(page.getByText(/bib must be 1–6 digits/i)).toBeVisible();
   });
 
   test('valid 1–6 digit bib clears validation error', async ({ page }) => {
     const input = page.getByLabel('Bib number');
     await input.fill('abc');
     await input.press('Tab');
-    await expect(page.getByText(/bib must be 1.6 digits/i)).toBeVisible();
+    await expect(page.getByText(/bib must be 1–6 digits/i)).toBeVisible();
 
     await input.clear();
     await input.fill('101');
     await input.press('Tab');
-    await expect(page.getByText(/bib must be 1.6 digits/i)).not.toBeVisible();
+    await expect(page.getByText(/bib must be 1–6 digits/i)).not.toBeVisible();
   });
 });
 

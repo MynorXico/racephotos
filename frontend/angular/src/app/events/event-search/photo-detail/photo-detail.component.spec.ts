@@ -66,9 +66,11 @@ describe('PhotoDetailComponent', () => {
     expect(placeholder).toBeTruthy();
   });
 
-  it('dispatches deselectPhoto and closes dialog on close', () => {
+  it('closes dialog on close without dispatching deselectPhoto', () => {
+    // deselectPhoto is dispatched by the parent EventSearchComponent's
+    // afterClosed() subscription to avoid a double dispatch.
     component.onClose();
-    expect(store.dispatch).toHaveBeenCalledWith(RunnerPhotosActions.deselectPhoto());
+    expect(store.dispatch).not.toHaveBeenCalledWith(RunnerPhotosActions.deselectPhoto());
     expect(dialogRef.close).toHaveBeenCalled();
   });
 

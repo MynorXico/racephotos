@@ -90,14 +90,28 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	evRes := <-evCh
 	if evRes.err != nil {
 		if errors.Is(evRes.err, apperrors.ErrNotFound) {
-			<-bibCh // drain to prevent goroutine leak
+			// Drain the bib goroutine to prevent a goroutine leak; log any
+			// secondary error at WARN so concurrent failures are observable.
+			if bibRes := <-bibCh; bibRes.err != nil {
+				slog.WarnContext(ctx, "GetPhotoIDsByBib also failed during event 404",
+					slog.String("eventID", eventID),
+					slog.String("error", bibRes.err.Error()),
+				)
+			}
 			return errResponse(404, "event not found"), nil
 		}
 		slog.ErrorContext(ctx, "GetEvent failed",
 			slog.String("eventID", eventID),
 			slog.String("error", evRes.err.Error()),
 		)
-		<-bibCh
+		// Drain the bib goroutine to prevent a goroutine leak; log any
+		// secondary error at WARN so concurrent failures are observable.
+		if bibRes := <-bibCh; bibRes.err != nil {
+			slog.WarnContext(ctx, "GetPhotoIDsByBib also failed during GetEvent error",
+				slog.String("eventID", eventID),
+				slog.String("error", bibRes.err.Error()),
+			)
+		}
 		return errResponse(500, "internal server error"), nil
 	}
 

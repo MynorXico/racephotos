@@ -10,7 +10,6 @@ import { MatIconModule } from '@angular/material/icon';
 import { Store } from '@ngrx/store';
 
 import { RunnerPhoto } from '../../../store/runner-photos/runner-photos.actions';
-import { RunnerPhotosActions } from '../../../store/runner-photos/runner-photos.actions';
 import { PurchasesActions } from '../../../store/purchases/purchases.actions';
 
 export interface PhotoDetailDialogData {
@@ -41,7 +40,9 @@ export class PhotoDetailComponent {
   }
 
   onClose(): void {
-    this.store.dispatch(RunnerPhotosActions.deselectPhoto());
+    // Close the dialog only — the parent EventSearchComponent's afterClosed()
+    // subscription is solely responsible for dispatching deselectPhoto(), so
+    // the action is not dispatched twice when the user presses the close button.
     this.dialogRef.close();
   }
 
