@@ -87,13 +87,21 @@ func (s *DynamoBibIndexReader) GetPhotoIDsByBib(ctx context.Context, eventID, bi
 	var lastKey map[string]types.AttributeValue
 
 	for {
-		// KeyConditionExpression uses a named placeholder (:bk) — the user-supplied
-		// bib value is placed exclusively in ExpressionAttributeValues, never
-		// concatenated into the expression string. No injection risk.
+		// KeyConditionExpression uses:
+		//   - #bk as a name alias for the "bibKey" attribute — ensures the
+		//     expression remains valid even if the attribute is renamed to a
+		//     DynamoDB reserved word in the future, and satisfies the project
+		//     convention of aliasing all attribute names in expressions.
+		//   - :bk as a value placeholder — the user-supplied composite value is
+		//     placed exclusively in ExpressionAttributeValues, never concatenated
+		//     into the expression string. No injection risk.
 		// ProjectionExpression returns only photoId to minimise RCU consumption.
 		input := &dynamodb.QueryInput{
 			TableName:              aws.String(s.TableName),
-			KeyConditionExpression: aws.String("bibKey = :bk"),
+			KeyConditionExpression: aws.String("#bk = :bk"),
+			ExpressionAttributeNames: map[string]string{
+				"#bk": "bibKey",
+			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":bk": &types.AttributeValueMemberS{Value: bibKey},
 			},
