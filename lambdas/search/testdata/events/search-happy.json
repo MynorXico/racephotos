@@ -1,0 +1,31 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /events/{id}/photos/search",
+  "rawPath": "/events/550e8400-e29b-41d4-a716-446655440001/photos/search",
+  "rawQueryString": "bib=101",
+  "pathParameters": {
+    "id": "550e8400-e29b-41d4-a716-446655440001"
+  },
+  "queryStringParameters": {
+    "bib": "101"
+  },
+  "requestContext": {
+    "accountId": "000000000000",
+    "apiId": "local",
+    "domainName": "localhost",
+    "domainPrefix": "localhost",
+    "http": {
+      "method": "GET",
+      "path": "/events/550e8400-e29b-41d4-a716-446655440001/photos/search",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "curl/7.79.1"
+    },
+    "requestId": "local-test-request-id",
+    "routeKey": "GET /events/{id}/photos/search",
+    "stage": "$default",
+    "time": "01/Jan/2026:00:00:00 +0000",
+    "timeEpoch": 1735689600000
+  },
+  "isBase64Encoded": false
+}

@@ -10,6 +10,7 @@ import { PhotographerStack } from '../stacks/photographer-stack';
 import { EventStack } from '../stacks/event-stack';
 import { PhotoUploadStack } from '../stacks/photo-upload-stack';
 import { PhotoProcessingStack } from '../stacks/photo-processing-stack';
+import { SearchStack } from '../stacks/search-stack';
 
 interface RacePhotosStageProps extends cdk.StageProps {
   config: EnvConfig;
@@ -112,6 +113,18 @@ export class RacePhotosStage extends cdk.Stage {
       pipeline: storage.pipeline,
     });
     photoProcessingStack.addDependency(storage);
+
+    // SearchStack — RS-009
+    // search Lambda: GET /events/{id}/photos/search (public, no auth)
+    // Depends on StorageStack (bib-index, photos, events tables + CDN domain) and AuthStack (API).
+    const searchStack = new SearchStack(this, 'Search', {
+      env: props.env,
+      config,
+      db: storage.db,
+      storage: storage.photoStorage,
+    });
+    searchStack.addDependency(storage);
+    searchStack.addDependency(auth);
 
     // FrontendStack — Angular SPA on S3 + CloudFront.
     // FrontendConstruct reads apiBaseUrl, userPoolId, and clientId from SSM via

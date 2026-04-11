@@ -1,0 +1,15 @@
+<div
+  class="photo-grid"
+  role="list"
+  [attr.aria-label]="searchedBib ? 'Photos for bib ' + searchedBib : 'Search results'"
+>
+  @for (photo of photos; track photo.photoId) {
+    <app-runner-photo-card
+      [photo]="photo"
+      [pricePerPhoto]="pricePerPhoto"
+      [currency]="currency"
+      [searchedBib]="searchedBib"
+      (photoSelected)="photoSelected.emit($event)"
+    />
+  }
+</div>

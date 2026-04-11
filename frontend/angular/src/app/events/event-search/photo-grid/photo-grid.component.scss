@@ -1,0 +1,14 @@
+.photo-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr; // mobile: single column
+
+  @media (min-width: 768px) {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  @media (min-width: 1280px) {
+    gap: 24px;
+    grid-template-columns: repeat(3, 1fr);
+  }
+}

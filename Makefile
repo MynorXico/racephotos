@@ -1,4 +1,4 @@
-.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark test-watermark invoke-list-event-photos
+.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark test-watermark invoke-list-event-photos invoke-search
 
 LAMBDAS := presign-photos photo-processor watermark search payment get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events list-event-photos
 
@@ -153,6 +153,9 @@ invoke-watermark:
 
 invoke-list-event-photos:
 	$(call invoke_lambda,list-event-photos,ListEventPhotosFunction)
+
+invoke-search:
+	$(call invoke_lambda,search,SearchFunction)
 
 ## test-watermark: apply watermark locally and open the result — no AWS needed.
 ## Usage:

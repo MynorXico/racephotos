@@ -1,0 +1,33 @@
+<mat-card appearance="outlined" class="runner-photo-card">
+  <div class="thumbnail-container">
+    @if (!imageError()) {
+      <img
+        [src]="photo.watermarkedUrl"
+        [alt]="altText"
+        class="thumbnail-img"
+        (error)="onImageError()"
+      />
+    } @else {
+      <div class="thumbnail-placeholder" aria-label="Photo unavailable">
+        <mat-icon class="placeholder-icon">broken_image</mat-icon>
+      </div>
+    }
+  </div>
+
+  <mat-card-content class="card-content">
+    <p class="price-line">
+      <strong>{{ currency }} {{ pricePerPhoto }}</strong>
+    </p>
+  </mat-card-content>
+
+  <mat-card-actions class="card-actions">
+    <button
+      mat-stroked-button
+      class="purchase-btn"
+      aria-label="Purchase photo"
+      (click)="$event.stopPropagation(); onCardClick()"
+    >
+      Purchase
+    </button>
+  </mat-card-actions>
+</mat-card>

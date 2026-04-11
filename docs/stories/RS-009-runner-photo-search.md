@@ -7,7 +7,7 @@
 
 ## Context
 
-Runners discover their photos by entering their bib number on the event search page — no account required (Journey 2). The search queries the BibIndex table (created in RS-007) to find photos tagged with that bib number, then returns the watermarked preview URLs via CloudFront. A photo may appear in multiple runners' search results if it contains multiple bib numbers (ADR-0003).
+Runners discover their photos by entering their bib number on the event search page — no account required (Journey 2). The search queries the BibIndex table (provisioned in RS-001, written by RS-007) to find photos tagged with that bib number, then returns the watermarked preview URLs via CloudFront. A photo may appear in multiple runners' search results if it contains multiple bib numbers (ADR-0003).
 
 ## Acceptance criteria
 
@@ -20,6 +20,7 @@ Runners discover their photos by entering their bib number on the event search p
 - [ ] AC7: Given a runner clicks a photo, then a photo detail view shows a large watermarked preview, the price, and a prominent "Purchase this photo" button leading to the purchase flow (RS-010).
 - [ ] AC8: Given no photos are found for the bib number, then an empty state message is shown: "No photos found for bib {bib}. Photos may still be processing — try again later."
 - [ ] AC9: Given the page is viewed on mobile (375px), then the photo grid is single-column and the bib search form is full-width.
+- [ ] AC10: Given the `?bib=` query parameter is absent or empty, then `400 Bad Request` is returned.
 
 ## Out of scope
 
@@ -28,7 +29,7 @@ Runners discover their photos by entering their bib number on the event search p
 
 ## Tech notes
 
-- New Lambda module: `lambdas/search-photos/`
+- New Lambda module: `lambdas/search/`
   - Route: `GET /events/{id}/photos/search`, no auth
   - Query params: `?bib=` (required)
 - Interfaces:
@@ -54,7 +55,11 @@ Runners discover their photos by entering their bib number on the event search p
   RACEPHOTOS_PHOTO_CDN_DOMAIN   required — CloudFront domain for watermarked photos
   ```
 - CDK: attach to existing `SearchConstruct` (or create if not yet present); wire `ObservabilityConstruct`; no Cognito authorizer on this route
-- Angular: public route `/events/:id` — no auth guard; `store/photos/` NgRx slice for search results; photo grid is a reusable read-only component (reused from RS-008 where applicable)
+- Angular: public route `/events/:id` — no auth guard; `store/photos/` NgRx slice for search results; component paths:
+  - `src/app/events/event-search/event-search.component.ts` — search page (route host)
+  - `src/app/events/event-search/photo-grid/photo-grid.component.ts` — reusable photo grid (reuse from RS-008 where applicable)
+  - `src/app/events/event-search/photo-card/photo-card.component.ts` — individual thumbnail card with price and Purchase button
+  - `src/app/events/event-search/photo-detail/photo-detail.component.ts` — large preview + "Purchase this photo" button (AC7)
 - ADR dependency: ADR-0003 (multi-bib photos show in multiple runners' results — already resolved)
 
 ## Definition of Done
