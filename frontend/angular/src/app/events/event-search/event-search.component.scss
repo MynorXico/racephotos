@@ -99,8 +99,10 @@
 .bib-field {
   flex: 1;
 
-  // Force the form-field background to match the card
-  .mat-mdc-text-field-wrapper {
+  // Force the form-field background to match the card.
+  // ::ng-deep is required to pierce Angular's emulated encapsulation
+  // and reach mat-form-field's internal template nodes.
+  ::ng-deep .mat-mdc-text-field-wrapper {
     background: var(--mat-sys-surface-container-low);
   }
 }
