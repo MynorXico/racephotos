@@ -167,7 +167,7 @@ describe('EventSearchComponent', () => {
     fixture.detectChanges();
     const btn: HTMLElement = fixture.nativeElement.querySelector('[role="alert"] button');
     expect(btn).toBeTruthy();
-    expect(btn.textContent?.trim().toLowerCase()).toBe('retry');
+    expect(btn.textContent?.trim().toLowerCase()).toBe('try again');
   });
 
   it('onRetry dispatches searchByBib when searchedBib is set', () => {
