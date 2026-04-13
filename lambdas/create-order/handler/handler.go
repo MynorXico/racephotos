@@ -38,6 +38,7 @@ const maxPhotoIDs = 20
 type Handler struct {
 	Orders        OrderStore
 	Purchases     PurchaseStore
+	Writer        OrderTransacter
 	Photos        PhotoStore
 	Events        EventStore
 	Photographers PhotographerStore
@@ -150,7 +151,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	now := time.Now().UTC().Format(time.RFC3339)
 	totalAmount := ev.PricePerPhoto * float64(len(photoIDs))
 
-	// Persist Order.
+	// Build Order and Purchase records before any write.
 	order := models.Order{
 		ID:             orderID,
 		RunnerEmail:    req.RunnerEmail,
@@ -163,28 +164,24 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		EventName:      ev.Name,
 		ClaimedAt:      now,
 	}
-	if err := h.Orders.CreateOrder(ctx, order); err != nil {
-		slog.ErrorContext(ctx, "CreateOrder failed", slog.String("error", err.Error()))
-		return errResponse(500, "internal server error"), nil
-	}
-
-	// Persist one Purchase per photo.
+	purchases := make([]models.Purchase, 0, len(photos))
 	for _, p := range photos {
-		purchase := models.Purchase{
+		purchases = append(purchases, models.Purchase{
 			ID:          uuid.New().String(),
 			OrderID:     orderID,
 			PhotoID:     p.ID,
 			RunnerEmail: req.RunnerEmail,
 			Status:      models.OrderStatusPending,
 			ClaimedAt:   now,
-		}
-		if err := h.Purchases.CreatePurchase(ctx, purchase); err != nil {
-			slog.ErrorContext(ctx, "CreatePurchase failed",
-				slog.String("photoID", p.ID),
-				slog.String("error", err.Error()),
-			)
-			return errResponse(500, "internal server error"), nil
-		}
+		})
+	}
+
+	// Persist Order and all Purchases atomically. TransactWriteItems guarantees
+	// that either all records land or none do — no orphaned Orders with missing
+	// Purchases on Lambda timeout or transient DynamoDB error.
+	if err := h.Writer.CreateOrderWithPurchases(ctx, order, purchases); err != nil {
+		slog.ErrorContext(ctx, "CreateOrderWithPurchases failed", slog.String("error", err.Error()))
+		return errResponse(500, "internal server error"), nil
 	}
 
 	// AC8: notify photographer with masked runner email.

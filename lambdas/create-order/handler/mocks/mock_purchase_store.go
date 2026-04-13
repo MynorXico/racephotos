@@ -33,21 +33,6 @@ func (m *MockPurchaseStore) EXPECT() *MockPurchaseStoreMockRecorder {
 	return m.recorder
 }
 
-// CreatePurchase mocks base method.
-func (m *MockPurchaseStore) CreatePurchase(ctx context.Context, p models.Purchase) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreatePurchase", ctx, p)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreatePurchase indicates an expected call of CreatePurchase.
-func (mr *MockPurchaseStoreMockRecorder) CreatePurchase(ctx, p interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreatePurchase",
-		reflect.TypeOf((*MockPurchaseStore)(nil).CreatePurchase), ctx, p)
-}
-
 // GetPurchaseByPhotoAndEmail mocks base method.
 func (m *MockPurchaseStore) GetPurchaseByPhotoAndEmail(ctx context.Context, photoID, runnerEmail string) (*models.Purchase, error) {
 	m.ctrl.T.Helper()

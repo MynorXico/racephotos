@@ -33,21 +33,6 @@ func (m *MockOrderStore) EXPECT() *MockOrderStoreMockRecorder {
 	return m.recorder
 }
 
-// CreateOrder mocks base method.
-func (m *MockOrderStore) CreateOrder(ctx context.Context, o models.Order) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateOrder", ctx, o)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// CreateOrder indicates an expected call of CreateOrder.
-func (mr *MockOrderStoreMockRecorder) CreateOrder(ctx, o interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrder",
-		reflect.TypeOf((*MockOrderStore)(nil).CreateOrder), ctx, o)
-}
-
 // GetOrderByID mocks base method.
 func (m *MockOrderStore) GetOrderByID(ctx context.Context, id string) (*models.Order, error) {
 	m.ctrl.T.Helper()

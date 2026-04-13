@@ -59,6 +59,11 @@ func main() {
 			Client:    ddbClient,
 			TableName: purchasesTable,
 		},
+		Writer: &handler.DynamoOrderTransacter{
+			Client:         ddbClient,
+			OrdersTable:    ordersTable,
+			PurchasesTable: purchasesTable,
+		},
 		Photos: &handler.DynamoPhotoStore{
 			Client:    ddbClient,
 			TableName: photosTable,

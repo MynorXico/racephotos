@@ -16,18 +16,24 @@ import (
 
 // ── Business-logic interfaces ─────────────────────────────────────────────────
 
-// OrderStore abstracts reads and writes to the racephotos-orders table.
+// OrderStore abstracts reads from the racephotos-orders table.
 type OrderStore interface {
-	CreateOrder(ctx context.Context, o models.Order) error
 	GetOrderByID(ctx context.Context, id string) (*models.Order, error)
 }
 
-// PurchaseStore abstracts reads and writes to the racephotos-purchases table.
+// PurchaseStore abstracts reads from the racephotos-purchases table.
 type PurchaseStore interface {
-	CreatePurchase(ctx context.Context, p models.Purchase) error
 	// GetPurchaseByPhotoAndEmail returns the purchase for the given (photoID, runnerEmail)
 	// pair, or nil if no matching record exists.
 	GetPurchaseByPhotoAndEmail(ctx context.Context, photoID, runnerEmail string) (*models.Purchase, error)
+}
+
+// OrderTransacter atomically writes an Order and all its Purchase line items in
+// a single DynamoDB TransactWriteItems call. This guarantees that a persisted
+// Order always has its full set of Purchase records — no orphaned Orders on
+// mid-loop failure, and correct idempotency on retries.
+type OrderTransacter interface {
+	CreateOrderWithPurchases(ctx context.Context, order models.Order, purchases []models.Purchase) error
 }
 
 // PhotoStore abstracts single-item reads from the racephotos-photos table.
@@ -52,18 +58,21 @@ type DynamoItemGetter interface {
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 }
 
-// DynamoOrderClient wraps DynamoDB methods needed for order storage.
+// DynamoOrderClient wraps DynamoDB methods needed for order reads.
 type DynamoOrderClient interface {
-	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 }
 
-// DynamoPurchaseClient wraps DynamoDB methods needed for purchase storage.
+// DynamoPurchaseClient wraps DynamoDB methods needed for purchase reads.
 // Includes Query for the photoId-runnerEmail-index GSI idempotency check.
 type DynamoPurchaseClient interface {
-	PutItem(ctx context.Context, params *dynamodb.PutItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.PutItemOutput, error)
 	Query(ctx context.Context, params *dynamodb.QueryInput, optFns ...func(*dynamodb.Options)) (*dynamodb.QueryOutput, error)
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
+}
+
+// DynamoTransactClient wraps the DynamoDB TransactWriteItems method.
+type DynamoTransactClient interface {
+	TransactWriteItems(ctx context.Context, params *dynamodb.TransactWriteItemsInput, optFns ...func(*dynamodb.Options)) (*dynamodb.TransactWriteItemsOutput, error)
 }
 
 // ── DynamoDB implementations ──────────────────────────────────────────────────
@@ -72,26 +81,6 @@ type DynamoPurchaseClient interface {
 type DynamoOrderStore struct {
 	Client    DynamoOrderClient
 	TableName string
-}
-
-// CreateOrder writes an Order record to DynamoDB.
-// The condition expression rejects a write when the id already exists, guarding
-// against silent overwrites in the (astronomically unlikely) event of a UUID
-// collision or a retry bug that reuses an orderID.
-func (s *DynamoOrderStore) CreateOrder(ctx context.Context, o models.Order) error {
-	item, err := attributevalue.MarshalMap(o)
-	if err != nil {
-		return fmt.Errorf("CreateOrder: marshal: %w", err)
-	}
-	_, err = s.Client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           aws.String(s.TableName),
-		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(id)"),
-	})
-	if err != nil {
-		return fmt.Errorf("CreateOrder: PutItem: %w", err)
-	}
-	return nil
 }
 
 // GetOrderByID retrieves an Order by its primary key.
@@ -120,25 +109,6 @@ func (s *DynamoOrderStore) GetOrderByID(ctx context.Context, id string) (*models
 type DynamoPurchaseStore struct {
 	Client    DynamoPurchaseClient
 	TableName string
-}
-
-// CreatePurchase writes a Purchase record to DynamoDB.
-// The condition expression prevents silent overwrites of an existing purchase
-// with the same id (UUID v4 collision guard).
-func (s *DynamoPurchaseStore) CreatePurchase(ctx context.Context, p models.Purchase) error {
-	item, err := attributevalue.MarshalMap(p)
-	if err != nil {
-		return fmt.Errorf("CreatePurchase: marshal: %w", err)
-	}
-	_, err = s.Client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName:           aws.String(s.TableName),
-		Item:                item,
-		ConditionExpression: aws.String("attribute_not_exists(id)"),
-	})
-	if err != nil {
-		return fmt.Errorf("CreatePurchase: PutItem: %w", err)
-	}
-	return nil
 }
 
 // GetPurchaseByPhotoAndEmail returns the purchase for the given (photoID, runnerEmail) pair.
@@ -199,6 +169,62 @@ func (s *DynamoPurchaseStore) GetPurchaseByPhotoAndEmail(ctx context.Context, ph
 		return nil, fmt.Errorf("GetPurchaseByPhotoAndEmail: unmarshal: %w", err)
 	}
 	return &p, nil
+}
+
+// DynamoOrderTransacter implements OrderTransacter using DynamoDB TransactWriteItems.
+// It holds references to both the orders and purchases table names because a single
+// transaction spans two tables.
+type DynamoOrderTransacter struct {
+	Client         DynamoTransactClient
+	OrdersTable    string
+	PurchasesTable string
+}
+
+// CreateOrderWithPurchases atomically writes an Order and all its Purchase line
+// items in a single TransactWriteItems call. If any write fails the entire
+// transaction is rolled back — no orphaned Orders with missing Purchases.
+//
+// Each item carries attribute_not_exists(id) to guard against silent overwrites
+// in the event of a UUID collision or a retry with a reused ID.
+//
+// DynamoDB TransactWriteItems limit is 25 items. The handler caps photoIds at 20,
+// so the maximum transaction size is 1 Order + 20 Purchases = 21 items.
+func (s *DynamoOrderTransacter) CreateOrderWithPurchases(ctx context.Context, order models.Order, purchases []models.Purchase) error {
+	transactItems := make([]types.TransactWriteItem, 0, 1+len(purchases))
+
+	orderItem, err := attributevalue.MarshalMap(order)
+	if err != nil {
+		return fmt.Errorf("CreateOrderWithPurchases: marshal order: %w", err)
+	}
+	transactItems = append(transactItems, types.TransactWriteItem{
+		Put: &types.Put{
+			TableName:           aws.String(s.OrdersTable),
+			Item:                orderItem,
+			ConditionExpression: aws.String("attribute_not_exists(id)"),
+		},
+	})
+
+	for i, p := range purchases {
+		purchaseItem, err := attributevalue.MarshalMap(p)
+		if err != nil {
+			return fmt.Errorf("CreateOrderWithPurchases: marshal purchase[%d]: %w", i, err)
+		}
+		transactItems = append(transactItems, types.TransactWriteItem{
+			Put: &types.Put{
+				TableName:           aws.String(s.PurchasesTable),
+				Item:                purchaseItem,
+				ConditionExpression: aws.String("attribute_not_exists(id)"),
+			},
+		})
+	}
+
+	_, err = s.Client.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+		TransactItems: transactItems,
+	})
+	if err != nil {
+		return fmt.Errorf("CreateOrderWithPurchases: TransactWriteItems: %w", err)
+	}
+	return nil
 }
 
 // DynamoPhotoStore implements PhotoStore using the racephotos-photos table.
