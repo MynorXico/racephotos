@@ -2,7 +2,7 @@ import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { of } from 'rxjs';
-import { catchError, map, switchMap } from 'rxjs/operators';
+import { catchError, exhaustMap, map } from 'rxjs/operators';
 
 import { AppConfigService } from '../../core/config/app-config.service';
 import { BankDetails, PurchasesActions } from './purchases.actions';
@@ -29,7 +29,7 @@ export class PurchasesEffects {
   submitEmail$ = createEffect(() =>
     this.actions$.pipe(
       ofType(PurchasesActions.submitEmail),
-      switchMap(({ photoId, runnerEmail }) =>
+      exhaustMap(({ photoId, runnerEmail }) =>
         this.http
           .post<CreateOrderResponse>(`${this.apiBase}/orders`, {
             photoIds: [photoId],
