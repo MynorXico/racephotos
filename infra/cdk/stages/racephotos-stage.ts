@@ -149,5 +149,12 @@ export class RacePhotosStage extends cdk.Stage {
       config,
     });
     frontendStack.addDependency(auth);
+
+    // PaymentStack reads /racephotos/env/{env}/approvals-url from SSM at
+    // CloudFormation change-set creation time (valueForStringParameter resolves
+    // at Prepare, not Deploy). FrontendConstruct writes that parameter during its
+    // Deploy step, so PaymentStack must be in a later pipeline wave than
+    // FrontendStack. addDependency() enforces that ordering.
+    paymentStack.addDependency(frontendStack);
   }
 }
