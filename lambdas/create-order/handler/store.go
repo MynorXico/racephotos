@@ -74,16 +74,19 @@ type DynamoOrderStore struct {
 	TableName string
 }
 
-// CreateOrder writes an Order record to DynamoDB. Uses PutItem (no condition expression)
-// so the handler is responsible for idempotency before calling this method.
+// CreateOrder writes an Order record to DynamoDB.
+// The condition expression rejects a write when the id already exists, guarding
+// against silent overwrites in the (astronomically unlikely) event of a UUID
+// collision or a retry bug that reuses an orderID.
 func (s *DynamoOrderStore) CreateOrder(ctx context.Context, o models.Order) error {
 	item, err := attributevalue.MarshalMap(o)
 	if err != nil {
 		return fmt.Errorf("CreateOrder: marshal: %w", err)
 	}
 	_, err = s.Client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(s.TableName),
-		Item:      item,
+		TableName:           aws.String(s.TableName),
+		Item:                item,
+		ConditionExpression: aws.String("attribute_not_exists(id)"),
 	})
 	if err != nil {
 		return fmt.Errorf("CreateOrder: PutItem: %w", err)
@@ -120,14 +123,17 @@ type DynamoPurchaseStore struct {
 }
 
 // CreatePurchase writes a Purchase record to DynamoDB.
+// The condition expression prevents silent overwrites of an existing purchase
+// with the same id (UUID v4 collision guard).
 func (s *DynamoPurchaseStore) CreatePurchase(ctx context.Context, p models.Purchase) error {
 	item, err := attributevalue.MarshalMap(p)
 	if err != nil {
 		return fmt.Errorf("CreatePurchase: marshal: %w", err)
 	}
 	_, err = s.Client.PutItem(ctx, &dynamodb.PutItemInput{
-		TableName: aws.String(s.TableName),
-		Item:      item,
+		TableName:           aws.String(s.TableName),
+		Item:                item,
+		ConditionExpression: aws.String("attribute_not_exists(id)"),
 	})
 	if err != nil {
 		return fmt.Errorf("CreatePurchase: PutItem: %w", err)
