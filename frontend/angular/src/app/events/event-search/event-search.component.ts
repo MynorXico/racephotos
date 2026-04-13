@@ -46,6 +46,7 @@ import {
   PurchaseStepperDialogData,
 } from './purchase-stepper/purchase-stepper.component';
 import { MatDialogRef } from '@angular/material/dialog';
+import { take } from 'rxjs';
 
 @Component({
   selector: 'app-event-search',
@@ -177,12 +178,12 @@ export class EventSearchComponent implements OnInit, OnDestroy {
             // "Done" button which already dispatched resetPurchase.
             this.store
               .select(selectActivePhotoId)
+              .pipe(take(1))
               .subscribe((activeId) => {
                 if (activeId) {
                   this.store.dispatch(PurchasesActions.resetPurchase());
                 }
-              })
-              .unsubscribe();
+              });
             this.purchaseDialogRef = null;
           });
       });

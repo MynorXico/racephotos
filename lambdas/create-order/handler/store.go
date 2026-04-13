@@ -111,12 +111,18 @@ type DynamoPurchaseStore struct {
 	TableName string
 }
 
-// GetPurchaseByPhotoAndEmail returns the purchase for the given (photoID, runnerEmail) pair.
-// Returns nil (no error) when no matching purchase exists.
+// GetPurchaseByPhotoAndEmail returns the most relevant purchase for the given
+// (photoID, runnerEmail) pair. Returns nil (no error) when no matching record exists.
 //
-// Implementation: queries the photoId-runnerEmail-index GSI (KEYS_ONLY projection) to
-// resolve the purchase's PK, then fetches the full item from the base table. Two reads
-// per lookup; correct because the GSI projection does not include status or orderId.
+// A runner may have multiple Purchase records for the same (photoId, runnerEmail)
+// pair — for example, one rejected record followed by a new pending record created
+// after re-submission. The photoId-runnerEmail-index GSI is not unique on those
+// keys, so all matching records are fetched and the first active (pending or
+// approved) record is returned. If none are active, the first rejected record is
+// returned so the caller can decide to re-order.
+//
+// Implementation: queries the photoId-runnerEmail-index GSI (KEYS_ONLY projection)
+// to resolve purchase PKs, then fetches each full item from the base table.
 func (s *DynamoPurchaseStore) GetPurchaseByPhotoAndEmail(ctx context.Context, photoID, runnerEmail string) (*models.Purchase, error) {
 	out, err := s.Client.Query(ctx, &dynamodb.QueryInput{
 		TableName:              aws.String(s.TableName),
@@ -130,7 +136,8 @@ func (s *DynamoPurchaseStore) GetPurchaseByPhotoAndEmail(ctx context.Context, ph
 			":photoId": &types.AttributeValueMemberS{Value: photoID},
 			":email":   &types.AttributeValueMemberS{Value: runnerEmail},
 		},
-		Limit: aws.Int32(1),
+		// No Limit — must inspect all records for this pair to find any active one.
+		// In practice there are at most a handful (one per rejection+resubmission cycle).
 	})
 	if err != nil {
 		return nil, fmt.Errorf("GetPurchaseByPhotoAndEmail: Query: %w", err)
@@ -139,36 +146,49 @@ func (s *DynamoPurchaseStore) GetPurchaseByPhotoAndEmail(ctx context.Context, ph
 		return nil, nil
 	}
 
-	// Resolve the purchase ID from the GSI item (KEYS_ONLY — only PK + GSI keys projected).
-	idAV, ok := out.Items[0]["id"]
-	if !ok {
-		return nil, fmt.Errorf("GetPurchaseByPhotoAndEmail: GSI item missing 'id' key")
-	}
-	idSV, ok := idAV.(*types.AttributeValueMemberS)
-	if !ok || idSV.Value == "" {
-		return nil, fmt.Errorf("GetPurchaseByPhotoAndEmail: GSI item has non-string 'id'")
-	}
+	var fallback *models.Purchase // first rejected record, used if no active one found
+	for i, gsiItem := range out.Items {
+		// Resolve the purchase ID from the GSI item (KEYS_ONLY — only PK + GSI keys projected).
+		idAV, ok := gsiItem["id"]
+		if !ok {
+			return nil, fmt.Errorf("GetPurchaseByPhotoAndEmail: GSI item[%d] missing 'id' key", i)
+		}
+		idSV, ok := idAV.(*types.AttributeValueMemberS)
+		if !ok || idSV.Value == "" {
+			return nil, fmt.Errorf("GetPurchaseByPhotoAndEmail: GSI item[%d] has non-string 'id'", i)
+		}
 
-	// Fetch the full purchase record from the base table.
-	itemOut, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(s.TableName),
-		Key: map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: idSV.Value},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("GetPurchaseByPhotoAndEmail: GetItem: %w", err)
-	}
-	if len(itemOut.Item) == 0 {
-		// Race condition: GSI returned the item but it was deleted from the base table.
-		return nil, nil
-	}
+		// Fetch the full purchase record from the base table.
+		itemOut, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
+			TableName: aws.String(s.TableName),
+			Key: map[string]types.AttributeValue{
+				"id": &types.AttributeValueMemberS{Value: idSV.Value},
+			},
+		})
+		if err != nil {
+			return nil, fmt.Errorf("GetPurchaseByPhotoAndEmail: GetItem: %w", err)
+		}
+		if len(itemOut.Item) == 0 {
+			// Race condition: GSI returned the item but it was deleted from the base table.
+			continue
+		}
 
-	var p models.Purchase
-	if err := attributevalue.UnmarshalMap(itemOut.Item, &p); err != nil {
-		return nil, fmt.Errorf("GetPurchaseByPhotoAndEmail: unmarshal: %w", err)
+		var p models.Purchase
+		if err := attributevalue.UnmarshalMap(itemOut.Item, &p); err != nil {
+			return nil, fmt.Errorf("GetPurchaseByPhotoAndEmail: unmarshal: %w", err)
+		}
+
+		if p.Status == models.OrderStatusPending || p.Status == models.OrderStatusApproved {
+			// Active purchase found — return immediately.
+			return &p, nil
+		}
+		if fallback == nil {
+			fallback = &p
+		}
 	}
-	return &p, nil
+	// No active purchase found; return the first rejected record (or nil if all were
+	// race-deleted from the base table).
+	return fallback, nil
 }
 
 // DynamoOrderTransacter implements OrderTransacter using DynamoDB TransactWriteItems.
