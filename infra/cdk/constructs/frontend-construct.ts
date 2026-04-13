@@ -185,6 +185,14 @@ export class FrontendConstruct extends Construct {
       description: `CloudFront domain for ${config.envName} — consumed by ApiConstruct CORS`,
     });
 
+    // Photographer approvals dashboard URL — consumed by PaymentConstruct
+    // (create-order Lambda injects it into the SES email sent to photographers).
+    new ssm.StringParameter(this, 'ApprovalsUrlParam', {
+      parameterName: `/racephotos/env/${config.envName}/approvals-url`,
+      stringValue: `https://${distribution.distributionDomainName}/photographer/approvals`,
+      description: `Photographer approvals dashboard URL for ${config.envName}`,
+    });
+
     // ── CloudFormation outputs ─────────────────────────────────────────────
     new cdk.CfnOutput(this, 'FrontendUrl', {
       value: hasCustomDomain
