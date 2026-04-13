@@ -3,6 +3,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
+import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import { Construct } from 'constructs';
 
@@ -106,7 +107,17 @@ export class PaymentConstruct extends Construct {
 
     // DynamoDB grants — principle of least privilege per table and operation.
     ordersTable.grant(this.createOrderFn, 'dynamodb:PutItem', 'dynamodb:GetItem');
-    purchasesTable.grant(this.createOrderFn, 'dynamodb:PutItem', 'dynamodb:Query', 'dynamodb:GetItem');
+    // PutItem and GetItem on the purchases base table.
+    purchasesTable.grant(this.createOrderFn, 'dynamodb:PutItem', 'dynamodb:GetItem');
+    // Query on the photoId-runnerEmail-index GSI requires an explicit grant on the
+    // index ARN. table.grant() only covers the base table ARN — CDK does not
+    // automatically include index/* for manual grant() calls.
+    this.createOrderFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['dynamodb:Query'],
+        resources: [`${purchasesTable.tableArn}/index/photoId-runnerEmail-index`],
+      }),
+    );
     photosTable.grant(this.createOrderFn, 'dynamodb:GetItem');
     eventsTable.grant(this.createOrderFn, 'dynamodb:GetItem');
     photographersTable.grant(this.createOrderFn, 'dynamodb:GetItem');
