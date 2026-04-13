@@ -151,6 +151,13 @@ export class EventSearchComponent implements OnInit, OnDestroy {
     this.actions$
       .pipe(ofType(PurchasesActions.initiatePurchase), takeUntilDestroyed(this._destroyRef))
       .subscribe(({ photoId }) => {
+        // Guard: avoid opening a second stepper when initiatePurchase is dispatched
+        // while one is already open (e.g. "Try again" from the error step retries
+        // the same action inside the existing dialog).
+        if (this.purchaseDialogRef) {
+          return;
+        }
+
         // Close the photo-detail dialog without dispatching deselectPhoto twice
         // (afterClosed() subscription handles deselectPhoto).
         if (this.dialogRef) {
