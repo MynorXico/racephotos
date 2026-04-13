@@ -59,7 +59,7 @@ scope for v1 given bank-transfer payment model where fraud risk is low.
 **Negative / tradeoffs**:
 - Requires SES in every environment (dev, staging, prod)
 - Contributor must verify a sender identity in SES before first deploy
-- Two new `RACEPHOTOS_` env vars required (documented below)
+- One new `RACEPHOTOS_` env var required (documented below); photographer email is fetched from DynamoDB, not an env var
 - `environments.example.ts` needs `sesFromAddress` and CDK must grant the
   payment Lambda `ses:SendEmail` on the verified identity ARN
 
@@ -75,7 +75,6 @@ See `docs/adr/0002-runner-self-serve-redownload.md` for full runner email spec.
 **New env vars introduced**:
 ```
 RACEPHOTOS_SES_FROM_ADDRESS   required — verified SES sender, e.g. noreply@example.com
-RACEPHOTOS_PHOTOGRAPHER_EMAIL required — destination address for approval notifications
 ```
 
 **New CDK config key introduced**:
@@ -89,4 +88,6 @@ sesFromAddress: string   // verified SES sender identity ARN or email
 3. Runner: purchase approved + permanent download link
 4. Runner: re-download resend (on-demand, contains all active download links)
 
-**Stories affected**: RS-006 (payment Lambda), RS-010 (photographer dashboard)
+**Stories affected**: RS-010 (create-order Lambda)
+
+**Amendment (RS-010)**: `RACEPHOTOS_PHOTOGRAPHER_EMAIL` is not used. The platform supports multiple photographers per deployment; the photographer's email address is fetched dynamically from the `Photographer` record in DynamoDB via `PhotographerStore.GetPhotographer()`. A single env var cannot cover multiple photographers.

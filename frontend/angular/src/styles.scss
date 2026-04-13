@@ -67,3 +67,14 @@ body {
 .loading-shimmer {
   animation: pulse 1.5s ease-in-out infinite;
 }
+
+// ── Purchase stepper dialog — full-screen on mobile ───────────────────────────
+// Component SCSS cannot pierce the CDK overlay panel, so this lives globally.
+@media (max-width: 374px) {
+  .purchase-stepper-dialog .mat-mdc-dialog-container {
+    width: 100vw;
+    height: 100vh;
+    max-width: 100vw;
+    border-radius: 0;
+  }
+}

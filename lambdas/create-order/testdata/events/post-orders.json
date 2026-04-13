@@ -1,0 +1,28 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /orders",
+  "rawPath": "/orders",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "requestContext": {
+    "accountId": "123456789012",
+    "apiId": "test-api",
+    "domainName": "example.execute-api.us-east-1.amazonaws.com",
+    "http": {
+      "method": "POST",
+      "path": "/orders",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "1.2.3.4",
+      "userAgent": "curl/7.68.0"
+    },
+    "requestId": "test-request-id",
+    "routeKey": "POST /orders",
+    "stage": "local",
+    "time": "12/Apr/2026:00:00:00 +0000",
+    "timeEpoch": 1744416000000
+  },
+  "body": "{\"photoIds\":[\"REPLACE_WITH_REAL_PHOTO_ID\"],\"runnerEmail\":\"runner@example.com\"}",
+  "isBase64Encoded": false
+}

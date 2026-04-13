@@ -18,7 +18,8 @@ interface DatabaseConstructProps {
  *   racephotos-events        — photographer events; GSIs for photographer and status queries
  *   racephotos-photos        — photo metadata; GSI for event-based listing
  *   racephotos-bib-index     — fan-out bib lookup table (ADR-0003); one item per (eventId, bib, photoId)
- *   racephotos-purchases     — purchase records; GSIs for approval workflow and runner history
+ *   racephotos-orders        — purchase orders (ADR-0010); GSIs for runner history, photographer queue, paymentRef
+ *   racephotos-purchases     — purchase line items; GSIs for idempotency and download
  *   racephotos-photographers — photographer profiles; simple PK-only lookup
  *   racephotos-rate-limits   — per-email rate limit tokens; TTL-based auto-expiry
  *
@@ -32,6 +33,7 @@ export class DatabaseConstruct extends Construct {
   readonly eventsTable: dynamodb.Table;
   readonly photosTable: dynamodb.Table;
   readonly bibIndexTable: dynamodb.Table;
+  readonly ordersTable: dynamodb.Table;
   readonly purchasesTable: dynamodb.Table;
   readonly photographersTable: dynamodb.Table;
   readonly rateLimitsTable: dynamodb.Table;
@@ -134,13 +136,53 @@ export class DatabaseConstruct extends Construct {
       projectionType: dynamodb.ProjectionType.KEYS_ONLY,
     });
 
+    // ── racephotos-orders ─────────────────────────────────────────────────────
+    // Primary purchase grouping entity (ADR-0010). One Order per bank transfer;
+    // each photo becomes a Purchase line item linked by orderId.
+    // PK: id (system-generated order UUID)
+    // GSI runnerEmail-claimedAt-index    : runner order history
+    // GSI photographerId-claimedAt-index : photographer approval queue
+    // GSI paymentRef-index               : lookup by payment reference
+    this.ordersTable = new dynamodb.Table(this, 'OrdersTable', {
+      tableName: 'racephotos-orders',
+      partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
+      encryption,
+      removalPolicy,
+    });
+
+    this.ordersTable.addGlobalSecondaryIndex({
+      indexName: 'runnerEmail-claimedAt-index',
+      partitionKey: { name: 'runnerEmail', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'claimedAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    this.ordersTable.addGlobalSecondaryIndex({
+      indexName: 'photographerId-claimedAt-index',
+      partitionKey: { name: 'photographerId', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'claimedAt', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
+    // KEYS_ONLY: paymentRef lookup only needs the order id to resolve the record —
+    // a GetItem on the base table fetches the full Order.
+    this.ordersTable.addGlobalSecondaryIndex({
+      indexName: 'paymentRef-index',
+      partitionKey: { name: 'paymentRef', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.KEYS_ONLY,
+    });
+
     // ── racephotos-purchases ──────────────────────────────────────────────────
+    // Purchase line items linked to an Order via orderId (ADR-0010).
     // PK: id (system-generated purchase UUID)
-    // GSI photoId-claimedAt-index         : list all purchase claims for a photo
-    // GSI runnerEmail-claimedAt-index      : runner purchase history
-    // GSI downloadToken-index              : token-based download URL lookup
-    // GSI photoId-runnerEmail-index        : idempotency check in create-purchase
-    // GSI photographerId-claimedAt-index   : photographer approval queue (list-purchases-for-approval)
+    // GSI photoId-claimedAt-index    : list all purchase claims for a photo
+    // GSI runnerEmail-claimedAt-index : runner purchase history (by line item)
+    // GSI downloadToken-index         : token-based download URL lookup
+    // GSI photoId-runnerEmail-index   : idempotency check in create-order
+    //
+    // Note: photographerId-claimedAt-index previously on this table is superseded
+    // by the same GSI on racephotos-orders (ADR-0010, RS-010).
     this.purchasesTable = new dynamodb.Table(this, 'PurchasesTable', {
       tableName: 'racephotos-purchases',
       partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
@@ -169,20 +211,13 @@ export class DatabaseConstruct extends Construct {
       projectionType: dynamodb.ProjectionType.ALL,
     });
 
-    // KEYS_ONLY: idempotency check in create-purchase only needs to know whether
-    // a (photoId, runnerEmail) record exists — it never reads attributes from this GSI.
+    // KEYS_ONLY: idempotency check in create-order only needs to resolve the
+    // purchase id — it never reads attributes from this GSI projection.
     this.purchasesTable.addGlobalSecondaryIndex({
       indexName: 'photoId-runnerEmail-index',
       partitionKey: { name: 'photoId', type: dynamodb.AttributeType.STRING },
       sortKey: { name: 'runnerEmail', type: dynamodb.AttributeType.STRING },
       projectionType: dynamodb.ProjectionType.KEYS_ONLY,
-    });
-
-    this.purchasesTable.addGlobalSecondaryIndex({
-      indexName: 'photographerId-claimedAt-index',
-      partitionKey: { name: 'photographerId', type: dynamodb.AttributeType.STRING },
-      sortKey: { name: 'claimedAt', type: dynamodb.AttributeType.STRING },
-      projectionType: dynamodb.ProjectionType.ALL,
     });
 
     // ── racephotos-photographers ──────────────────────────────────────────────

@@ -1,0 +1,403 @@
+package handler_test
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"testing"
+
+	"github.com/aws/aws-lambda-go/events"
+	"github.com/golang/mock/gomock"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/racephotos/create-order/handler"
+	"github.com/racephotos/create-order/handler/mocks"
+	"github.com/racephotos/shared/apperrors"
+	"github.com/racephotos/shared/models"
+)
+
+const (
+	testPhotographerID = "photographer-1"
+	testEventID        = "550e8400-e29b-41d4-a716-446655440001"
+	testPhotoID        = "photo-1"
+	testPhoto2ID       = "photo-2"
+	testRunnerEmail    = "runner@example.com"
+	testApprovalsURL   = "https://example.com/approvals"
+)
+
+var (
+	testPhoto = &models.Photo{
+		ID:               testPhotoID,
+		EventID:          testEventID,
+		Status:           models.PhotoStatusIndexed,
+		WatermarkedS3Key: "processed/photo-1.jpg",
+	}
+	testPhoto2 = &models.Photo{
+		ID:               testPhoto2ID,
+		EventID:          testEventID,
+		Status:           models.PhotoStatusIndexed,
+		WatermarkedS3Key: "processed/photo-2.jpg",
+	}
+	testEvent = &models.Event{
+		ID:             testEventID,
+		PhotographerID: testPhotographerID,
+		Name:           "Spring Race 2026",
+		PricePerPhoto:  75.0,
+		Currency:       "GTQ",
+	}
+	testPhotographer = &models.Photographer{
+		ID:                testPhotographerID,
+		Email:             "photographer@example.com",
+		DisplayName:       "Jane Photo",
+		BankName:          "Banco Industrial",
+		BankAccountNumber: "1234567890",
+		BankAccountHolder: "Jane Doe",
+		BankInstructions:  "Include payment ref in notes",
+	}
+)
+
+func makeReq(photoIDs []string, email string) events.APIGatewayV2HTTPRequest {
+	body, _ := json.Marshal(map[string]interface{}{
+		"photoIds":    photoIDs,
+		"runnerEmail": email,
+	})
+	return events.APIGatewayV2HTTPRequest{Body: string(body)}
+}
+
+func newHandler(ctrl *gomock.Controller) (
+	*handler.Handler,
+	*mocks.MockOrderStore,
+	*mocks.MockPurchaseStore,
+	*mocks.MockPhotoStore,
+	*mocks.MockEventStore,
+	*mocks.MockPhotographerStore,
+	*mocks.MockEmailSender,
+) {
+	orders := mocks.NewMockOrderStore(ctrl)
+	purchases := mocks.NewMockPurchaseStore(ctrl)
+	photos := mocks.NewMockPhotoStore(ctrl)
+	evStore := mocks.NewMockEventStore(ctrl)
+	phStore := mocks.NewMockPhotographerStore(ctrl)
+	email := mocks.NewMockEmailSender(ctrl)
+	h := &handler.Handler{
+		Orders:        orders,
+		Purchases:     purchases,
+		Photos:        photos,
+		Events:        evStore,
+		Photographers: phStore,
+		Email:         email,
+		ApprovalsURL:  testApprovalsURL,
+	}
+	return h, orders, purchases, photos, evStore, phStore, email
+}
+
+func TestHandle_HappyPath(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, orders, purchases, photos, evStore, phStore, email := newHandler(ctrl)
+
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+	orders.EXPECT().CreateOrder(gomock.Any(), gomock.Any()).Return(nil)
+	purchases.EXPECT().CreatePurchase(gomock.Any(), gomock.Any()).Return(nil)
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), testPhotographer.Email, "racephotos-photographer-claim", gomock.Any()).Return(nil)
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), testRunnerEmail, "racephotos-runner-claim-confirmation", gomock.Any()).Return(nil)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 201, resp.StatusCode)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(resp.Body), &body))
+	assert.NotEmpty(t, body["orderId"])
+	assert.NotEmpty(t, body["paymentRef"])
+	assert.Equal(t, 75.0, body["totalAmount"])
+	assert.Equal(t, "GTQ", body["currency"])
+	bd, ok := body["bankDetails"].(map[string]interface{})
+	require.True(t, ok)
+	assert.Equal(t, "Banco Industrial", bd["bankName"])
+}
+
+func TestHandle_HappyPath_MultiPhoto(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, orders, purchases, photos, evStore, phStore, email := newHandler(ctrl)
+
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhoto2ID).Return(testPhoto2, nil)
+	// checkIdempotency exits on first nil — only photo-1 is queried before returning allActive=false.
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+	orders.EXPECT().CreateOrder(gomock.Any(), gomock.Any()).Return(nil)
+	purchases.EXPECT().CreatePurchase(gomock.Any(), gomock.Any()).Return(nil).Times(2)
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID, testPhoto2ID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 201, resp.StatusCode)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(resp.Body), &body))
+	assert.Equal(t, 150.0, body["totalAmount"]) // 2 × 75.0
+}
+
+func TestHandle_Idempotent_AllPending_Returns200(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, orders, purchases, _, _, phStore, _ := newHandler(ctrl)
+
+	existingOrder := &models.Order{
+		ID:             "existing-order-1",
+		PaymentRef:     "RS-ABCD1234",
+		TotalAmount:    75.0,
+		Currency:       "GTQ",
+		PhotographerID: testPhotographerID,
+		Status:         models.OrderStatusPending,
+	}
+	existingPurchase := &models.Purchase{
+		ID:          "purchase-1",
+		OrderID:     "existing-order-1",
+		PhotoID:     testPhotoID,
+		RunnerEmail: testRunnerEmail,
+		Status:      models.OrderStatusPending,
+	}
+
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(existingPurchase, nil)
+	orders.EXPECT().GetOrderByID(gomock.Any(), "existing-order-1").Return(existingOrder, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(resp.Body), &body))
+	assert.Equal(t, "existing-order-1", body["orderId"])
+	assert.Equal(t, "RS-ABCD1234", body["paymentRef"])
+}
+
+func TestHandle_Idempotent_AllApproved_Returns200(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, orders, purchases, _, _, phStore, _ := newHandler(ctrl)
+
+	existingPurchase := &models.Purchase{
+		ID:      "purchase-1",
+		OrderID: "existing-order-2",
+		PhotoID: testPhotoID,
+		Status:  models.OrderStatusApproved,
+	}
+	existingOrder := &models.Order{
+		ID:             "existing-order-2",
+		PaymentRef:     "RS-ZZZZ0000",
+		TotalAmount:    75.0,
+		Currency:       "GTQ",
+		PhotographerID: testPhotographerID,
+		Status:         models.OrderStatusApproved,
+	}
+
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(existingPurchase, nil)
+	orders.EXPECT().GetOrderByID(gomock.Any(), "existing-order-2").Return(existingOrder, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 200, resp.StatusCode)
+}
+
+func TestHandle_Idempotent_RejectedPurchase_CreatesNew201(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, orders, purchases, photos, evStore, phStore, email := newHandler(ctrl)
+
+	rejectedPurchase := &models.Purchase{
+		ID:      "purchase-old",
+		OrderID: "order-old",
+		PhotoID: testPhotoID,
+		Status:  models.OrderStatusRejected,
+	}
+
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(rejectedPurchase, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
+	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+	orders.EXPECT().CreateOrder(gomock.Any(), gomock.Any()).Return(nil)
+	purchases.EXPECT().CreatePurchase(gomock.Any(), gomock.Any()).Return(nil)
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 201, resp.StatusCode)
+}
+
+func TestHandle_EmptyPhotoIds_Returns400(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, _, _, _, _, _ := newHandler(ctrl)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 400, resp.StatusCode)
+	assert.Contains(t, resp.Body, "at least one photo is required")
+}
+
+func TestHandle_InvalidEmail_Returns400(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, _, _, _, _, _ := newHandler(ctrl)
+
+	tests := []struct{ email string }{
+		{"not-an-email"},
+		{"@nodomain.com"},
+		{"no-at-sign"},
+		{""},
+	}
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.email, func(t *testing.T) {
+			resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, tc.email))
+			require.NoError(t, err)
+			assert.Equal(t, 400, resp.StatusCode)
+			assert.Contains(t, resp.Body, "invalid email address")
+		})
+	}
+}
+
+func TestHandle_PhotoNotFound_Returns404(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, purchases, photos, _, _, _ := newHandler(ctrl)
+
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(nil, apperrors.ErrNotFound)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 404, resp.StatusCode)
+	assert.Contains(t, resp.Body, "one or more photos not found")
+}
+
+func TestHandle_PhotoNotIndexed_Returns422(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, purchases, photos, _, _, _ := newHandler(ctrl)
+
+	processingPhoto := &models.Photo{
+		ID:      testPhotoID,
+		EventID: testEventID,
+		Status:  models.PhotoStatusProcessing,
+	}
+
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(processingPhoto, nil)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 422, resp.StatusCode)
+	assert.Contains(t, resp.Body, "not available for purchase")
+}
+
+func TestHandle_PhotosDifferentEvents_Returns422(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, purchases, photos, _, _, _ := newHandler(ctrl)
+
+	photo2DiffEvent := &models.Photo{
+		ID:      testPhoto2ID,
+		EventID: "different-event-id",
+		Status:  models.PhotoStatusIndexed,
+	}
+
+	// checkIdempotency exits on first nil — only photo-1 is queried before returning allActive=false.
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhoto2ID).Return(photo2DiffEvent, nil)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID, testPhoto2ID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 422, resp.StatusCode)
+	assert.Contains(t, resp.Body, "same event")
+}
+
+func TestHandle_InvalidBody_Returns400(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, _, _, _, _, _ := newHandler(ctrl)
+
+	resp, err := h.Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: "not json {"})
+	require.NoError(t, err)
+	assert.Equal(t, 400, resp.StatusCode)
+}
+
+func TestHandle_CreateOrderFails_Returns500(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, orders, purchases, photos, evStore, phStore, _ := newHandler(ctrl)
+
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
+	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+	orders.EXPECT().CreateOrder(gomock.Any(), gomock.Any()).Return(errors.New("dynamo unavailable"))
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 500, resp.StatusCode)
+}
+
+func TestHandle_EmailFailure_OrderStillCreated(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, orders, purchases, photos, evStore, phStore, email := newHandler(ctrl)
+
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
+	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+	orders.EXPECT().CreateOrder(gomock.Any(), gomock.Any()).Return(nil)
+	purchases.EXPECT().CreatePurchase(gomock.Any(), gomock.Any()).Return(nil)
+	// Both emails fail — order should still return 201.
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("SES error")).Times(2)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 201, resp.StatusCode)
+}
+
+func TestHandle_DeduplicatePhotoIds(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, orders, purchases, photos, evStore, phStore, email := newHandler(ctrl)
+
+	// Duplicate photoID in request — should be treated as a single photo.
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil).Times(1)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil).Times(1)
+	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+	orders.EXPECT().CreateOrder(gomock.Any(), gomock.Any()).Return(nil)
+	purchases.EXPECT().CreatePurchase(gomock.Any(), gomock.Any()).Return(nil).Times(1)
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID, testPhotoID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 201, resp.StatusCode)
+
+	var body map[string]interface{}
+	require.NoError(t, json.Unmarshal([]byte(resp.Body), &body))
+	// totalAmount = 1 × 75.0 (deduplicated)
+	assert.Equal(t, 75.0, body["totalAmount"])
+}
+
+func TestHandle_PaymentRefFormat(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, orders, purchases, photos, evStore, phStore, email := newHandler(ctrl)
+
+	var capturedOrder models.Order
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
+	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+	orders.EXPECT().CreateOrder(gomock.Any(), gomock.Any()).DoAndReturn(func(_ context.Context, o models.Order) error {
+		capturedOrder = o
+		return nil
+	})
+	purchases.EXPECT().CreatePurchase(gomock.Any(), gomock.Any()).Return(nil)
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 201, resp.StatusCode)
+
+	// Verify paymentRef format: RS- followed by 8 uppercase alphanumeric chars.
+	assert.Regexp(t, `^RS-[A-Z0-9]{8}$`, capturedOrder.PaymentRef)
+}

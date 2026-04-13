@@ -11,6 +11,7 @@ import {
 } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { Store } from '@ngrx/store';
+import { Actions, ofType } from '@ngrx/effects';
 import { MatDialog } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -33,11 +34,17 @@ import {
 } from '../../store/runner-photos/runner-photos.selectors';
 import { EventsActions } from '../../store/events/events.actions';
 import { selectSelectedEvent, selectEventsLoading } from '../../store/events/events.selectors';
+import { PurchasesActions } from '../../store/purchases/purchases.actions';
+import { selectActivePhotoId } from '../../store/purchases/purchases.selectors';
 import { RunnerPhotoGridComponent } from './photo-grid/photo-grid.component';
 import {
   PhotoDetailComponent,
   PhotoDetailDialogData,
 } from './photo-detail/photo-detail.component';
+import {
+  PurchaseStepperComponent,
+  PurchaseStepperDialogData,
+} from './purchase-stepper/purchase-stepper.component';
 import { MatDialogRef } from '@angular/material/dialog';
 
 @Component({
@@ -60,6 +67,7 @@ export class EventSearchComponent implements OnInit, OnDestroy {
   private readonly store = inject(Store);
   private readonly route = inject(ActivatedRoute);
   private readonly dialog = inject(MatDialog);
+  private readonly actions$ = inject(Actions);
   private readonly titleService = inject(Title);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly _destroyRef = inject(DestroyRef);
@@ -87,6 +95,7 @@ export class EventSearchComponent implements OnInit, OnDestroy {
   readonly eventId = computed(() => this.paramMap()?.get('id') ?? '');
 
   private dialogRef: MatDialogRef<PhotoDetailComponent> | null = null;
+  private purchaseDialogRef: MatDialogRef<PurchaseStepperComponent> | null = null;
 
   constructor() {
     // Load event metadata when route param changes.
@@ -136,6 +145,47 @@ export class EventSearchComponent implements OnInit, OnDestroy {
         this.dialogRef = null;
       }
     });
+
+    // When the runner initiates a purchase: close the photo-detail dialog and open the stepper.
+    this.actions$
+      .pipe(ofType(PurchasesActions.initiatePurchase), takeUntilDestroyed(this._destroyRef))
+      .subscribe(({ photoId }) => {
+        // Close the photo-detail dialog without dispatching deselectPhoto twice
+        // (afterClosed() subscription handles deselectPhoto).
+        if (this.dialogRef) {
+          this.dialogRef.close();
+          this.dialogRef = null;
+        }
+
+        const data: PurchaseStepperDialogData = { photoId };
+        this.purchaseDialogRef = this.dialog.open(PurchaseStepperComponent, {
+          data,
+          width: '560px',
+          maxWidth: '100vw',
+          height: 'auto',
+          maxHeight: '90vh',
+          panelClass: 'purchase-stepper-dialog',
+          disableClose: true,
+        });
+
+        this.purchaseDialogRef
+          .afterClosed()
+          .pipe(takeUntilDestroyed(this._destroyRef))
+          .subscribe(() => {
+            // Guard: only dispatch resetPurchase if the store still has an active photo,
+            // meaning the dialog was closed by backdrop/external means rather than the
+            // "Done" button which already dispatched resetPurchase.
+            this.store
+              .select(selectActivePhotoId)
+              .subscribe((activeId) => {
+                if (activeId) {
+                  this.store.dispatch(PurchasesActions.resetPurchase());
+                }
+              })
+              .unsubscribe();
+            this.purchaseDialogRef = null;
+          });
+      });
   }
 
   ngOnInit(): void {

@@ -3,6 +3,9 @@ import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
+import { provideMockActions } from '@ngrx/effects/testing';
+import { Subject } from 'rxjs';
+import { Action } from '@ngrx/store';
 import { of } from 'rxjs';
 
 import { EventSearchComponent } from './event-search.component';
@@ -21,6 +24,7 @@ import {
   selectSelectedEvent,
   selectEventsLoading,
 } from '../../store/events/events.selectors';
+import { selectActivePhotoId } from '../../store/purchases/purchases.selectors';
 
 const mockEvent = {
   id: 'event-123',
@@ -54,12 +58,16 @@ describe('EventSearchComponent', () => {
   let fixture: ComponentFixture<EventSearchComponent>;
   let component: EventSearchComponent;
   let store: MockStore;
+  let actions$: Subject<Action>;
   let dialogSpy: jasmine.SpyObj<MatDialog>;
   let dialogRefSpy: jasmine.SpyObj<MatDialogRef<unknown>>;
 
   beforeEach(async () => {
-    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['afterClosed', 'close']);
+    actions$ = new Subject<Action>();
+
+    dialogRefSpy = jasmine.createSpyObj('MatDialogRef', ['afterClosed', 'close', 'backdropClick']);
     dialogRefSpy.afterClosed.and.returnValue(of(undefined));
+    dialogRefSpy.backdropClick = jasmine.createSpy().and.returnValue(of(undefined));
 
     dialogSpy = jasmine.createSpyObj('MatDialog', ['open']);
     dialogSpy.open.and.returnValue(dialogRefSpy);
@@ -68,6 +76,7 @@ describe('EventSearchComponent', () => {
       imports: [NoopAnimationsModule, EventSearchComponent],
       providers: [
         provideMockStore(),
+        provideMockActions(() => actions$),
         { provide: ActivatedRoute, useValue: buildActivatedRoute('event-123') },
         { provide: MatDialog, useValue: dialogSpy },
       ],
@@ -85,6 +94,7 @@ describe('EventSearchComponent', () => {
     store.overrideSelector(selectSelectedPhoto, null);
     store.overrideSelector(selectSelectedEvent, null);
     store.overrideSelector(selectEventsLoading, false);
+    store.overrideSelector(selectActivePhotoId, null);
 
     spyOn(store, 'dispatch');
 

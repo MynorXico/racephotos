@@ -1,0 +1,47 @@
+<div mat-dialog-title class="dialog-title-bar">
+  <h2 class="dialog-title">Purchase photo</h2>
+  <button
+    mat-icon-button
+    class="close-btn"
+    aria-label="Close purchase dialog"
+    (click)="onClose()"
+  >
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<mat-dialog-content class="dialog-content">
+  <mat-stepper #stepper linear orientation="horizontal" class="purchase-stepper">
+
+    <!-- Step 1: Email -->
+    <mat-step label="Your email" [editable]="false" [completed]="false">
+      <app-email-step
+        [loading]="loading()"
+        [error]="error()"
+        [maskedEmail]="maskedEmail()"
+        (emailConfirmed)="onEmailConfirmed($event)"
+        (errorDismissed)="onErrorDismissed()"
+      />
+    </mat-step>
+
+    <!-- Step 2: Bank transfer -->
+    <mat-step label="Bank transfer" [editable]="false" [completed]="false">
+      <app-bank-details-step
+        [paymentRef]="paymentRef()"
+        [totalAmount]="totalAmount()"
+        [currency]="currency()"
+        [bankDetails]="bankDetails()"
+        (transferConfirmed)="onTransferConfirmed()"
+      />
+    </mat-step>
+
+    <!-- Step 3: Confirmation -->
+    <mat-step label="Done" [editable]="false" [completed]="false">
+      <app-confirmation-step
+        [maskedEmail]="maskedEmail()"
+        (purchaseDone)="onDone()"
+      />
+    </mat-step>
+
+  </mat-stepper>
+</mat-dialog-content>

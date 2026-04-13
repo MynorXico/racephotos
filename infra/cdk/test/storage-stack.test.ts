@@ -171,9 +171,9 @@ describe('PhotoStorageConstruct', () => {
 // ── DatabaseConstruct ─────────────────────────────────────────────────────────
 
 describe('DatabaseConstruct', () => {
-  test('creates exactly six DynamoDB tables', () => {
+  test('creates exactly seven DynamoDB tables', () => {
     const t = makeTemplate(devConfig);
-    t.resourceCountIs('AWS::DynamoDB::Table', 6);
+    t.resourceCountIs('AWS::DynamoDB::Table', 7);
   });
 
   test('all tables use PAY_PER_REQUEST billing', () => {
@@ -220,7 +220,23 @@ describe('DatabaseConstruct', () => {
     });
   });
 
-  test('racephotos-purchases table has correct PK and five GSIs', () => {
+  test('racephotos-orders table has correct PK and three GSIs (ADR-0010)', () => {
+    const t = makeTemplate(devConfig);
+    t.hasResourceProperties('AWS::DynamoDB::Table', {
+      TableName: 'racephotos-orders',
+      KeySchema: [{ AttributeName: 'id', KeyType: 'HASH' }],
+      GlobalSecondaryIndexes: Match.arrayWith([
+        Match.objectLike({ IndexName: 'runnerEmail-claimedAt-index' }),
+        Match.objectLike({ IndexName: 'photographerId-claimedAt-index' }),
+        Match.objectLike({
+          IndexName: 'paymentRef-index',
+          Projection: Match.objectLike({ ProjectionType: 'KEYS_ONLY' }),
+        }),
+      ]),
+    });
+  });
+
+  test('racephotos-purchases table has correct PK and four GSIs', () => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::DynamoDB::Table', {
       TableName: 'racephotos-purchases',
@@ -233,9 +249,9 @@ describe('DatabaseConstruct', () => {
           IndexName: 'photoId-runnerEmail-index',
           Projection: Match.objectLike({ ProjectionType: 'KEYS_ONLY' }),
         }),
-        Match.objectLike({ IndexName: 'photographerId-claimedAt-index' }),
       ]),
     });
+    // photographerId-claimedAt-index removed — superseded by same GSI on racephotos-orders (ADR-0010)
   });
 
   test('racephotos-photographers table has simple PK', () => {

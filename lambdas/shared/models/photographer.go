@@ -9,6 +9,7 @@ package models
 // these fields before returning the response.
 type Photographer struct {
 	ID                string `dynamodbav:"id"                json:"id"`
+	Email             string `dynamodbav:"email"             json:"email"`
 	DisplayName       string `dynamodbav:"displayName"       json:"displayName"`
 	DefaultCurrency   string `dynamodbav:"defaultCurrency"   json:"defaultCurrency"` // ISO 4217
 	BankName          string `dynamodbav:"bankName"          json:"bankName"`

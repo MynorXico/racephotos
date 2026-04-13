@@ -1,0 +1,38 @@
+.dialog-title-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 0;
+}
+
+.dialog-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--mat-sys-on-surface);
+}
+
+.close-btn {
+  margin-right: -8px;
+}
+
+.dialog-content {
+  padding: 16px;
+  max-height: calc(90vh - 80px);
+  overflow-y: auto;
+}
+
+.purchase-stepper {
+  // Remove default Material stepper background
+  background: transparent;
+
+  // Hide the back button on all steps — runner cannot go back once submitted
+  ::ng-deep .mat-stepper-previous {
+    display: none;
+  }
+
+  // Step content padding
+  ::ng-deep .mat-step-body {
+    padding-top: 16px;
+  }
+}

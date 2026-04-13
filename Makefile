@@ -1,6 +1,6 @@
-.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark test-watermark invoke-list-event-photos invoke-search
+.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark test-watermark invoke-list-event-photos invoke-search invoke-create-order
 
-LAMBDAS := presign-photos photo-processor watermark search payment get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events list-event-photos
+LAMBDAS := presign-photos photo-processor watermark search payment create-order get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events list-event-photos
 
 # Run all tests
 test: test-unit test-integration
@@ -32,7 +32,7 @@ test-integration:
 # Each Lambda is built in a subshell so a failure exits immediately (|| exit 1)
 # and the working directory is never left in a corrupted state.
 # CGO_ENABLED=0 ensures static linking — avoids GLIBC version mismatches on AL2023.
-ARM64_LAMBDAS := presign-photos list-event-photos search
+ARM64_LAMBDAS := presign-photos list-event-photos search create-order
 build:
 	@for lambda in $(LAMBDAS); do \
 		if [ -d lambdas/$$lambda ]; then \
@@ -156,6 +156,9 @@ invoke-list-event-photos:
 
 invoke-search:
 	$(call invoke_lambda,search,SearchFunction)
+
+invoke-create-order:
+	$(call invoke_lambda,create-order,CreateOrderFunction)
 
 ## test-watermark: apply watermark locally and open the result — no AWS needed.
 ## Usage:
