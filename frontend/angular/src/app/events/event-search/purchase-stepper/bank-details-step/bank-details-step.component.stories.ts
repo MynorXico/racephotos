@@ -14,7 +14,9 @@ const fullBankDetails: BankDetails = {
 };
 
 const noopClipboard = { copy: (_: string) => true };
-const noopSnackBar = { open: () => ({ onAction: () => ({ subscribe: () => {} }) }) };
+const noopSnackBar = {
+  open: () => ({ onAction: () => ({ subscribe: (_fn: () => void) => void 0 }) }),
+};
 
 const meta: Meta<BankDetailsStepComponent> = {
   title: 'Runner/Purchase Flow/BankDetailsStepComponent',

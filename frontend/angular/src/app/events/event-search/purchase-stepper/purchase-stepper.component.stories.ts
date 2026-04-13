@@ -19,8 +19,10 @@ import {
   selectBankDetails,
 } from '../../../store/purchases/purchases.selectors';
 
+// eslint-disable-next-line @typescript-eslint/no-empty-function
+const noop = () => {};
 const noopDialogRef = {
-  close: () => {},
+  close: noop,
   backdropClick: () => EMPTY,
   afterClosed: () => EMPTY,
 };
@@ -47,7 +49,7 @@ const sharedProviders = [
   { provide: MAT_DIALOG_DATA, useValue: { photoId: 'photo-1' } },
   { provide: MatDialogRef, useValue: noopDialogRef },
   { provide: Clipboard, useValue: { copy: () => true } },
-  { provide: MatSnackBar, useValue: { open: () => {} } },
+  { provide: MatSnackBar, useValue: { open: noop } },
   provideMockActions(() => new Subject()),
 ];
 
