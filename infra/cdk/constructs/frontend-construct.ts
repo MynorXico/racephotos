@@ -185,21 +185,22 @@ export class FrontendConstruct extends Construct {
       description: `CloudFront domain for ${config.envName} — consumed by ApiConstruct CORS`,
     });
 
+    // Base URL used in all outbound links — respects custom domain when configured.
+    const frontendUrl = hasCustomDomain
+      ? `https://${config.domainName}`
+      : `https://${distribution.distributionDomainName}`;
+
     // Photographer approvals dashboard URL — consumed by PaymentConstruct
     // (create-order Lambda injects it into the SES email sent to photographers).
     new ssm.StringParameter(this, 'ApprovalsUrlParam', {
       parameterName: `/racephotos/env/${config.envName}/approvals-url`,
-      stringValue: hasCustomDomain
-        ? `https://${config.domainName}/photographer/approvals`
-        : `https://${distribution.distributionDomainName}/photographer/approvals`,
+      stringValue: `${frontendUrl}/photographer/approvals`,
       description: `Photographer approvals dashboard URL for ${config.envName}`,
     });
 
     // ── CloudFormation outputs ─────────────────────────────────────────────
     new cdk.CfnOutput(this, 'FrontendUrl', {
-      value: hasCustomDomain
-        ? `https://${config.domainName}`
-        : `https://${distribution.distributionDomainName}`,
+      value: frontendUrl,
       description: `Frontend URL — ${config.envName}`,
     });
 
