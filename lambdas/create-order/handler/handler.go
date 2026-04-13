@@ -29,6 +29,11 @@ const paymentRefChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 // paymentRefRandLen is the length of the random suffix appended to "RS-".
 const paymentRefRandLen = 8
 
+// maxPhotoIDs caps the number of photos in a single order to limit DynamoDB cost
+// amplification on this unauthenticated endpoint. RS-011 (multi-photo cart) will not
+// exceed this limit in its v1 scope.
+const maxPhotoIDs = 20
+
 // Handler holds dependencies for POST /orders.
 type Handler struct {
 	Orders        OrderStore
@@ -72,6 +77,11 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(400, "at least one photo is required"), nil
 	}
 
+	// Guard against cost-amplification on this unauthenticated endpoint.
+	if len(req.PhotoIDs) > maxPhotoIDs {
+		return errResponse(400, fmt.Sprintf("too many photos in one order (max %d)", maxPhotoIDs)), nil
+	}
+
 	// AC7: validate email format.
 	if !emailRE.MatchString(req.RunnerEmail) {
 		return errResponse(400, "invalid email address"), nil
@@ -79,6 +89,13 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 
 	// Deduplicate photoIds preserving order (guards against accidental double-sends).
 	photoIDs := deduplicate(req.PhotoIDs)
+
+	// Reject empty-string photoIds that survive deduplication.
+	for _, id := range photoIDs {
+		if id == "" {
+			return errResponse(400, "photoIds must not contain empty values"), nil
+		}
+	}
 
 	// AC2: Idempotency — check whether all (photoId, runnerEmail) pairs already have
 	// an active (pending/approved) Purchase. If so, return the existing Order (HTTP 200).
@@ -176,9 +193,9 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	// AC9: confirm to runner.
 	h.sendRunnerEmail(ctx, req.RunnerEmail, ev, paymentRef, totalAmount)
 
+	// paymentRef is a financial identifier — never log it in plain text (CLAUDE.md).
 	slog.InfoContext(ctx, "order created",
 		slog.String("orderID", orderID),
-		slog.String("paymentRef", paymentRef),
 		slog.Int("photoCount", len(photoIDs)),
 	)
 

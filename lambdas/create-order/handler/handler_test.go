@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -376,6 +377,32 @@ func TestHandle_DeduplicatePhotoIds(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(resp.Body), &body))
 	// totalAmount = 1 × 75.0 (deduplicated)
 	assert.Equal(t, 75.0, body["totalAmount"])
+}
+
+func TestHandle_TooManyPhotoIds_Returns400(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, _, _, _, _, _ := newHandler(ctrl)
+
+	// 21 unique photo IDs — one over the cap.
+	photoIDs := make([]string, 21)
+	for i := range photoIDs {
+		photoIDs[i] = fmt.Sprintf("photo-%d", i+1)
+	}
+
+	resp, err := h.Handle(context.Background(), makeReq(photoIDs, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 400, resp.StatusCode)
+	assert.Contains(t, resp.Body, "too many photos")
+}
+
+func TestHandle_EmptyStringPhotoId_Returns400(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, _, _, _, _, _ := newHandler(ctrl)
+
+	resp, err := h.Handle(context.Background(), makeReq([]string{""}, testRunnerEmail))
+	require.NoError(t, err)
+	assert.Equal(t, 400, resp.StatusCode)
+	assert.Contains(t, resp.Body, "must not contain empty values")
 }
 
 func TestHandle_PaymentRefFormat(t *testing.T) {
