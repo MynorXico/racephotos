@@ -11,6 +11,7 @@ import { EventStack } from '../stacks/event-stack';
 import { PhotoUploadStack } from '../stacks/photo-upload-stack';
 import { PhotoProcessingStack } from '../stacks/photo-processing-stack';
 import { SearchStack } from '../stacks/search-stack';
+import { PaymentStack } from '../stacks/payment-stack';
 
 interface RacePhotosStageProps extends cdk.StageProps {
   config: EnvConfig;
@@ -125,6 +126,19 @@ export class RacePhotosStage extends cdk.Stage {
     });
     searchStack.addDependency(storage);
     searchStack.addDependency(auth);
+
+    // PaymentStack — RS-010
+    // create-order Lambda: POST /orders (public, no auth)
+    // Depends on StorageStack (tables) and AuthStack (API) and SesStack (email).
+    const paymentStack = new PaymentStack(this, 'Payment', {
+      env: props.env,
+      config,
+      db: storage.db,
+      ses: ses.ses,
+    });
+    paymentStack.addDependency(storage);
+    paymentStack.addDependency(auth);
+    paymentStack.addDependency(ses);
 
     // FrontendStack — Angular SPA on S3 + CloudFront.
     // FrontendConstruct reads apiBaseUrl, userPoolId, and clientId from SSM via

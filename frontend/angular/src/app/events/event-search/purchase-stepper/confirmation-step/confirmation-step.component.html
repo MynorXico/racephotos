@@ -1,0 +1,21 @@
+<div class="confirmation-body">
+  <mat-icon aria-hidden="true" class="success-icon">check_circle_outline</mat-icon>
+
+  <h2 class="headline" cdkFocusInitial tabindex="-1">Payment claim submitted</h2>
+
+  <p class="body-text">
+    Your payment claim has been submitted. The photographer will review it and
+    you'll receive an email once approved.
+  </p>
+
+  @if (maskedEmail) {
+    <p class="email-reminder">
+      A confirmation has been sent to <strong>{{ maskedEmail }}</strong>.
+    </p>
+  }
+
+  <div class="action-row">
+    <button mat-flat-button color="primary" class="done-btn" (click)="onDone()">Done</button>
+
+  </div>
+</div>

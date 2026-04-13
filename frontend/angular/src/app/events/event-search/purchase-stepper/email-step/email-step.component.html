@@ -1,0 +1,61 @@
+<p class="instruction">Enter your email to receive payment instructions and download links.</p>
+
+<mat-form-field appearance="outline" class="email-field">
+  <mat-label>Email address</mat-label>
+  <input
+    matInput
+    type="email"
+    placeholder="you@example.com"
+    [formControl]="emailControl"
+    autocomplete="email"
+  />
+  @if (emailControl.hasError('required') && emailControl.touched) {
+    <mat-error>Email address is required.</mat-error>
+  } @else if (emailControl.hasError('email') && emailControl.touched) {
+    <mat-error>Enter a valid email address.</mat-error>
+  }
+</mat-form-field>
+
+@if (!error && showPreview) {
+  <mat-card appearance="outlined" class="preview-card" role="status">
+    <mat-card-content class="preview-content">
+      <mat-icon aria-hidden="true">mail_outline</mat-icon>
+      <span>
+        We'll send updates to <strong>{{ maskedEmail ?? emailControl.value[0] + '***@...' }}</strong> — is this correct?
+      </span>
+    </mat-card-content>
+  </mat-card>
+}
+
+@if (error) {
+  <mat-card appearance="outlined" class="error-card" role="alert">
+    <mat-card-content class="error-content">
+      <mat-icon aria-hidden="true" class="error-icon">error_outline</mat-icon>
+      <span class="error-message">{{ error }}</span>
+      <a
+        href="javascript:void(0)"
+        (click)="onTryAgain()"
+        aria-label="Clear error and try again"
+        class="try-again-link"
+      >Try again</a>
+    </mat-card-content>
+  </mat-card>
+}
+
+<div class="action-row">
+  <button
+    mat-flat-button
+    color="primary"
+    class="confirm-btn"
+    [disabled]="emailControl.invalid || loading"
+    [attr.aria-busy]="loading"
+    (click)="onConfirm()"
+  >
+    @if (loading) {
+      <mat-spinner diameter="20" mode="indeterminate" />
+      Submitting&hellip;
+    } @else {
+      Confirm and continue
+    }
+  </button>
+</div>

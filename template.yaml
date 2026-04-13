@@ -114,3 +114,20 @@ Resources:
           RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
           RACEPHOTOS_EVENTS_TABLE: racephotos-events
           RACEPHOTOS_PHOTO_CDN_DOMAIN: localhost:4566
+
+
+  CreateOrderFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-create-order-local
+      Handler: bootstrap
+      CodeUri: lambdas/create-order/
+      Environment:
+        Variables:
+          RACEPHOTOS_ORDERS_TABLE: racephotos-orders
+          RACEPHOTOS_PURCHASES_TABLE: racephotos-purchases
+          RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
+          RACEPHOTOS_EVENTS_TABLE: racephotos-events
+          RACEPHOTOS_PHOTOGRAPHERS_TABLE: racephotos-photographers
+          RACEPHOTOS_SES_FROM_ADDRESS: noreply@example.com
+          RACEPHOTOS_APPROVALS_URL: http://localhost:4200/approvals

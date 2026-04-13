@@ -1,0 +1,54 @@
+:host {
+  display: block;
+  padding: 16px 0;
+}
+
+.confirmation-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.success-icon {
+  font-size: 96px;
+  width: 96px;
+  height: 96px;
+  color: var(--mat-sys-primary);
+}
+
+.headline {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--mat-sys-on-surface);
+  outline: none;
+}
+
+.body-text {
+  margin: 0;
+  font-size: 14px;
+  color: var(--mat-sys-on-surface-variant);
+  max-width: 400px;
+}
+
+.email-reminder {
+  margin: 0;
+  font-size: 13px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.action-row {
+  margin-top: 8px;
+  display: flex;
+  justify-content: center;
+}
+
+.done-btn {
+  min-width: 120px;
+
+  @media (max-width: 374px) {
+    width: 100%;
+  }
+}

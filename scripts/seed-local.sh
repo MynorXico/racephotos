@@ -35,6 +35,7 @@ PROCESSED_BUCKET="racephotos-processed-${ENV_NAME}"
 EVENTS_TABLE="racephotos-events"
 PHOTOS_TABLE="racephotos-photos"
 BIB_INDEX_TABLE="racephotos-bib-index"
+ORDERS_TABLE="racephotos-orders"
 PURCHASES_TABLE="racephotos-purchases"
 PHOTOGRAPHERS_TABLE="racephotos-photographers"
 RATE_LIMITS_TABLE="racephotos-rate-limits"
@@ -187,7 +188,49 @@ $AWS dynamodb create-table \
   2>/dev/null || true
 log "table: ${BIB_INDEX_TABLE}"
 
-# racephotos-purchases — PK: id, 5 GSIs
+# racephotos-orders — PK: id, 3 GSIs (ADR-0010)
+# photographerId-claimedAt-index supersedes the same GSI that was previously on purchases.
+$AWS dynamodb create-table \
+  --table-name "${ORDERS_TABLE}" \
+  --attribute-definitions \
+    AttributeName=id,AttributeType=S \
+    AttributeName=runnerEmail,AttributeType=S \
+    AttributeName=claimedAt,AttributeType=S \
+    AttributeName=photographerId,AttributeType=S \
+    AttributeName=paymentRef,AttributeType=S \
+  --key-schema \
+    AttributeName=id,KeyType=HASH \
+  --global-secondary-indexes '[
+    {
+      "IndexName": "runnerEmail-claimedAt-index",
+      "KeySchema": [
+        {"AttributeName":"runnerEmail","KeyType":"HASH"},
+        {"AttributeName":"claimedAt","KeyType":"RANGE"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
+    },
+    {
+      "IndexName": "photographerId-claimedAt-index",
+      "KeySchema": [
+        {"AttributeName":"photographerId","KeyType":"HASH"},
+        {"AttributeName":"claimedAt","KeyType":"RANGE"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
+    },
+    {
+      "IndexName": "paymentRef-index",
+      "KeySchema": [
+        {"AttributeName":"paymentRef","KeyType":"HASH"}
+      ],
+      "Projection": {"ProjectionType":"KEYS_ONLY"}
+    }
+  ]' \
+  --billing-mode PAY_PER_REQUEST \
+  2>/dev/null || true
+log "table: ${ORDERS_TABLE}"
+
+# racephotos-purchases — PK: id, 4 GSIs (RS-010)
+# photographerId-claimedAt-index removed — superseded by same GSI on racephotos-orders (ADR-0010).
 $AWS dynamodb create-table \
   --table-name "${PURCHASES_TABLE}" \
   --attribute-definitions \
@@ -196,7 +239,6 @@ $AWS dynamodb create-table \
     AttributeName=claimedAt,AttributeType=S \
     AttributeName=runnerEmail,AttributeType=S \
     AttributeName=downloadToken,AttributeType=S \
-    AttributeName=photographerId,AttributeType=S \
   --key-schema \
     AttributeName=id,KeyType=HASH \
   --global-secondary-indexes '[
@@ -229,15 +271,7 @@ $AWS dynamodb create-table \
         {"AttributeName":"photoId","KeyType":"HASH"},
         {"AttributeName":"runnerEmail","KeyType":"RANGE"}
       ],
-      "Projection": {"ProjectionType":"ALL"}
-    },
-    {
-      "IndexName": "photographerId-claimedAt-index",
-      "KeySchema": [
-        {"AttributeName":"photographerId","KeyType":"HASH"},
-        {"AttributeName":"claimedAt","KeyType":"RANGE"}
-      ],
-      "Projection": {"ProjectionType":"ALL"}
+      "Projection": {"ProjectionType":"KEYS_ONLY"}
     }
   ]' \
   --billing-mode PAY_PER_REQUEST \
@@ -466,6 +500,7 @@ echo "   RACEPHOTOS_PROCESSED_BUCKET=${PROCESSED_BUCKET}"
 echo "   RACEPHOTOS_EVENTS_TABLE=${EVENTS_TABLE}"
 echo "   RACEPHOTOS_PHOTOS_TABLE=${PHOTOS_TABLE}"
 echo "   RACEPHOTOS_BIB_INDEX_TABLE=${BIB_INDEX_TABLE}"
+echo "   RACEPHOTOS_ORDERS_TABLE=${ORDERS_TABLE}"
 echo "   RACEPHOTOS_PURCHASES_TABLE=${PURCHASES_TABLE}"
 echo "   RACEPHOTOS_PHOTOGRAPHERS_TABLE=${PHOTOGRAPHERS_TABLE}"
 echo "   RACEPHOTOS_RATE_LIMITS_TABLE=${RATE_LIMITS_TABLE}"

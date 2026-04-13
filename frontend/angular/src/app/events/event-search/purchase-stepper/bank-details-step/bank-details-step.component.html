@@ -1,0 +1,66 @@
+<p class="instruction">
+  Transfer the amount below to the bank account shown. Use the payment reference
+  exactly as shown so the photographer can identify your payment.
+</p>
+
+<div class="amount-block">
+  <span class="amount-text">{{ formatAmount(totalAmount, currency) }}</span>
+</div>
+
+<mat-card appearance="outlined" class="ref-card">
+  <mat-card-content class="ref-content">
+    <div class="ref-label">Payment reference</div>
+    <div class="ref-row">
+      <span
+        class="ref-value mono"
+        [attr.aria-label]="'Payment reference: ' + paymentRef"
+      >{{ paymentRef }}</span>
+      <button
+        mat-icon-button
+        aria-label="Copy payment reference"
+        (click)="copyRef()"
+      >
+        <mat-icon>{{ copiedRef() ? 'check' : 'content_copy' }}</mat-icon>
+      </button>
+    </div>
+  </mat-card-content>
+</mat-card>
+
+@if (bankDetails) {
+  <mat-card appearance="outlined" class="bank-card">
+    <mat-card-content>
+      <div class="bank-label">Bank account</div>
+      <div class="bank-name">{{ bankDetails.bankName }}</div>
+      <div class="bank-holder">{{ bankDetails.bankAccountHolder }}</div>
+      <div class="bank-row">
+        <span
+          class="bank-number mono"
+          [attr.aria-label]="'Account number: ' + bankDetails.bankAccountNumber"
+        >{{ bankDetails.bankAccountNumber }}</span>
+        <button
+          mat-icon-button
+          aria-label="Copy account number"
+          (click)="copyAccount()"
+        >
+          <mat-icon>{{ copiedAccount() ? 'check' : 'content_copy' }}</mat-icon>
+        </button>
+      </div>
+
+      @if (bankDetails.bankInstructions) {
+        <mat-card appearance="outlined" class="instructions-card" role="note">
+          <mat-card-content class="instructions-content">
+            <mat-icon aria-hidden="true">info_outline</mat-icon>
+            <span class="instructions-label">Additional instructions</span>
+            <p class="instructions-text">{{ bankDetails.bankInstructions }}</p>
+          </mat-card-content>
+        </mat-card>
+      }
+    </mat-card-content>
+  </mat-card>
+}
+
+<div class="action-row">
+  <button mat-flat-button color="primary" class="confirm-btn" (click)="onConfirm()">
+    I've made the transfer
+  </button>
+</div>
