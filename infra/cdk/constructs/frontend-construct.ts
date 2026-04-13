@@ -189,7 +189,9 @@ export class FrontendConstruct extends Construct {
     // (create-order Lambda injects it into the SES email sent to photographers).
     new ssm.StringParameter(this, 'ApprovalsUrlParam', {
       parameterName: `/racephotos/env/${config.envName}/approvals-url`,
-      stringValue: `https://${distribution.distributionDomainName}/photographer/approvals`,
+      stringValue: hasCustomDomain
+        ? `https://${config.domainName}/photographer/approvals`
+        : `https://${distribution.distributionDomainName}/photographer/approvals`,
       description: `Photographer approvals dashboard URL for ${config.envName}`,
     });
 
