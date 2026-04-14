@@ -77,31 +77,27 @@ export class PurchaseStepperComponent implements OnInit, OnDestroy {
   constructor(@Inject(MAT_DIALOG_DATA) public readonly data: PurchaseStepperDialogData) {}
 
   ngOnInit(): void {
-    // Advance to step 2 when the email submission succeeds.
     // MatStepper (linear mode) blocks next() unless the current step is marked
     // completed — set it before calling next(), then trigger OnPush re-render.
+    // steps.get() avoids the array allocation of toArray()[index].
+    const advanceStepper = () => {
+      if (this.stepper) {
+        const current = this.stepper.steps.get(this.stepper.selectedIndex);
+        if (current) current.completed = true;
+        this.stepper.next();
+        this.cdr.markForCheck();
+      }
+    };
+
+    // Advance to step 2 when the email submission succeeds.
     this.actions$
       .pipe(ofType(PurchasesActions.submitEmailSuccess), takeUntil(this.destroy$))
-      .subscribe(() => {
-        if (this.stepper) {
-          const current = this.stepper.steps.toArray()[this.stepper.selectedIndex];
-          if (current) current.completed = true;
-          this.stepper.next();
-          this.cdr.markForCheck();
-        }
-      });
+      .subscribe(advanceStepper);
 
     // Advance to step 3 when the runner confirms the transfer.
     this.actions$
       .pipe(ofType(PurchasesActions.confirmTransfer), takeUntil(this.destroy$))
-      .subscribe(() => {
-        if (this.stepper) {
-          const current = this.stepper.steps.toArray()[this.stepper.selectedIndex];
-          if (current) current.completed = true;
-          this.stepper.next();
-          this.cdr.markForCheck();
-        }
-      });
+      .subscribe(advanceStepper);
 
     // Close the dialog when resetPurchase is dispatched.
     this.actions$
