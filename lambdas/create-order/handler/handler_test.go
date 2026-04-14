@@ -58,11 +58,13 @@ var (
 	}
 )
 
-func makeReq(photoIDs []string, email string) events.APIGatewayV2HTTPRequest {
-	body, _ := json.Marshal(map[string]interface{}{
+func makeReq(t *testing.T, photoIDs []string, email string) events.APIGatewayV2HTTPRequest {
+	t.Helper()
+	body, err := json.Marshal(map[string]interface{}{
 		"photoIds":    photoIDs,
 		"runnerEmail": email,
 	})
+	require.NoError(t, err)
 	return events.APIGatewayV2HTTPRequest{Body: string(body)}
 }
 
@@ -108,7 +110,7 @@ func TestHandle_HappyPath(t *testing.T) {
 	email.EXPECT().SendTemplatedEmail(gomock.Any(), testPhotographer.Email, "racephotos-photographer-claim", gomock.Any()).Return(nil)
 	email.EXPECT().SendTemplatedEmail(gomock.Any(), testRunnerEmail, "racephotos-runner-claim-confirmation", gomock.Any()).Return(nil)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 201, resp.StatusCode)
 
@@ -136,7 +138,7 @@ func TestHandle_HappyPath_MultiPhoto(t *testing.T) {
 	writer.EXPECT().CreateOrderWithPurchases(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID, testPhoto2ID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID, testPhoto2ID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 201, resp.StatusCode)
 
@@ -169,7 +171,7 @@ func TestHandle_Idempotent_AllPending_Returns200(t *testing.T) {
 	orders.EXPECT().GetOrderByID(gomock.Any(), "existing-order-1").Return(existingOrder, nil)
 	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 
@@ -202,7 +204,7 @@ func TestHandle_Idempotent_AllApproved_Returns200(t *testing.T) {
 	orders.EXPECT().GetOrderByID(gomock.Any(), "existing-order-2").Return(existingOrder, nil)
 	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 200, resp.StatusCode)
 }
@@ -225,7 +227,7 @@ func TestHandle_Idempotent_RejectedPurchase_CreatesNew201(t *testing.T) {
 	writer.EXPECT().CreateOrderWithPurchases(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 201, resp.StatusCode)
 }
@@ -234,7 +236,7 @@ func TestHandle_EmptyPhotoIds_Returns400(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	h, _, _, _, _, _, _, _ := newHandler(ctrl)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 400, resp.StatusCode)
 	assert.Contains(t, resp.Body, "at least one photo is required")
@@ -253,7 +255,7 @@ func TestHandle_InvalidEmail_Returns400(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.email, func(t *testing.T) {
-			resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, tc.email))
+			resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, tc.email))
 			require.NoError(t, err)
 			assert.Equal(t, 400, resp.StatusCode)
 			assert.Contains(t, resp.Body, "invalid email address")
@@ -268,7 +270,7 @@ func TestHandle_PhotoNotFound_Returns404(t *testing.T) {
 	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
 	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(nil, apperrors.ErrNotFound)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 404, resp.StatusCode)
 	assert.Contains(t, resp.Body, "one or more photos not found")
@@ -287,7 +289,7 @@ func TestHandle_PhotoNotIndexed_Returns422(t *testing.T) {
 	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
 	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(processingPhoto, nil)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 422, resp.StatusCode)
 	assert.Contains(t, resp.Body, "not available for purchase")
@@ -308,7 +310,7 @@ func TestHandle_PhotosDifferentEvents_Returns422(t *testing.T) {
 	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
 	photos.EXPECT().GetPhoto(gomock.Any(), testPhoto2ID).Return(photo2DiffEvent, nil)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID, testPhoto2ID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID, testPhoto2ID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 422, resp.StatusCode)
 	assert.Contains(t, resp.Body, "same event")
@@ -333,7 +335,7 @@ func TestHandle_CreateOrderFails_Returns500(t *testing.T) {
 	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
 	writer.EXPECT().CreateOrderWithPurchases(gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("dynamo unavailable"))
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 500, resp.StatusCode)
 }
@@ -350,7 +352,7 @@ func TestHandle_EmailFailure_OrderStillCreated(t *testing.T) {
 	// Both emails fail — order should still return 201.
 	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(errors.New("SES error")).Times(2)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 201, resp.StatusCode)
 }
@@ -367,7 +369,7 @@ func TestHandle_DeduplicatePhotoIds(t *testing.T) {
 	writer.EXPECT().CreateOrderWithPurchases(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
 	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID, testPhotoID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID, testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 201, resp.StatusCode)
 
@@ -387,7 +389,7 @@ func TestHandle_TooManyPhotoIds_Returns400(t *testing.T) {
 		photoIDs[i] = fmt.Sprintf("photo-%d", i+1)
 	}
 
-	resp, err := h.Handle(context.Background(), makeReq(photoIDs, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, photoIDs, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 400, resp.StatusCode)
 	assert.Contains(t, resp.Body, "too many photos")
@@ -397,7 +399,7 @@ func TestHandle_EmptyStringPhotoId_Returns400(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	h, _, _, _, _, _, _, _ := newHandler(ctrl)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{""}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{""}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 400, resp.StatusCode)
 	assert.Contains(t, resp.Body, "must not contain empty values")
@@ -419,7 +421,7 @@ func TestHandle_PaymentRefFormat(t *testing.T) {
 		})
 	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
-	resp, err := h.Handle(context.Background(), makeReq([]string{testPhotoID}, testRunnerEmail))
+	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
 	assert.Equal(t, 201, resp.StatusCode)
 

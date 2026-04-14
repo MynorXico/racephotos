@@ -225,7 +225,8 @@ func (s *DynamoOrderTransacter) CreateOrderWithPurchases(ctx context.Context, or
 	})
 
 	for i, p := range purchases {
-		purchaseItem, err := attributevalue.MarshalMap(p)
+		var purchaseItem map[string]types.AttributeValue
+		purchaseItem, err = attributevalue.MarshalMap(p)
 		if err != nil {
 			return fmt.Errorf("CreateOrderWithPurchases: marshal purchase[%d]: %w", i, err)
 		}
