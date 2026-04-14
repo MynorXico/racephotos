@@ -168,9 +168,9 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			wantFailures:  1,
 		},
 		{
-			name:    "invalid S3 key format — message failed",
-			sqsBody: s3NotifBody("racephotos-raw-local", "bad-key"),
-			setupDetector: func(m *mocks.MockTextDetector) {},
+			name:            "invalid S3 key format — message failed",
+			sqsBody:         s3NotifBody("racephotos-raw-local", "bad-key"),
+			setupDetector:   func(m *mocks.MockTextDetector) {},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
 			setupBibIndex:   func(m *mocks.MockBibIndexStore) {},
 			setupWmQueue:    func(m *mocks.MockWatermarkQueue) {},
@@ -209,8 +209,8 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			wantFailures: 0,
 		},
 		{
-			name:    "malformed SQS body — message failed",
-			sqsBody: "not-json",
+			name:            "malformed SQS body — message failed",
+			sqsBody:         "not-json",
 			setupDetector:   func(m *mocks.MockTextDetector) {},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
 			setupBibIndex:   func(m *mocks.MockBibIndexStore) {},
@@ -243,8 +243,8 @@ func TestHandler_ProcessBatch(t *testing.T) {
 		{
 			// domain rule 10: photo already in terminal "review_required" state —
 			// same as indexed: pipeline complete, ack without re-driving.
-			name:    "domain rule 10: review_required photo — Rekognition and downstream skipped, acked",
-			sqsBody: s3NotifBody("racephotos-raw-local", testRawS3Key),
+			name:          "domain rule 10: review_required photo — Rekognition and downstream skipped, acked",
+			sqsBody:       s3NotifBody("racephotos-raw-local", testRawS3Key),
 			setupDetector: func(m *mocks.MockTextDetector) {},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {
 				already := testPhoto()
@@ -288,8 +288,8 @@ func TestHandler_ProcessBatch(t *testing.T) {
 		},
 		{
 			// TC-027b: status=error on redelivery — ack, do not reprocess.
-			name:    "domain rule 10: error-status photo — acked without reprocessing",
-			sqsBody: s3NotifBody("racephotos-raw-local", testRawS3Key),
+			name:          "domain rule 10: error-status photo — acked without reprocessing",
+			sqsBody:       s3NotifBody("racephotos-raw-local", testRawS3Key),
 			setupDetector: func(m *mocks.MockTextDetector) {},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {
 				already := testPhoto()

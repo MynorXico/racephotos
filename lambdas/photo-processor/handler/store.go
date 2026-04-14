@@ -82,7 +82,8 @@ func (s *DynamoPhotoStore) UpdatePhotoStatus(ctx context.Context, id string, upd
 	exprValues[":status"] = statusVal
 
 	if len(update.BibNumbers) > 0 {
-		bibVal, err := attributevalue.Marshal(update.BibNumbers)
+		var bibVal types.AttributeValue
+		bibVal, err = attributevalue.Marshal(update.BibNumbers)
 		if err != nil {
 			return fmt.Errorf("UpdatePhotoStatus: marshal bibNumbers: %w", err)
 		}
@@ -92,7 +93,8 @@ func (s *DynamoPhotoStore) UpdatePhotoStatus(ctx context.Context, id string, upd
 	}
 
 	if update.RekognitionConfidence > 0 {
-		confVal, err := attributevalue.Marshal(update.RekognitionConfidence)
+		var confVal types.AttributeValue
+		confVal, err = attributevalue.Marshal(update.RekognitionConfidence)
 		if err != nil {
 			return fmt.Errorf("UpdatePhotoStatus: marshal confidence: %w", err)
 		}

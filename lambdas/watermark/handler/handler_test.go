@@ -140,8 +140,8 @@ func TestHandler_ProcessBatch(t *testing.T) {
 		},
 		{
 			// RS-017: missing finalStatus in message is treated as malformed — message goes to batchItemFailures.
-			name:    "missing finalStatus — message in batchItemFailures",
-			sqsBody: `{"photoId":"` + testPhotoID + `","eventId":"` + testEventID + `","rawS3Key":"` + testRawS3Key + `"}`,
+			name:            "missing finalStatus — message in batchItemFailures",
+			sqsBody:         `{"photoId":"` + testPhotoID + `","eventId":"` + testEventID + `","rawS3Key":"` + testRawS3Key + `"}`,
 			setupReader:     func(m *mocks.MockRawPhotoReader) {},
 			setupWriter:     func(m *mocks.MockProcessedPhotoWriter) {},
 			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
@@ -151,8 +151,8 @@ func TestHandler_ProcessBatch(t *testing.T) {
 		},
 		{
 			// Security: finalStatus allowlist enforced — only "indexed" and "review_required" accepted.
-			name:    "invalid finalStatus — message in batchItemFailures",
-			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "watermarking"),
+			name:            "invalid finalStatus — message in batchItemFailures",
+			sqsBody:         watermarkMsg(testPhotoID, testEventID, testRawS3Key, "watermarking"),
 			setupReader:     func(m *mocks.MockRawPhotoReader) {},
 			setupWriter:     func(m *mocks.MockProcessedPhotoWriter) {},
 			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
@@ -161,8 +161,8 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			wantFailures:    1,
 		},
 		{
-			name:    "malformed SQS body — message in batchItemFailures",
-			sqsBody: "not-json",
+			name:            "malformed SQS body — message in batchItemFailures",
+			sqsBody:         "not-json",
 			setupReader:     func(m *mocks.MockRawPhotoReader) {},
 			setupWriter:     func(m *mocks.MockProcessedPhotoWriter) {},
 			setupWatermark:  func(m *mocks.MockImageWatermarker) {},

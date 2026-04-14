@@ -148,7 +148,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 			continue
 		}
 		item := photoItem{
-			PhotoID:        p.ID,
+			PhotoID: p.ID,
 			// TrimLeft strips all leading slashes — TrimPrefix removes only one,
 			// leaving double-slash URLs if a key begins with "//".
 			WatermarkedURL: "https://" + h.CdnDomain + "/" + strings.TrimLeft(p.WatermarkedS3Key, "/"),

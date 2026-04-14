@@ -26,8 +26,8 @@ const (
 
 	// Font size is clamped to [watermarkMinFontSize, watermarkMaxFontSize] points,
 	// scaled at watermarkFontSizeRatio of the larger image dimension.
-	watermarkMinFontSize  = 24.0
-	watermarkMaxFontSize  = 120.0
+	watermarkMinFontSize   = 24.0
+	watermarkMaxFontSize   = 120.0
 	watermarkFontSizeRatio = 0.05
 
 	// Tile spacing multipliers relative to measured text dimensions.
@@ -122,9 +122,5 @@ func (w *GgWatermarker) ApplyTextWatermark(src io.Reader, text string) (image.Im
 
 	dc.Pop()
 
-	result := dc.Image()
-	if result == nil {
-		return nil, fmt.Errorf("GgWatermarker: dc.Image() returned nil")
-	}
-	return result, nil
+	return dc.Image(), nil
 }
