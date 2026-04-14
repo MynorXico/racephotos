@@ -129,36 +129,43 @@ export class SesConstruct extends Construct {
   }
 
   /**
-   * Grants ses:SendEmail and ses:SendTemplatedEmail on all SES identities in
-   * this account and region.
+   * Grants ses:SendEmail and ses:SendTemplatedEmail on the two identity ARNs
+   * that SES may authorise against for the configured sender address:
+   *
+   *   1. The email-level identity ARN (identity/noreply@example.com) — covers
+   *      accounts where the individual address is verified.
+   *   2. The domain-level identity ARN (identity/example.com) — covers accounts
+   *      where only the domain is verified (the common production setup).
+   *
+   * The domain is extracted from the email address via CFN intrinsics
+   * (cdk.Fn.split / cdk.Fn.select) so the ARN is resolved at deploy time from
+   * the SSM parameter value, keeping the grant narrowly scoped to this one
+   * sending domain rather than granting identity/*.
    *
    * Note: intentionally does NOT grant ses:SendRawEmail — raw email sending is
    * not used by this service. The CDK built-in grantSendEmail() grants
    * SendRawEmail instead of SendTemplatedEmail; this method corrects that.
-   *
-   * Why identity/* rather than the specific identity ARN:
-   *   SES authorises sends against the DOMAIN identity ARN when the domain —
-   *   not the individual address — is verified in the account (e.g. a send from
-   *   noreply@example.com is authorised against identity/example.com). The CDK
-   *   EmailIdentity is created for the address-level identity, so its ARN alone
-   *   is insufficient.
-   *
-   *   CFN intrinsics (cdk.Fn.split / cdk.Fn.select) could extract the domain
-   *   from the SSM token to build a specific ARN, but the identity/* wildcard
-   *   is the deliberate choice here: it is still account- and region-scoped,
-   *   restricted to two non-destructive send actions, and resilient to future
-   *   identity changes (e.g. switching from email to domain verification).
    */
   grantSendEmail(grantee: iam.IGrantable): iam.Grant {
     const stack = cdk.Stack.of(this);
-    return iam.Grant.addToPrincipal({
-      grantee,
-      actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
-      resourceArns: [
-        stack.formatArn({ service: 'ses', resource: 'identity', resourceName: '*' }),
-      ],
-      scope: this,
-    });
+
+    // Grant on the email-level identity ARN.
+    const grant = this.emailIdentity.grant(grantee, 'ses:SendEmail', 'ses:SendTemplatedEmail');
+
+    // Also grant on the parent domain identity ARN.
+    // sesFromAddress is an SSM token at synth time; CFN intrinsics extract the
+    // domain (the part after @) so CloudFormation resolves the ARN at deploy time.
+    const domain = cdk.Fn.select(1, cdk.Fn.split('@', this.emailIdentity.emailIdentityName));
+    grantee.grantPrincipal.addToPrincipalPolicy(
+      new iam.PolicyStatement({
+        actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
+        resources: [
+          stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
+        ],
+      }),
+    );
+
+    return grant;
   }
 
   /**
