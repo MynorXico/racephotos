@@ -149,23 +149,21 @@ export class SesConstruct extends Construct {
   grantSendEmail(grantee: iam.IGrantable): iam.Grant {
     const stack = cdk.Stack.of(this);
 
-    // Grant on the email-level identity ARN.
-    const grant = this.emailIdentity.grant(grantee, 'ses:SendEmail', 'ses:SendTemplatedEmail');
-
-    // Also grant on the parent domain identity ARN.
-    // sesFromAddress is an SSM token at synth time; CFN intrinsics extract the
-    // domain (the part after @) so CloudFormation resolves the ARN at deploy time.
+    // Extract the domain from the sender address via CFN intrinsics so the ARN
+    // is resolved at deploy time (sesFromAddress is an SSM token at synth time).
     const domain = cdk.Fn.select(1, cdk.Fn.split('@', this.emailIdentity.emailIdentityName));
-    grantee.grantPrincipal.addToPrincipalPolicy(
-      new iam.PolicyStatement({
-        actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
-        resources: [
-          stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
-        ],
-      }),
-    );
 
-    return grant;
+    // Grant on both resource ARNs in a single statement so the returned Grant
+    // object covers all permissions and the IAM policy stays consolidated.
+    return iam.Grant.addToPrincipal({
+      grantee,
+      actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
+      resourceArns: [
+        this.emailIdentityArn,
+        stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
+      ],
+      scope: this,
+    });
   }
 
   /**
