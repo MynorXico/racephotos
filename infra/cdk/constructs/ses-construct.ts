@@ -129,14 +129,35 @@ export class SesConstruct extends Construct {
   }
 
   /**
-   * Grants ses:SendEmail and ses:SendTemplatedEmail on the verified identity ARN.
+   * Grants ses:SendEmail and ses:SendTemplatedEmail on all SES identities in
+   * this account and region.
    *
    * Note: intentionally does NOT grant ses:SendRawEmail — raw email sending is
    * not used by this service. The CDK built-in grantSendEmail() grants
    * SendRawEmail instead of SendTemplatedEmail; this method corrects that.
+   *
+   * Why identity/* rather than the specific identity ARN:
+   *   The sesFromAddress prop is resolved from SSM via valueForStringParameter,
+   *   which produces a CloudFormation token at synth time. String operations on
+   *   the token (e.g. extracting the domain with split('@')) cannot be performed
+   *   at synth time, so we cannot build a domain-identity ARN programmatically.
+   *
+   *   SES authorises sends against the DOMAIN identity ARN when the domain —
+   *   not the individual address — is verified in the account. Using
+   *   identity/* ensures the grant covers both email-level and domain-level
+   *   identities without hardcoding ARNs. The grant remains account-scoped and
+   *   restricted to two non-destructive send actions.
    */
   grantSendEmail(grantee: iam.IGrantable): iam.Grant {
-    return this.emailIdentity.grant(grantee, 'ses:SendEmail', 'ses:SendTemplatedEmail');
+    const stack = cdk.Stack.of(this);
+    return iam.Grant.addToPrincipal({
+      grantee,
+      actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
+      resourceArns: [
+        stack.formatArn({ service: 'ses', resource: 'identity', resourceName: '*' }),
+      ],
+      scope: this,
+    });
   }
 
   /**
