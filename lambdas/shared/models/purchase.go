@@ -14,7 +14,7 @@ type Purchase struct {
 	OrderID       string `dynamodbav:"orderId"       json:"orderId"`
 	PhotoID       string `dynamodbav:"photoId"       json:"photoId"`
 	RunnerEmail   string `dynamodbav:"runnerEmail"   json:"runnerEmail"`
-	DownloadToken string `dynamodbav:"downloadToken" json:"downloadToken,omitempty"`
+	DownloadToken *string `dynamodbav:"downloadToken" json:"downloadToken,omitempty"`
 	Status        string `dynamodbav:"status"        json:"status"` // mirrors Order.Status
 	ClaimedAt     string `dynamodbav:"claimedAt"     json:"claimedAt"`
 	ApprovedAt    string `dynamodbav:"approvedAt"    json:"approvedAt,omitempty"`
