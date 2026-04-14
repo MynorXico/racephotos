@@ -10,12 +10,12 @@ package models
 //
 // Status mirrors the parent Order's status and is set atomically at approval.
 type Purchase struct {
-	ID            string `dynamodbav:"id"            json:"id"`
-	OrderID       string `dynamodbav:"orderId"       json:"orderId"`
-	PhotoID       string `dynamodbav:"photoId"       json:"photoId"`
-	RunnerEmail   string `dynamodbav:"runnerEmail"   json:"runnerEmail"`
-	DownloadToken string `dynamodbav:"downloadToken" json:"downloadToken,omitempty"`
-	Status        string `dynamodbav:"status"        json:"status"` // mirrors Order.Status
-	ClaimedAt     string `dynamodbav:"claimedAt"     json:"claimedAt"`
-	ApprovedAt    string `dynamodbav:"approvedAt"    json:"approvedAt,omitempty"`
+	ID            string  `dynamodbav:"id"            json:"id"`
+	OrderID       string  `dynamodbav:"orderId"       json:"orderId"`
+	PhotoID       string  `dynamodbav:"photoId"       json:"photoId"`
+	RunnerEmail   string  `dynamodbav:"runnerEmail"   json:"runnerEmail"`
+	DownloadToken *string `dynamodbav:"downloadToken,omitempty" json:"downloadToken,omitempty"`
+	Status        string  `dynamodbav:"status"        json:"status"` // mirrors Order.Status
+	ClaimedAt     string  `dynamodbav:"claimedAt"     json:"claimedAt"`
+	ApprovedAt    string  `dynamodbav:"approvedAt"    json:"approvedAt,omitempty"`
 }

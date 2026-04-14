@@ -72,14 +72,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(400, err.Error()), nil
 	}
 
-	fields := UpdateFields{
-		Name:          req.Name,
-		Date:          req.Date,
-		Location:      req.Location,
-		PricePerPhoto: req.PricePerPhoto,
-		Currency:      req.Currency,
-		WatermarkText: req.WatermarkText,
-	}
+	fields := UpdateFields(req)
 
 	updated, err := h.Store.UpdateEvent(ctx, id, callerID, fields)
 	if err != nil {

@@ -92,11 +92,13 @@ func seedPhoto(t *testing.T, client *dynamodb.Client, p models.Photo) {
 	require.NoError(t, err)
 }
 
-func makeBody(photoIDs []string, email string) string {
-	b, _ := json.Marshal(map[string]interface{}{
+func makeBody(t *testing.T, photoIDs []string, email string) string {
+	t.Helper()
+	b, err := json.Marshal(map[string]interface{}{
 		"photoIds":    photoIDs,
 		"runnerEmail": email,
 	})
+	require.NoError(t, err)
 	return string(b)
 }
 
@@ -165,7 +167,7 @@ func TestIntegration_CreateOrder_HappyPath(t *testing.T) {
 	}
 
 	resp, err := h.Handle(ctx, events.APIGatewayV2HTTPRequest{
-		Body: makeBody([]string{photoID}, runnerEmail),
+		Body: makeBody(t, []string{photoID}, runnerEmail),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 201, resp.StatusCode)
@@ -253,7 +255,7 @@ func TestIntegration_CreateOrder_Idempotent(t *testing.T) {
 		ApprovalsURL: testApprovalsURL,
 	}
 
-	req := events.APIGatewayV2HTTPRequest{Body: makeBody([]string{photoID}, runnerEmail)}
+	req := events.APIGatewayV2HTTPRequest{Body: makeBody(t, []string{photoID}, runnerEmail)}
 
 	// First call → 201.
 	resp1, err := h.Handle(ctx, req)
@@ -304,7 +306,7 @@ func TestIntegration_CreateOrder_PhotoNotFound(t *testing.T) {
 	}
 
 	resp, err := h.Handle(ctx, events.APIGatewayV2HTTPRequest{
-		Body: makeBody([]string{uuid.New().String()}, "runner@example.com"),
+		Body: makeBody(t, []string{uuid.New().String()}, "runner@example.com"),
 	})
 	require.NoError(t, err)
 	assert.Equal(t, 404, resp.StatusCode)

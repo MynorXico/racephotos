@@ -126,7 +126,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	ownerRes := <-ownerCh
 	if ownerRes.err != nil {
 		cancelList() // abort in-flight DynamoDB Query
-		<-listCh    // drain to prevent goroutine leak
+		<-listCh     // drain to prevent goroutine leak
 		if errors.Is(ownerRes.err, ErrEventNotFound) {
 			return errResponse(404, "event not found"), nil
 		}
@@ -138,7 +138,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 	if ownerRes.id != photographerID {
 		cancelList() // abort in-flight DynamoDB Query
-		<-listCh    // drain to prevent goroutine leak
+		<-listCh     // drain to prevent goroutine leak
 		return errResponse(403, "forbidden"), nil
 	}
 
