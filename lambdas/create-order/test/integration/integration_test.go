@@ -93,10 +93,13 @@ func seedPhoto(t *testing.T, client *dynamodb.Client, p models.Photo) {
 }
 
 func makeBody(photoIDs []string, email string) string {
-	b, _ := json.Marshal(map[string]interface{}{
+	b, err := json.Marshal(map[string]interface{}{
 		"photoIds":    photoIDs,
 		"runnerEmail": email,
 	})
+	if err != nil {
+		panic(err)
+	}
 	return string(b)
 }
 

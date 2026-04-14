@@ -44,9 +44,9 @@ func (s *DynamoPhotoStore) BatchCreatePhotos(ctx context.Context, photos []model
 
 	// Write all chunks concurrently; collect the first error encountered.
 	var (
-		mu      sync.Mutex
+		mu       sync.Mutex
 		firstErr error
-		wg      sync.WaitGroup
+		wg       sync.WaitGroup
 	)
 	for _, chunk := range chunks {
 		wg.Add(1)

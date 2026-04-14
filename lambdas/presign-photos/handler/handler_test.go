@@ -309,6 +309,9 @@ func buildBatchBody(n int) string {
 	for i := range items {
 		items[i] = item{Filename: "photo.jpg", ContentType: "image/jpeg", Size: 1024}
 	}
-	b, _ := json.Marshal(map[string]any{"photos": items})
+	b, err := json.Marshal(map[string]any{"photos": items})
+	if err != nil {
+		panic(err)
+	}
 	return string(b)
 }
