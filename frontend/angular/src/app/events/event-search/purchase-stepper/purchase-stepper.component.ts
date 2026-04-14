@@ -1,10 +1,11 @@
 import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   Inject,
-  OnInit,
   OnDestroy,
+  OnInit,
   ViewChild,
-  ChangeDetectionStrategy,
   inject,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -60,6 +61,7 @@ export class PurchaseStepperComponent implements OnInit, OnDestroy {
   private readonly store = inject(Store);
   private readonly actions$ = inject(Actions);
   private readonly dialogRef = inject<MatDialogRef<PurchaseStepperComponent>>(MatDialogRef);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly loading = toSignal(this.store.select(selectPurchaseLoading), { initialValue: false });
   readonly error = toSignal(this.store.select(selectPurchaseError), { initialValue: null });
@@ -75,23 +77,27 @@ export class PurchaseStepperComponent implements OnInit, OnDestroy {
   constructor(@Inject(MAT_DIALOG_DATA) public readonly data: PurchaseStepperDialogData) {}
 
   ngOnInit(): void {
+    // MatStepper (linear mode) blocks next() unless the current step is marked
+    // completed — set it before calling next(), then trigger OnPush re-render.
+    // steps.get() avoids the array allocation of toArray()[index].
+    const advanceStepper = () => {
+      if (this.stepper) {
+        const current = this.stepper.steps.get(this.stepper.selectedIndex);
+        if (current) current.completed = true;
+        this.stepper.next();
+        this.cdr.markForCheck();
+      }
+    };
+
     // Advance to step 2 when the email submission succeeds.
     this.actions$
       .pipe(ofType(PurchasesActions.submitEmailSuccess), takeUntil(this.destroy$))
-      .subscribe(() => {
-        if (this.stepper) {
-          this.stepper.next();
-        }
-      });
+      .subscribe(advanceStepper);
 
     // Advance to step 3 when the runner confirms the transfer.
     this.actions$
       .pipe(ofType(PurchasesActions.confirmTransfer), takeUntil(this.destroy$))
-      .subscribe(() => {
-        if (this.stepper) {
-          this.stepper.next();
-        }
-      });
+      .subscribe(advanceStepper);
 
     // Close the dialog when resetPurchase is dispatched.
     this.actions$

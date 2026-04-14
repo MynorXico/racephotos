@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
@@ -18,12 +19,16 @@ import (
 )
 
 func makeEvent(sub, body string) events.APIGatewayV2HTTPRequest {
+	return makeEventWithEmail(sub, "photographer@example.com", body)
+}
+
+func makeEventWithEmail(sub, email, body string) events.APIGatewayV2HTTPRequest {
 	e := events.APIGatewayV2HTTPRequest{Body: body}
 	if sub != "" {
 		e.RequestContext = events.APIGatewayV2HTTPRequestContext{
 			Authorizer: &events.APIGatewayV2HTTPRequestContextAuthorizerDescription{
 				JWT: &events.APIGatewayV2HTTPRequestContextAuthorizerJWTDescription{
-					Claims: map[string]string{"sub": sub},
+					Claims: map[string]string{"sub": sub, "email": email},
 				},
 			},
 		}
@@ -90,6 +95,28 @@ func TestHandler_Handle(t *testing.T) {
 			event: makeEvent("user-1", validBody("USD")),
 			mockFn: func(m *mocks.MockPhotographerUpserter) {
 				m.EXPECT().UpsertPhotographer(gomock.Any(), gomock.Any()).Return(stubProfile("user-1"), nil)
+			},
+			wantCode: 200,
+		},
+		{
+			name:  "happy path — email claim is passed to store",
+			event: makeEventWithEmail("user-1b", "photo@example.com", validBody("USD")),
+			mockFn: func(m *mocks.MockPhotographerUpserter) {
+				m.EXPECT().UpsertPhotographer(gomock.Any(), gomock.AssignableToTypeOf(models.Photographer{})).
+					DoAndReturn(func(_ interface{}, p models.Photographer) (*models.Photographer, error) {
+						if p.Email != "photo@example.com" {
+							return nil, fmt.Errorf("expected email photo@example.com, got %q", p.Email)
+						}
+						return stubProfile("user-1b"), nil
+					})
+			},
+			wantCode: 200,
+		},
+		{
+			name:  "happy path — missing email claim is tolerated",
+			event: makeEventWithEmail("user-1c", "", validBody("USD")),
+			mockFn: func(m *mocks.MockPhotographerUpserter) {
+				m.EXPECT().UpsertPhotographer(gomock.Any(), gomock.Any()).Return(stubProfile("user-1c"), nil)
 			},
 			wantCode: 200,
 		},
