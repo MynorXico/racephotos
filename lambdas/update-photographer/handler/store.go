@@ -39,6 +39,7 @@ func (s *DynamoStore) UpsertPhotographer(ctx context.Context, p models.Photograp
 	}
 
 	values, err := attributevalue.MarshalMap(map[string]any{
+		":em":  p.Email,
 		":dn":  p.DisplayName,
 		":dc":  p.DefaultCurrency,
 		":bn":  p.BankName,
@@ -60,11 +61,12 @@ func (s *DynamoStore) UpsertPhotographer(ctx context.Context, p models.Photograp
 		TableName: aws.String(s.TableName),
 		Key:       key,
 		UpdateExpression: aws.String(
-			"SET #dn = :dn, #dc = :dc, #bn = :bn, " +
+			"SET #em = :em, #dn = :dn, #dc = :dc, #bn = :bn, " +
 				"#ban = :ban, #bah = :bah, #bi = :bi, " +
 				"#ua = :ua, #ca = if_not_exists(#ca, :ca)",
 		),
 		ExpressionAttributeNames: map[string]string{
+			"#em":  "email",
 			"#dn":  "displayName",
 			"#dc":  "defaultCurrency",
 			"#bn":  "bankName",

@@ -1,10 +1,11 @@
 import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   Inject,
-  OnInit,
   OnDestroy,
+  OnInit,
   ViewChild,
-  ChangeDetectionStrategy,
   inject,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
@@ -60,6 +61,7 @@ export class PurchaseStepperComponent implements OnInit, OnDestroy {
   private readonly store = inject(Store);
   private readonly actions$ = inject(Actions);
   private readonly dialogRef = inject<MatDialogRef<PurchaseStepperComponent>>(MatDialogRef);
+  private readonly cdr = inject(ChangeDetectorRef);
 
   readonly loading = toSignal(this.store.select(selectPurchaseLoading), { initialValue: false });
   readonly error = toSignal(this.store.select(selectPurchaseError), { initialValue: null });
@@ -76,11 +78,16 @@ export class PurchaseStepperComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     // Advance to step 2 when the email submission succeeds.
+    // MatStepper (linear mode) blocks next() unless the current step is marked
+    // completed — set it before calling next(), then trigger OnPush re-render.
     this.actions$
       .pipe(ofType(PurchasesActions.submitEmailSuccess), takeUntil(this.destroy$))
       .subscribe(() => {
         if (this.stepper) {
+          const current = this.stepper.steps.toArray()[this.stepper.selectedIndex];
+          if (current) current.completed = true;
           this.stepper.next();
+          this.cdr.markForCheck();
         }
       });
 
@@ -89,7 +96,10 @@ export class PurchaseStepperComponent implements OnInit, OnDestroy {
       .pipe(ofType(PurchasesActions.confirmTransfer), takeUntil(this.destroy$))
       .subscribe(() => {
         if (this.stepper) {
+          const current = this.stepper.steps.toArray()[this.stepper.selectedIndex];
+          if (current) current.completed = true;
           this.stepper.next();
+          this.cdr.markForCheck();
         }
       });
 

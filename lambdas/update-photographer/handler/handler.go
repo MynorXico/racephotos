@@ -70,6 +70,10 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(401, "unauthorized"), nil
 	}
 
+	// email is sourced from the Cognito JWT claim — it is not part of the request
+	// body, so the caller cannot spoof it. It may be absent on older accounts.
+	photographerEmail := extractClaim(event, "email")
+
 	// Reject null or empty body before attempting to parse; json.Unmarshal
 	// accepts "null" without error, leaving req at zero values.
 	if event.Body == "" || event.Body == "null" {
@@ -97,6 +101,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 
 	p := models.Photographer{
 		ID:                photographerID,
+		Email:             photographerEmail,
 		DisplayName:       req.DisplayName,
 		DefaultCurrency:   req.DefaultCurrency,
 		BankName:          req.BankName,
@@ -150,14 +155,16 @@ func validate(req updateRequest) error {
 
 // extractSub returns the Cognito sub claim from the JWT authorizer context.
 func extractSub(event events.APIGatewayV2HTTPRequest) (string, bool) {
-	if event.RequestContext.Authorizer == nil {
-		return "", false
+	sub := extractClaim(event, "sub")
+	return sub, sub != ""
+}
+
+// extractClaim returns a JWT claim value, or "" if absent.
+func extractClaim(event events.APIGatewayV2HTTPRequest, claim string) string {
+	if event.RequestContext.Authorizer == nil || event.RequestContext.Authorizer.JWT == nil {
+		return ""
 	}
-	if event.RequestContext.Authorizer.JWT == nil {
-		return "", false
-	}
-	sub, ok := event.RequestContext.Authorizer.JWT.Claims["sub"]
-	return sub, ok && sub != ""
+	return event.RequestContext.Authorizer.JWT.Claims[claim]
 }
 
 type errorBody struct {
