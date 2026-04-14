@@ -137,16 +137,17 @@ export class SesConstruct extends Construct {
    * SendRawEmail instead of SendTemplatedEmail; this method corrects that.
    *
    * Why identity/* rather than the specific identity ARN:
-   *   The sesFromAddress prop is resolved from SSM via valueForStringParameter,
-   *   which produces a CloudFormation token at synth time. String operations on
-   *   the token (e.g. extracting the domain with split('@')) cannot be performed
-   *   at synth time, so we cannot build a domain-identity ARN programmatically.
-   *
    *   SES authorises sends against the DOMAIN identity ARN when the domain —
-   *   not the individual address — is verified in the account. Using
-   *   identity/* ensures the grant covers both email-level and domain-level
-   *   identities without hardcoding ARNs. The grant remains account-scoped and
-   *   restricted to two non-destructive send actions.
+   *   not the individual address — is verified in the account (e.g. a send from
+   *   noreply@example.com is authorised against identity/example.com). The CDK
+   *   EmailIdentity is created for the address-level identity, so its ARN alone
+   *   is insufficient.
+   *
+   *   CFN intrinsics (cdk.Fn.split / cdk.Fn.select) could extract the domain
+   *   from the SSM token to build a specific ARN, but the identity/* wildcard
+   *   is the deliberate choice here: it is still account- and region-scoped,
+   *   restricted to two non-destructive send actions, and resilient to future
+   *   identity changes (e.g. switching from email to domain verification).
    */
   grantSendEmail(grantee: iam.IGrantable): iam.Grant {
     const stack = cdk.Stack.of(this);
