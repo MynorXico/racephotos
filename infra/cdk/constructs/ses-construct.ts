@@ -129,14 +129,41 @@ export class SesConstruct extends Construct {
   }
 
   /**
-   * Grants ses:SendEmail and ses:SendTemplatedEmail on the verified identity ARN.
+   * Grants ses:SendEmail and ses:SendTemplatedEmail on the two identity ARNs
+   * that SES may authorise against for the configured sender address:
+   *
+   *   1. The email-level identity ARN (identity/noreply@example.com) — covers
+   *      accounts where the individual address is verified.
+   *   2. The domain-level identity ARN (identity/example.com) — covers accounts
+   *      where only the domain is verified (the common production setup).
+   *
+   * The domain is extracted from the email address via CFN intrinsics
+   * (cdk.Fn.split / cdk.Fn.select) so the ARN is resolved at deploy time from
+   * the SSM parameter value, keeping the grant narrowly scoped to this one
+   * sending domain rather than granting identity/*.
    *
    * Note: intentionally does NOT grant ses:SendRawEmail — raw email sending is
    * not used by this service. The CDK built-in grantSendEmail() grants
    * SendRawEmail instead of SendTemplatedEmail; this method corrects that.
    */
   grantSendEmail(grantee: iam.IGrantable): iam.Grant {
-    return this.emailIdentity.grant(grantee, 'ses:SendEmail', 'ses:SendTemplatedEmail');
+    const stack = cdk.Stack.of(this);
+
+    // Extract the domain from the sender address via CFN intrinsics so the ARN
+    // is resolved at deploy time (sesFromAddress is an SSM token at synth time).
+    const domain = cdk.Fn.select(1, cdk.Fn.split('@', this.emailIdentity.emailIdentityName));
+
+    // Grant on both resource ARNs in a single statement so the returned Grant
+    // object covers all permissions and the IAM policy stays consolidated.
+    return iam.Grant.addToPrincipal({
+      grantee,
+      actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
+      resourceArns: [
+        this.emailIdentityArn,
+        stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
+      ],
+      scope: this,
+    });
   }
 
   /**
