@@ -51,6 +51,19 @@ export class SesConstruct extends Construct {
 
   private readonly emailIdentity: ses.EmailIdentity;
 
+  /**
+   * Account-scoped SES template names used by this service.
+   * Centralised here so the constructor (template creation) and grantSendEmail
+   * (IAM grant) always reference the same list — adding a template in one place
+   * automatically keeps the IAM grant in sync.
+   */
+  static readonly TEMPLATE_NAMES = [
+    'racephotos-photographer-claim',
+    'racephotos-runner-claim-confirmation',
+    'racephotos-runner-purchase-approved',
+    'racephotos-runner-redownload-resend',
+  ] as const;
+
   constructor(scope: Construct, id: string, props: SesConstructProps) {
     super(scope, id);
 
@@ -80,7 +93,7 @@ export class SesConstruct extends Construct {
     // Template 1 — Photographer: new purchase claim (ADR-0001)
     new ses.CfnTemplate(this, 'PhotographerClaimTemplate', {
       template: {
-        templateName: 'racephotos-photographer-claim',
+        templateName: SesConstruct.TEMPLATE_NAMES[0],
         subjectPart: 'New purchase claim — {{eventName}}',
         htmlPart: fs.readFileSync(path.join(tmplDir, 'photographer-claim.html'), 'utf8'),
         textPart: fs.readFileSync(path.join(tmplDir, 'photographer-claim.txt'), 'utf8'),
@@ -90,7 +103,7 @@ export class SesConstruct extends Construct {
     // Template 2 — Runner: claim confirmation (ADR-0002)
     new ses.CfnTemplate(this, 'RunnerClaimConfirmationTemplate', {
       template: {
-        templateName: 'racephotos-runner-claim-confirmation',
+        templateName: SesConstruct.TEMPLATE_NAMES[1],
         subjectPart: 'Payment claim received — {{eventName}}',
         htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-claim-confirmation.html'), 'utf8'),
         textPart: fs.readFileSync(path.join(tmplDir, 'runner-claim-confirmation.txt'), 'utf8'),
@@ -103,7 +116,7 @@ export class SesConstruct extends Construct {
     // never a short-lived S3 presigned URL. The token does not expire.
     new ses.CfnTemplate(this, 'RunnerPurchaseApprovedTemplate', {
       template: {
-        templateName: 'racephotos-runner-purchase-approved',
+        templateName: SesConstruct.TEMPLATE_NAMES[2],
         subjectPart: 'Your photo is ready to download — {{eventName}}',
         htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-purchase-approved.html'), 'utf8'),
         textPart: fs.readFileSync(path.join(tmplDir, 'runner-purchase-approved.txt'), 'utf8'),
@@ -120,7 +133,7 @@ export class SesConstruct extends Construct {
     // structured array and let SES render it.
     new ses.CfnTemplate(this, 'RunnerRedownloadResendTemplate', {
       template: {
-        templateName: 'racephotos-runner-redownload-resend',
+        templateName: SesConstruct.TEMPLATE_NAMES[3],
         subjectPart: 'Your RaceShots download links',
         htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-redownload-resend.html'), 'utf8'),
         textPart: fs.readFileSync(path.join(tmplDir, 'runner-redownload-resend.txt'), 'utf8'),
@@ -156,14 +169,6 @@ export class SesConstruct extends Construct {
     // is resolved at deploy time (sesFromAddress is an SSM token at synth time).
     const domain = cdk.Fn.select(1, cdk.Fn.split('@', this.emailIdentity.emailIdentityName));
 
-    // Template names defined in this construct — account-scoped, no envName suffix.
-    const templateNames = [
-      'racephotos-photographer-claim',
-      'racephotos-runner-claim-confirmation',
-      'racephotos-runner-purchase-approved',
-      'racephotos-runner-redownload-resend',
-    ];
-
     // Grant on identity + template ARNs in a single statement so the returned
     // Grant object covers all permissions and the IAM policy stays consolidated.
     return iam.Grant.addToPrincipal({
@@ -172,7 +177,7 @@ export class SesConstruct extends Construct {
       resourceArns: [
         this.emailIdentityArn,
         stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
-        ...templateNames.map(name =>
+        ...SesConstruct.TEMPLATE_NAMES.map(name =>
           stack.formatArn({ service: 'ses', resource: 'template', resourceName: name }),
         ),
       ],

@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Template, Match } from 'aws-cdk-lib/assertions';
 import { SesStack } from '../stacks/ses-stack';
+import { SesConstruct } from '../constructs/ses-construct';
 import { EnvConfig } from '../config/types';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -302,12 +303,7 @@ describe('SesConstruct — grantSendEmail (AC3)', () => {
       }),
     );
 
-    const expectedTemplates = [
-      'racephotos-photographer-claim',
-      'racephotos-runner-claim-confirmation',
-      'racephotos-runner-purchase-approved',
-      'racephotos-runner-redownload-resend',
-    ];
+    const expectedTemplates = SesConstruct.TEMPLATE_NAMES;
 
     for (const templateName of expectedTemplates) {
       expect(sesResourceJson).toContain(`template/${templateName}`);
