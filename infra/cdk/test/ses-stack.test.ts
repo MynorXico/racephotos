@@ -303,7 +303,7 @@ describe('SesConstruct — grantSendEmail (AC3)', () => {
       }),
     );
 
-    const expectedTemplates = Object.values(SesConstruct.TEMPLATES);
+    const expectedTemplates = Object.values(SesConstruct.TEMPLATES).map(t => t.name);
 
     for (const templateName of expectedTemplates) {
       expect(sesResourceJson).toContain(`template/${templateName}`);

@@ -52,20 +52,44 @@ export class SesConstruct extends Construct {
   private readonly emailIdentity: ses.EmailIdentity;
 
   /**
-   * Account-scoped SES template names used by this service.
-   * Centralised here so the constructor (template creation) and grantSendEmail
-   * (IAM grant) always reference the same source — adding a template in one
-   * place automatically keeps the IAM grant in sync.
+   * SES template definitions — the single source of truth for all four templates.
    *
-   * Named properties are used (rather than an array with indices) so that
-   * each templateName assignment is self-documenting and reordering entries
-   * cannot silently assign the wrong name to a CfnTemplate resource.
+   * Each entry drives both resource creation in the constructor (via iteration)
+   * and the IAM grant in grantSendEmail, so adding or renaming a template in one
+   * place keeps every layer in sync automatically.
+   *
+   * Keys are PascalCase to produce stable CloudFormation logical IDs
+   * (`${key}Template`) that match the original hand-written resource IDs,
+   * avoiding unintended resource replacements on deploy.
+   *
+   * Template names have NO {envName} suffix — SES templates are account-scoped
+   * and each environment is deployed to an isolated AWS account.
    */
   static readonly TEMPLATES = {
-    PHOTOGRAPHER_CLAIM: 'racephotos-photographer-claim',
-    RUNNER_CLAIM_CONFIRMATION: 'racephotos-runner-claim-confirmation',
-    RUNNER_PURCHASE_APPROVED: 'racephotos-runner-purchase-approved',
-    RUNNER_REDOWNLOAD_RESEND: 'racephotos-runner-redownload-resend',
+    PhotographerClaim: {
+      name: 'racephotos-photographer-claim',
+      subject: 'New purchase claim — {{eventName}}',
+      htmlFile: 'photographer-claim.html',
+      textFile: 'photographer-claim.txt',
+    },
+    RunnerClaimConfirmation: {
+      name: 'racephotos-runner-claim-confirmation',
+      subject: 'Payment claim received — {{eventName}}',
+      htmlFile: 'runner-claim-confirmation.html',
+      textFile: 'runner-claim-confirmation.txt',
+    },
+    RunnerPurchaseApproved: {
+      name: 'racephotos-runner-purchase-approved',
+      subject: 'Your photo is ready to download — {{eventName}}',
+      htmlFile: 'runner-purchase-approved.html',
+      textFile: 'runner-purchase-approved.txt',
+    },
+    RunnerRedownloadResend: {
+      name: 'racephotos-runner-redownload-resend',
+      subject: 'Your RaceShots download links',
+      htmlFile: 'runner-redownload-resend.html',
+      textFile: 'runner-redownload-resend.txt',
+    },
   } as const;
 
   constructor(scope: Construct, id: string, props: SesConstructProps) {
@@ -87,62 +111,22 @@ export class SesConstruct extends Construct {
 
     // ── Email templates ─────────────────────────────────────────────────────
     //
-    // All four templates are defined here so they exist before any Lambda
-    // story (RS-006, RS-011) calls ses:SendTemplatedEmail. Plain text
-    // alternatives are required for all templates (RFC 1341, accessibility).
+    // Driven by SesConstruct.TEMPLATES so adding a template in the constant
+    // automatically creates the resource and includes it in the IAM grant.
+    // Plain text alternatives are required for all templates (RFC 1341).
     //
     // HTML and text sources are in ./ses-templates/ — edit there for syntax
     // highlighting, linting, and preview support.
-
-    // Template 1 — Photographer: new purchase claim (ADR-0001)
-    new ses.CfnTemplate(this, 'PhotographerClaimTemplate', {
-      template: {
-        templateName: SesConstruct.TEMPLATES.PHOTOGRAPHER_CLAIM,
-        subjectPart: 'New purchase claim — {{eventName}}',
-        htmlPart: fs.readFileSync(path.join(tmplDir, 'photographer-claim.html'), 'utf8'),
-        textPart: fs.readFileSync(path.join(tmplDir, 'photographer-claim.txt'), 'utf8'),
-      },
-    });
-
-    // Template 2 — Runner: claim confirmation (ADR-0002)
-    new ses.CfnTemplate(this, 'RunnerClaimConfirmationTemplate', {
-      template: {
-        templateName: SesConstruct.TEMPLATES.RUNNER_CLAIM_CONFIRMATION,
-        subjectPart: 'Payment claim received — {{eventName}}',
-        htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-claim-confirmation.html'), 'utf8'),
-        textPart: fs.readFileSync(path.join(tmplDir, 'runner-claim-confirmation.txt'), 'utf8'),
-      },
-    });
-
-    // Template 3 — Runner: purchase approved + permanent download link (ADR-0002)
-    //
-    // downloadUrl must be the permanent platform route /download/{downloadToken},
-    // never a short-lived S3 presigned URL. The token does not expire.
-    new ses.CfnTemplate(this, 'RunnerPurchaseApprovedTemplate', {
-      template: {
-        templateName: SesConstruct.TEMPLATES.RUNNER_PURCHASE_APPROVED,
-        subjectPart: 'Your photo is ready to download — {{eventName}}',
-        htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-purchase-approved.html'), 'utf8'),
-        textPart: fs.readFileSync(path.join(tmplDir, 'runner-purchase-approved.txt'), 'utf8'),
-      },
-    });
-
-    // Template 4 — Runner: re-download resend (ADR-0002 recovery path)
-    //
-    // TemplateData contract for SendTemplatedEmail (RS-011):
-    //   { "downloads": [ { "url": "...", "eventName": "...", "photoReference": "..." }, ... ] }
-    //
-    // Uses Handlebars {{#each downloads}} iteration to avoid a raw-HTML injection
-    // surface. The calling Lambda must never pass pre-built HTML — supply the
-    // structured array and let SES render it.
-    new ses.CfnTemplate(this, 'RunnerRedownloadResendTemplate', {
-      template: {
-        templateName: SesConstruct.TEMPLATES.RUNNER_REDOWNLOAD_RESEND,
-        subjectPart: 'Your RaceShots download links',
-        htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-redownload-resend.html'), 'utf8'),
-        textPart: fs.readFileSync(path.join(tmplDir, 'runner-redownload-resend.txt'), 'utf8'),
-      },
-    });
+    for (const [key, tmpl] of Object.entries(SesConstruct.TEMPLATES)) {
+      new ses.CfnTemplate(this, `${key}Template`, {
+        template: {
+          templateName: tmpl.name,
+          subjectPart: tmpl.subject,
+          htmlPart: fs.readFileSync(path.join(tmplDir, tmpl.htmlFile), 'utf8'),
+          textPart: fs.readFileSync(path.join(tmplDir, tmpl.textFile), 'utf8'),
+        },
+      });
+    }
   }
 
   /**
@@ -181,8 +165,8 @@ export class SesConstruct extends Construct {
       resourceArns: [
         this.emailIdentityArn,
         stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
-        ...Object.values(SesConstruct.TEMPLATES).map(name =>
-          stack.formatArn({ service: 'ses', resource: 'template', resourceName: name }),
+        ...Object.values(SesConstruct.TEMPLATES).map(tmpl =>
+          stack.formatArn({ service: 'ses', resource: 'template', resourceName: tmpl.name }),
         ),
       ],
       scope: this,
