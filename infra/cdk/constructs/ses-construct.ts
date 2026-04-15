@@ -129,13 +129,16 @@ export class SesConstruct extends Construct {
   }
 
   /**
-   * Grants ses:SendEmail and ses:SendTemplatedEmail on the two identity ARNs
-   * that SES may authorise against for the configured sender address:
+   * Grants ses:SendEmail and ses:SendTemplatedEmail on:
    *
-   *   1. The email-level identity ARN (identity/noreply@example.com) — covers
-   *      accounts where the individual address is verified.
-   *   2. The domain-level identity ARN (identity/example.com) — covers accounts
-   *      where only the domain is verified (the common production setup).
+   *   Identity ARNs (two, to cover both verified-address and verified-domain setups):
+   *     1. The email-level identity ARN (identity/noreply@example.com)
+   *     2. The domain-level identity ARN (identity/example.com)
+   *
+   *   Template ARNs (one per template defined in this construct):
+   *     ses:SendTemplatedEmail requires an explicit grant on the template resource
+   *     in addition to the sender identity. Template names are account-scoped
+   *     static strings — no envName suffix needed.
    *
    * The domain is extracted from the email address via CFN intrinsics
    * (cdk.Fn.split / cdk.Fn.select) so the ARN is resolved at deploy time from
@@ -153,14 +156,25 @@ export class SesConstruct extends Construct {
     // is resolved at deploy time (sesFromAddress is an SSM token at synth time).
     const domain = cdk.Fn.select(1, cdk.Fn.split('@', this.emailIdentity.emailIdentityName));
 
-    // Grant on both resource ARNs in a single statement so the returned Grant
-    // object covers all permissions and the IAM policy stays consolidated.
+    // Template names defined in this construct — account-scoped, no envName suffix.
+    const templateNames = [
+      'racephotos-photographer-claim',
+      'racephotos-runner-claim-confirmation',
+      'racephotos-runner-purchase-approved',
+      'racephotos-runner-redownload-resend',
+    ];
+
+    // Grant on identity + template ARNs in a single statement so the returned
+    // Grant object covers all permissions and the IAM policy stays consolidated.
     return iam.Grant.addToPrincipal({
       grantee,
       actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
       resourceArns: [
         this.emailIdentityArn,
         stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
+        ...templateNames.map(name =>
+          stack.formatArn({ service: 'ses', resource: 'template', resourceName: name }),
+        ),
       ],
       scope: this,
     });
