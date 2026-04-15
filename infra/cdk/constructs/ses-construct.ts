@@ -151,13 +151,12 @@ export class SesConstruct extends Construct {
    *     in addition to the sender identity. Template names are account-scoped
    *     static strings — no envName suffix needed.
    *
-   *   Configuration set ARN (configuration-set/*):
+   *   Configuration set ARN:
    *     When a default configuration set is associated with the SES sending
    *     identity (common in accounts that have SES configuration sets for
    *     tracking/suppression), SES enforces IAM on the configuration-set resource
-   *     too. The configuration set name is set per-account outside CDK (e.g. in
-   *     the SES console), so the name is not known at synth time — a wildcard
-   *     scoped to configuration-set/* in this account/region is used.
+   *     too. This grant is scoped to the specific configuration set name if
+   *     provided, or falls back to a wildcard (configuration-set/*) if not.
    *
    * The domain is extracted from the email address via CFN intrinsics
    * (cdk.Fn.split / cdk.Fn.select) so the ARN is resolved at deploy time from
