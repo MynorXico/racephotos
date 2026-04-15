@@ -8,13 +8,21 @@ import { Construct } from 'constructs';
 interface SesConstructProps {
   /**
    * Verified SES sender email address.
-   * Loaded via ssm.StringParameter.valueFromLookup in the parent stack:
+   * Loaded via ssm.StringParameter.valueForStringParameter in the parent stack:
    *   /racephotos/env/{envName}/ses-from-address
    *
    * NOT stored in EnvConfig — email addresses must not appear in version
    * control. SSM is the correct layer for this value.
    */
   sesFromAddress: string;
+  /**
+   * SES configuration set name associated with the verified sender identity.
+   * When set (not "none"), grantSendEmail scopes the configuration-set IAM grant
+   * to this specific ARN rather than using configuration-set/*.
+   * Use "none" if no configuration set is associated with the sending identity.
+   * Sourced from EnvConfig.sesConfigurationSetName.
+   */
+  sesConfigurationSetName: string;
 }
 
 /**
@@ -50,6 +58,7 @@ export class SesConstruct extends Construct {
   readonly emailIdentityArn: string;
 
   private readonly emailIdentity: ses.EmailIdentity;
+  private readonly sesConfigurationSetName: string;
 
   /**
    * SES template definitions — the single source of truth for all four templates.
@@ -95,7 +104,8 @@ export class SesConstruct extends Construct {
   constructor(scope: Construct, id: string, props: SesConstructProps) {
     super(scope, id);
 
-    const { sesFromAddress } = props;
+    const { sesFromAddress, sesConfigurationSetName } = props;
+    this.sesConfigurationSetName = sesConfigurationSetName;
     const tmplDir = path.join(__dirname, 'ses-templates');
 
     // ── Verified sender identity ────────────────────────────────────────────
@@ -165,6 +175,12 @@ export class SesConstruct extends Construct {
     // is resolved at deploy time (sesFromAddress is an SSM token at synth time).
     const domain = cdk.Fn.select(1, cdk.Fn.split('@', this.emailIdentity.emailIdentityName));
 
+    // Scope the configuration-set grant to the specific name when provided;
+    // fall back to configuration-set/* when no configuration set is configured
+    // ("none") so the grant still covers accounts that do not use one.
+    const configSetResourceName =
+      this.sesConfigurationSetName !== 'none' ? this.sesConfigurationSetName : '*';
+
     // Grant on identity + template + configuration-set ARNs in a single statement
     // so the returned Grant object covers all permissions and the IAM policy stays
     // consolidated.
@@ -177,9 +193,11 @@ export class SesConstruct extends Construct {
         ...Object.values(SesConstruct.TEMPLATES).map(tmpl =>
           stack.formatArn({ service: 'ses', resource: 'template', resourceName: tmpl.name }),
         ),
-        // Wildcard covers any configuration set that may be associated with the
-        // sending identity in this account — the name is not known at synth time.
-        stack.formatArn({ service: 'ses', resource: 'configuration-set', resourceName: '*' }),
+        stack.formatArn({
+          service: 'ses',
+          resource: 'configuration-set',
+          resourceName: configSetResourceName,
+        }),
       ],
       scope: this,
     });

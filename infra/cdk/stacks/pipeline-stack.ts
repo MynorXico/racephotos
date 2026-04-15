@@ -149,6 +149,7 @@ export class PipelineStack extends cdk.Stack {
           sqsMaxConcurrency: 3,
           domainName: param('/racephotos/env/dev/domain-name'),
           certificateArn: param('/racephotos/env/dev/certificate-arn'),
+          sesConfigurationSetName: param('/racephotos/env/dev/ses-configuration-set-name'),
         },
         qa: {
           envName: 'qa',
@@ -161,6 +162,7 @@ export class PipelineStack extends cdk.Stack {
           sqsMaxConcurrency: 3,
           domainName: param('/racephotos/env/qa/domain-name'),
           certificateArn: param('/racephotos/env/qa/certificate-arn'),
+          sesConfigurationSetName: param('/racephotos/env/qa/ses-configuration-set-name'),
         },
         // staging: {
         //     envName: "staging",
@@ -185,6 +187,7 @@ export class PipelineStack extends cdk.Stack {
           sqsMaxConcurrency: 50,
           domainName: param('/racephotos/env/prod/domain-name'),
           certificateArn: param('/racephotos/env/prod/certificate-arn'),
+          sesConfigurationSetName: param('/racephotos/env/prod/ses-configuration-set-name'),
         },
       },
     };
