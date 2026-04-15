@@ -2,6 +2,7 @@ import * as cdk from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import { Template, Match } from 'aws-cdk-lib/assertions';
 import { SesStack } from '../stacks/ses-stack';
+import { SesConstruct } from '../constructs/ses-construct';
 import { EnvConfig } from '../config/types';
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -267,5 +268,45 @@ describe('SesConstruct — grantSendEmail (AC3)', () => {
       }
     }
     expect(foundSesPolicy).toBe(true);
+  });
+
+  test('grantSendEmail includes all four template ARNs (ses:SendTemplatedEmail requires template resource grant)', () => {
+    // Regression test: ses:SendTemplatedEmail requires an IAM grant on the template
+    // resource ARN in addition to the sender identity. Missing template ARNs causes
+    // AccessDenied on SendTemplatedEmail even when the identity grant is correct.
+    const app = new cdk.App();
+    const stack = new SesStack(app, 'TestSesStack', {
+      config: devConfig,
+      env: { account: devConfig.account, region: devConfig.region },
+    });
+    const role = new iam.Role(stack, 'TestRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+    });
+
+    stack.ses.grantSendEmail(role);
+
+    const t = Template.fromStack(stack);
+    const policies = t.findResources('AWS::IAM::Policy');
+
+    // Collect all resource strings from SES statements (some are Fn::Join objects
+    // at synth time, so serialize the whole statement to locate template names).
+    const sesResourceJson = JSON.stringify(
+      Object.values(policies).flatMap(policy => {
+        const stmts = (policy as Record<string, Record<string, Record<string, unknown[]>>>)[
+          'Properties'
+        ]['PolicyDocument']['Statement'] as Record<string, unknown>[];
+        return stmts.filter(stmt => {
+          const actions = stmt['Action'] as string | string[];
+          const arr = Array.isArray(actions) ? actions : [actions];
+          return arr.includes('ses:SendTemplatedEmail');
+        });
+      }),
+    );
+
+    const expectedTemplates = Object.values(SesConstruct.TEMPLATES).map(t => t.name);
+
+    for (const templateName of expectedTemplates) {
+      expect(sesResourceJson).toContain(`template/${templateName}`);
+    }
   });
 });
