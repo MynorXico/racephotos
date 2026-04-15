@@ -141,6 +141,14 @@ export class SesConstruct extends Construct {
    *     in addition to the sender identity. Template names are account-scoped
    *     static strings — no envName suffix needed.
    *
+   *   Configuration set ARN (configuration-set/*):
+   *     When a default configuration set is associated with the SES sending
+   *     identity (common in accounts that have SES configuration sets for
+   *     tracking/suppression), SES enforces IAM on the configuration-set resource
+   *     too. The configuration set name is set per-account outside CDK (e.g. in
+   *     the SES console), so the name is not known at synth time — a wildcard
+   *     scoped to configuration-set/* in this account/region is used.
+   *
    * The domain is extracted from the email address via CFN intrinsics
    * (cdk.Fn.split / cdk.Fn.select) so the ARN is resolved at deploy time from
    * the SSM parameter value, keeping the grant narrowly scoped to this one
@@ -157,8 +165,9 @@ export class SesConstruct extends Construct {
     // is resolved at deploy time (sesFromAddress is an SSM token at synth time).
     const domain = cdk.Fn.select(1, cdk.Fn.split('@', this.emailIdentity.emailIdentityName));
 
-    // Grant on identity + template ARNs in a single statement so the returned
-    // Grant object covers all permissions and the IAM policy stays consolidated.
+    // Grant on identity + template + configuration-set ARNs in a single statement
+    // so the returned Grant object covers all permissions and the IAM policy stays
+    // consolidated.
     return iam.Grant.addToPrincipal({
       grantee,
       actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
@@ -168,6 +177,9 @@ export class SesConstruct extends Construct {
         ...Object.values(SesConstruct.TEMPLATES).map(tmpl =>
           stack.formatArn({ service: 'ses', resource: 'template', resourceName: tmpl.name }),
         ),
+        // Wildcard covers any configuration set that may be associated with the
+        // sending identity in this account — the name is not known at synth time.
+        stack.formatArn({ service: 'ses', resource: 'configuration-set', resourceName: '*' }),
       ],
       scope: this,
     });
