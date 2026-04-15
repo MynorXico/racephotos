@@ -54,15 +54,19 @@ export class SesConstruct extends Construct {
   /**
    * Account-scoped SES template names used by this service.
    * Centralised here so the constructor (template creation) and grantSendEmail
-   * (IAM grant) always reference the same list — adding a template in one place
-   * automatically keeps the IAM grant in sync.
+   * (IAM grant) always reference the same source — adding a template in one
+   * place automatically keeps the IAM grant in sync.
+   *
+   * Named properties are used (rather than an array with indices) so that
+   * each templateName assignment is self-documenting and reordering entries
+   * cannot silently assign the wrong name to a CfnTemplate resource.
    */
-  static readonly TEMPLATE_NAMES = [
-    'racephotos-photographer-claim',
-    'racephotos-runner-claim-confirmation',
-    'racephotos-runner-purchase-approved',
-    'racephotos-runner-redownload-resend',
-  ] as const;
+  static readonly TEMPLATES = {
+    PHOTOGRAPHER_CLAIM: 'racephotos-photographer-claim',
+    RUNNER_CLAIM_CONFIRMATION: 'racephotos-runner-claim-confirmation',
+    RUNNER_PURCHASE_APPROVED: 'racephotos-runner-purchase-approved',
+    RUNNER_REDOWNLOAD_RESEND: 'racephotos-runner-redownload-resend',
+  } as const;
 
   constructor(scope: Construct, id: string, props: SesConstructProps) {
     super(scope, id);
@@ -93,7 +97,7 @@ export class SesConstruct extends Construct {
     // Template 1 — Photographer: new purchase claim (ADR-0001)
     new ses.CfnTemplate(this, 'PhotographerClaimTemplate', {
       template: {
-        templateName: SesConstruct.TEMPLATE_NAMES[0],
+        templateName: SesConstruct.TEMPLATES.PHOTOGRAPHER_CLAIM,
         subjectPart: 'New purchase claim — {{eventName}}',
         htmlPart: fs.readFileSync(path.join(tmplDir, 'photographer-claim.html'), 'utf8'),
         textPart: fs.readFileSync(path.join(tmplDir, 'photographer-claim.txt'), 'utf8'),
@@ -103,7 +107,7 @@ export class SesConstruct extends Construct {
     // Template 2 — Runner: claim confirmation (ADR-0002)
     new ses.CfnTemplate(this, 'RunnerClaimConfirmationTemplate', {
       template: {
-        templateName: SesConstruct.TEMPLATE_NAMES[1],
+        templateName: SesConstruct.TEMPLATES.RUNNER_CLAIM_CONFIRMATION,
         subjectPart: 'Payment claim received — {{eventName}}',
         htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-claim-confirmation.html'), 'utf8'),
         textPart: fs.readFileSync(path.join(tmplDir, 'runner-claim-confirmation.txt'), 'utf8'),
@@ -116,7 +120,7 @@ export class SesConstruct extends Construct {
     // never a short-lived S3 presigned URL. The token does not expire.
     new ses.CfnTemplate(this, 'RunnerPurchaseApprovedTemplate', {
       template: {
-        templateName: SesConstruct.TEMPLATE_NAMES[2],
+        templateName: SesConstruct.TEMPLATES.RUNNER_PURCHASE_APPROVED,
         subjectPart: 'Your photo is ready to download — {{eventName}}',
         htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-purchase-approved.html'), 'utf8'),
         textPart: fs.readFileSync(path.join(tmplDir, 'runner-purchase-approved.txt'), 'utf8'),
@@ -133,7 +137,7 @@ export class SesConstruct extends Construct {
     // structured array and let SES render it.
     new ses.CfnTemplate(this, 'RunnerRedownloadResendTemplate', {
       template: {
-        templateName: SesConstruct.TEMPLATE_NAMES[3],
+        templateName: SesConstruct.TEMPLATES.RUNNER_REDOWNLOAD_RESEND,
         subjectPart: 'Your RaceShots download links',
         htmlPart: fs.readFileSync(path.join(tmplDir, 'runner-redownload-resend.html'), 'utf8'),
         textPart: fs.readFileSync(path.join(tmplDir, 'runner-redownload-resend.txt'), 'utf8'),
@@ -177,7 +181,7 @@ export class SesConstruct extends Construct {
       resourceArns: [
         this.emailIdentityArn,
         stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
-        ...SesConstruct.TEMPLATE_NAMES.map(name =>
+        ...Object.values(SesConstruct.TEMPLATES).map(name =>
           stack.formatArn({ service: 'ses', resource: 'template', resourceName: name }),
         ),
       ],
