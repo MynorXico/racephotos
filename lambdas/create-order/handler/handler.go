@@ -312,7 +312,7 @@ func (h *Handler) sendPhotographerEmail(ctx context.Context, to string, ev *mode
 		"paymentReference":  paymentRef,
 		"dashboardUrl":      h.ApprovalsURL,
 	}); err != nil {
-		slog.ErrorContext(ctx, "SendTemplatedEmail to photographer failed", slog.String("error", err.Error()))
+		slog.ErrorContext(ctx, "SendTemplatedEmail to photographer failed", slog.String("error", err.Error()), slog.String("orderID", orderID))
 	}
 }
 
@@ -326,7 +326,7 @@ func (h *Handler) sendRunnerEmail(ctx context.Context, to string, ev *models.Eve
 		"photoReference":   orderID,
 		"paymentReference": paymentRef,
 	}); err != nil {
-		slog.ErrorContext(ctx, "SendTemplatedEmail to runner failed", slog.String("error", err.Error()))
+		slog.ErrorContext(ctx, "SendTemplatedEmail to runner failed", slog.String("error", err.Error()), slog.String("orderID", orderID))
 	}
 }
 
