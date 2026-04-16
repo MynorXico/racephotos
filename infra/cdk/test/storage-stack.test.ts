@@ -16,7 +16,6 @@ const devConfig: EnvConfig = {
     sqsMaxConcurrency: 3,
   domainName: 'none',
   certificateArn: 'none',
-  sesConfigurationSetName: 'none',
 };
 
 const prodConfig: EnvConfig = {

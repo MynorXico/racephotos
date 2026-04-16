@@ -34,16 +34,6 @@ export interface EnvConfig {
    * Loaded from SSM: /racephotos/env/{envName}/certificate-arn
    */
   certificateArn: string;
-  /**
-   * SES configuration set name associated with the verified sender identity.
-   * When an SES configuration set is attached to the sending identity (e.g. for
-   * click/open tracking or suppression lists via the SES console), SES enforces
-   * IAM on the configuration-set resource during SendTemplatedEmail calls.
-   * Providing the name allows grantSendEmail to scope the grant to that specific
-   * ARN rather than using configuration-set/*.
-   * Use "none" if no configuration set is associated with the sending identity.
-   */
-  sesConfigurationSetName: string;
 }
 
 export interface PipelineConfig {

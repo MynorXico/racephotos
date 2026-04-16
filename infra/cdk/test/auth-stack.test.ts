@@ -16,7 +16,6 @@ const localConfig: EnvConfig = {
     sqsMaxConcurrency: 3,
   domainName: 'none',
   certificateArn: 'none',
-  sesConfigurationSetName: 'none',
 };
 
 const devConfig: EnvConfig = {
@@ -30,7 +29,6 @@ const devConfig: EnvConfig = {
     sqsMaxConcurrency: 3,
   domainName: 'none',
   certificateArn: 'none',
-  sesConfigurationSetName: 'none',
 };
 
 const prodConfig: EnvConfig = {
@@ -40,7 +38,6 @@ const prodConfig: EnvConfig = {
     sqsMaxConcurrency: 50,
   domainName: 'app.example.com',
   certificateArn: 'arn:aws:acm:us-east-1:000000000000:certificate/test',
-  sesConfigurationSetName: 'none',
 };
 
 const qaConfig: EnvConfig = {
