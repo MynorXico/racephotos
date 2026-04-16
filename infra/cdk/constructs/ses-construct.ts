@@ -35,7 +35,7 @@ interface SesConstructProps {
  * ses:SendEmail + ses:SendTemplatedEmail on the verified identity ARN.
  *
  * SES template variable conventions (Handlebars {{variableName}}):
- *   photographer-claim:        runnerEmailMasked, eventName, photoReference, dashboardUrl
+ *   photographer-claim:        runnerEmailMasked, eventName, photoReference, paymentReference, dashboardUrl
  *   runner-claim-confirmation: eventName, photoReference, paymentReference
  *   runner-purchase-approved:  eventName, downloadUrl
  *   runner-redownload-resend:  downloads (array) — each item: { url, eventName, photoReference }

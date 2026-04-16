@@ -185,7 +185,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	// AC8: notify photographer with masked runner email.
-	h.sendPhotographerEmail(ctx, photographer.Email, ev, paymentRef, req.RunnerEmail)
+	h.sendPhotographerEmail(ctx, photographer.Email, ev, orderID, paymentRef, req.RunnerEmail)
 
 	// AC9: confirm to runner.
 	h.sendRunnerEmail(ctx, req.RunnerEmail, ev, orderID, paymentRef)
@@ -301,14 +301,15 @@ func (h *Handler) checkIdempotency(ctx context.Context, photoIDs []string, runne
 
 // sendPhotographerEmail sends the photographer claim notification (AC8).
 // Email failures are logged but not returned to the caller — the Order is already persisted.
-// Template variables match racephotos-photographer-claim: runnerEmailMasked, eventName, photoReference, dashboardUrl.
-// photoReference is the payment reference (RS-XXXXX) so the photographer can match the
-// incoming bank transfer to this email.
-func (h *Handler) sendPhotographerEmail(ctx context.Context, to string, ev *models.Event, paymentRef string, runnerEmail string) {
+// Template variables match racephotos-photographer-claim: runnerEmailMasked, eventName, photoReference, paymentReference, dashboardUrl.
+// photoReference is the orderID (consistent with runner email); paymentReference is the RS-XXXXX
+// bank transfer reference so the photographer can match the incoming transfer to this claim.
+func (h *Handler) sendPhotographerEmail(ctx context.Context, to string, ev *models.Event, orderID string, paymentRef string, runnerEmail string) {
 	if err := h.Email.SendTemplatedEmail(ctx, to, "racephotos-photographer-claim", map[string]string{
 		"runnerEmailMasked": maskEmail(runnerEmail),
 		"eventName":         ev.Name,
-		"photoReference":    paymentRef,
+		"photoReference":    orderID,
+		"paymentReference":  paymentRef,
 		"dashboardUrl":      h.ApprovalsURL,
 	}); err != nil {
 		slog.ErrorContext(ctx, "SendTemplatedEmail to photographer failed", slog.String("error", err.Error()))
