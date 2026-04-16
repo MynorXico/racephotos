@@ -171,6 +171,16 @@ for ENV_NAME in dev qa staging prod; do
   fi
   put "/racephotos/env/$ENV_NAME/ses-from-address" "$SES_FROM"
 
+  # SES configuration set name (RS-010)
+  # The name of the SES configuration set associated with the sending identity
+  # in this environment (used for click/open tracking or suppression lists).
+  # Leave blank or enter "none" if no configuration set is associated.
+  # Find the name in SES console → Configuration sets, or under the verified
+  # identity's "Default configuration set" setting.
+  prompt "  SES configuration set name (blank = none)" "/racephotos/env/$ENV_NAME/ses-configuration-set-name" "none"
+  SES_CONFIG_SET="${PROMPT_RESULT:-none}"
+  put "/racephotos/env/$ENV_NAME/ses-configuration-set-name" "$SES_CONFIG_SET"
+
   # Write env-specific parameters to the target environment account.
   # CloudFormation resolves valueForStringParameter at deploy time in the
   # account where the stack is deployed — not in the tools account.
