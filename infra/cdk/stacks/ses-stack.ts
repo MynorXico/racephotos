@@ -45,7 +45,6 @@ export class SesStack extends cdk.Stack {
 
     this.ses = new SesConstruct(this, 'Ses', {
       sesFromAddress,
-      sesConfigurationSetName: config.sesConfigurationSetName,
     });
     this.ses.addArnOutput();
   }

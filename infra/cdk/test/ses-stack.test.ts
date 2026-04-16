@@ -18,7 +18,7 @@ const devConfig: EnvConfig = {
   sqsMaxConcurrency: 3,
   domainName: 'none',
   certificateArn: 'none',
-  sesConfigurationSetName: 'none',
+
 };
 
 const prodConfig: EnvConfig = {
@@ -311,14 +311,14 @@ describe('SesConstruct — grantSendEmail (AC3)', () => {
     }
   });
 
-  test('grantSendEmail uses specific configuration-set ARN when sesConfigurationSetName is provided', () => {
-    const configWithConfigSet: EnvConfig = {
-      ...devConfig,
-      sesConfigurationSetName: 'my-tracking-config-set',
-    };
+  test('grantSendEmail includes configuration-set/* wildcard ARN', () => {
+    // SES enforces IAM on configuration-set resources when a default config set
+    // is attached to the sending identity. The config set name is an SES console
+    // setting not discoverable at synth time, so a wildcard scoped to this
+    // account/region is used — still narrowly scoped to ses:SendEmail actions.
     const app = new cdk.App();
     const stack = new SesStack(app, 'TestSesStack', {
-      config: configWithConfigSet,
+      config: devConfig,
       env: { account: devConfig.account, region: devConfig.region },
     });
     const role = new iam.Role(stack, 'TestRole', {
@@ -331,26 +331,6 @@ describe('SesConstruct — grantSendEmail (AC3)', () => {
     const policies = t.findResources('AWS::IAM::Policy');
     const sesResourceJson = JSON.stringify(Object.values(policies));
 
-    expect(sesResourceJson).toContain('configuration-set/my-tracking-config-set');
-    expect(sesResourceJson).not.toContain('configuration-set/*');
-  });
-
-  test('grantSendEmail omits configuration-set resource entirely when sesConfigurationSetName is "none"', () => {
-    const app = new cdk.App();
-    const stack = new SesStack(app, 'TestSesStack', {
-      config: devConfig, // sesConfigurationSetName: 'none'
-      env: { account: devConfig.account, region: devConfig.region },
-    });
-    const role = new iam.Role(stack, 'TestRole', {
-      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
-    });
-
-    stack.ses.grantSendEmail(role);
-
-    const t = Template.fromStack(stack);
-    const policies = t.findResources('AWS::IAM::Policy');
-    const sesResourceJson = JSON.stringify(Object.values(policies));
-
-    expect(sesResourceJson).not.toContain('configuration-set/');
+    expect(sesResourceJson).toContain('configuration-set/*');
   });
 });

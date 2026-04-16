@@ -15,14 +15,6 @@ interface SesConstructProps {
    * control. SSM is the correct layer for this value.
    */
   sesFromAddress: string;
-  /**
-   * SES configuration set name associated with the verified sender identity.
-   * When set (not "none"), grantSendEmail scopes the configuration-set IAM grant
-   * to this specific ARN rather than using configuration-set/*.
-   * Use "none" if no configuration set is associated with the sending identity.
-   * Sourced from EnvConfig.sesConfigurationSetName.
-   */
-  sesConfigurationSetName: string;
 }
 
 /**
@@ -58,7 +50,6 @@ export class SesConstruct extends Construct {
   readonly emailIdentityArn: string;
 
   private readonly emailIdentity: ses.EmailIdentity;
-  private readonly sesConfigurationSetName: string;
 
   /**
    * SES template definitions — the single source of truth for all four templates.
@@ -104,8 +95,7 @@ export class SesConstruct extends Construct {
   constructor(scope: Construct, id: string, props: SesConstructProps) {
     super(scope, id);
 
-    const { sesFromAddress, sesConfigurationSetName } = props;
-    this.sesConfigurationSetName = sesConfigurationSetName;
+    const { sesFromAddress } = props;
     const tmplDir = path.join(__dirname, 'ses-templates');
 
     // ── Verified sender identity ────────────────────────────────────────────
@@ -151,12 +141,13 @@ export class SesConstruct extends Construct {
    *     in addition to the sender identity. Template names are account-scoped
    *     static strings — no envName suffix needed.
    *
-   *   Configuration set ARN:
+   *   Configuration set ARN (configuration-set/*):
    *     When a default configuration set is associated with the SES sending
    *     identity (common in accounts that have SES configuration sets for
    *     tracking/suppression), SES enforces IAM on the configuration-set resource
-   *     too. This grant is added only when a configuration set name is provided
-   *     (not "none").
+   *     too. A wildcard scoped to configuration-set/* in this account/region is
+   *     used — the configuration set name is an SES console setting not known at
+   *     synth time and not discoverable without manual inspection.
    *
    * The domain is extracted from the email address via CFN intrinsics
    * (cdk.Fn.split / cdk.Fn.select) so the ARN is resolved at deploy time from
@@ -174,32 +165,17 @@ export class SesConstruct extends Construct {
     // is resolved at deploy time (sesFromAddress is an SSM token at synth time).
     const domain = cdk.Fn.select(1, cdk.Fn.split('@', this.emailIdentity.emailIdentityName));
 
-    // Build the resource ARN list. The configuration-set ARN is included only
-    // when a configuration set name is explicitly provided — omitting it when
-    // "none" avoids granting access to configuration sets that don't exist for
-    // this environment (principle of least privilege).
-    const resourceArns = [
-      this.emailIdentityArn,
-      stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
-      ...Object.values(SesConstruct.TEMPLATES).map(tmpl =>
-        stack.formatArn({ service: 'ses', resource: 'template', resourceName: tmpl.name }),
-      ),
-    ];
-
-    if (this.sesConfigurationSetName !== 'none') {
-      resourceArns.push(
-        stack.formatArn({
-          service: 'ses',
-          resource: 'configuration-set',
-          resourceName: this.sesConfigurationSetName,
-        }),
-      );
-    }
-
     return iam.Grant.addToPrincipal({
       grantee,
       actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
-      resourceArns,
+      resourceArns: [
+        this.emailIdentityArn,
+        stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
+        ...Object.values(SesConstruct.TEMPLATES).map(tmpl =>
+          stack.formatArn({ service: 'ses', resource: 'template', resourceName: tmpl.name }),
+        ),
+        stack.formatArn({ service: 'ses', resource: 'configuration-set', resourceName: '*' }),
+      ],
       scope: this,
     });
   }
