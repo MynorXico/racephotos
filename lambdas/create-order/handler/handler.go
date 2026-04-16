@@ -185,10 +185,10 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	// AC8: notify photographer with masked runner email.
-	h.sendPhotographerEmail(ctx, photographer.Email, ev, len(photoIDs), totalAmount, req.RunnerEmail)
+	h.sendPhotographerEmail(ctx, photographer.Email, ev, orderID, paymentRef, req.RunnerEmail)
 
 	// AC9: confirm to runner.
-	h.sendRunnerEmail(ctx, req.RunnerEmail, ev, paymentRef, totalAmount)
+	h.sendRunnerEmail(ctx, req.RunnerEmail, ev, orderID, paymentRef)
 
 	// paymentRef is a financial identifier — never log it in plain text (CLAUDE.md).
 	slog.InfoContext(ctx, "order created",
@@ -301,29 +301,32 @@ func (h *Handler) checkIdempotency(ctx context.Context, photoIDs []string, runne
 
 // sendPhotographerEmail sends the photographer claim notification (AC8).
 // Email failures are logged but not returned to the caller — the Order is already persisted.
-func (h *Handler) sendPhotographerEmail(ctx context.Context, to string, ev *models.Event, photoCount int, totalAmount float64, runnerEmail string) {
+// Template variables match racephotos-photographer-claim: runnerEmailMasked, eventName, photoReference, paymentReference, dashboardUrl.
+// photoReference is the orderID (consistent with runner email); paymentReference is the RS-XXXXX
+// bank transfer reference so the photographer can match the incoming transfer to this claim.
+func (h *Handler) sendPhotographerEmail(ctx context.Context, to string, ev *models.Event, orderID string, paymentRef string, runnerEmail string) {
 	if err := h.Email.SendTemplatedEmail(ctx, to, "racephotos-photographer-claim", map[string]string{
-		"maskedRunnerEmail": maskEmail(runnerEmail),
+		"runnerEmailMasked": maskEmail(runnerEmail),
 		"eventName":         ev.Name,
-		"photoCount":        fmt.Sprintf("%d", photoCount),
-		"totalAmount":       fmt.Sprintf("%.2f", totalAmount),
-		"currency":          ev.Currency,
-		"approvalsUrl":      h.ApprovalsURL,
+		"photoReference":    orderID,
+		"paymentReference":  paymentRef,
+		"dashboardUrl":      h.ApprovalsURL,
 	}); err != nil {
-		slog.ErrorContext(ctx, "SendTemplatedEmail to photographer failed", slog.String("error", err.Error()))
+		slog.ErrorContext(ctx, "SendTemplatedEmail to photographer failed", slog.String("error", err.Error()), slog.String("orderID", orderID))
 	}
 }
 
 // sendRunnerEmail sends the runner claim confirmation (AC9).
 // Email failures are logged but not returned to the caller.
-func (h *Handler) sendRunnerEmail(ctx context.Context, to string, ev *models.Event, paymentRef string, totalAmount float64) {
+// Template variables match racephotos-runner-claim-confirmation: eventName, photoReference, paymentReference.
+// photoReference is the orderID; paymentReference is the RS-XXXXX bank transfer reference.
+func (h *Handler) sendRunnerEmail(ctx context.Context, to string, ev *models.Event, orderID string, paymentRef string) {
 	if err := h.Email.SendTemplatedEmail(ctx, to, "racephotos-runner-claim-confirmation", map[string]string{
-		"eventName":   ev.Name,
-		"paymentRef":  paymentRef,
-		"totalAmount": fmt.Sprintf("%.2f", totalAmount),
-		"currency":    ev.Currency,
+		"eventName":        ev.Name,
+		"photoReference":   orderID,
+		"paymentReference": paymentRef,
 	}); err != nil {
-		slog.ErrorContext(ctx, "SendTemplatedEmail to runner failed", slog.String("error", err.Error()))
+		slog.ErrorContext(ctx, "SendTemplatedEmail to runner failed", slog.String("error", err.Error()), slog.String("orderID", orderID))
 	}
 }
 
