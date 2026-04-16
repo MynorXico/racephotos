@@ -155,8 +155,8 @@ export class SesConstruct extends Construct {
    *     When a default configuration set is associated with the SES sending
    *     identity (common in accounts that have SES configuration sets for
    *     tracking/suppression), SES enforces IAM on the configuration-set resource
-   *     too. This grant is scoped to the specific configuration set name if
-   *     provided, or falls back to a wildcard (configuration-set/*) if not.
+   *     too. This grant is added only when a configuration set name is provided
+   *     (not "none").
    *
    * The domain is extracted from the email address via CFN intrinsics
    * (cdk.Fn.split / cdk.Fn.select) so the ARN is resolved at deploy time from
@@ -174,30 +174,32 @@ export class SesConstruct extends Construct {
     // is resolved at deploy time (sesFromAddress is an SSM token at synth time).
     const domain = cdk.Fn.select(1, cdk.Fn.split('@', this.emailIdentity.emailIdentityName));
 
-    // Scope the configuration-set grant to the specific name when provided;
-    // fall back to configuration-set/* when no configuration set is configured
-    // ("none") so the grant still covers accounts that do not use one.
-    const configSetResourceName =
-      this.sesConfigurationSetName !== 'none' ? this.sesConfigurationSetName : '*';
+    // Build the resource ARN list. The configuration-set ARN is included only
+    // when a configuration set name is explicitly provided — omitting it when
+    // "none" avoids granting access to configuration sets that don't exist for
+    // this environment (principle of least privilege).
+    const resourceArns = [
+      this.emailIdentityArn,
+      stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
+      ...Object.values(SesConstruct.TEMPLATES).map(tmpl =>
+        stack.formatArn({ service: 'ses', resource: 'template', resourceName: tmpl.name }),
+      ),
+    ];
 
-    // Grant on identity + template + configuration-set ARNs in a single statement
-    // so the returned Grant object covers all permissions and the IAM policy stays
-    // consolidated.
-    return iam.Grant.addToPrincipal({
-      grantee,
-      actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
-      resourceArns: [
-        this.emailIdentityArn,
-        stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
-        ...Object.values(SesConstruct.TEMPLATES).map(tmpl =>
-          stack.formatArn({ service: 'ses', resource: 'template', resourceName: tmpl.name }),
-        ),
+    if (this.sesConfigurationSetName !== 'none') {
+      resourceArns.push(
         stack.formatArn({
           service: 'ses',
           resource: 'configuration-set',
-          resourceName: configSetResourceName,
+          resourceName: this.sesConfigurationSetName,
         }),
-      ],
+      );
+    }
+
+    return iam.Grant.addToPrincipal({
+      grantee,
+      actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
+      resourceArns,
       scope: this,
     });
   }

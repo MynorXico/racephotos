@@ -335,7 +335,7 @@ describe('SesConstruct — grantSendEmail (AC3)', () => {
     expect(sesResourceJson).not.toContain('configuration-set/*');
   });
 
-  test('grantSendEmail falls back to configuration-set/* when sesConfigurationSetName is "none"', () => {
+  test('grantSendEmail omits configuration-set resource entirely when sesConfigurationSetName is "none"', () => {
     const app = new cdk.App();
     const stack = new SesStack(app, 'TestSesStack', {
       config: devConfig, // sesConfigurationSetName: 'none'
@@ -351,6 +351,6 @@ describe('SesConstruct — grantSendEmail (AC3)', () => {
     const policies = t.findResources('AWS::IAM::Policy');
     const sesResourceJson = JSON.stringify(Object.values(policies));
 
-    expect(sesResourceJson).toContain('configuration-set/*');
+    expect(sesResourceJson).not.toContain('configuration-set/');
   });
 });
