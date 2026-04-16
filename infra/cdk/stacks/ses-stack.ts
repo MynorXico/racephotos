@@ -43,7 +43,10 @@ export class SesStack extends cdk.Stack {
       `/racephotos/env/${config.envName}/ses-from-address`,
     );
 
-    this.ses = new SesConstruct(this, 'Ses', { sesFromAddress });
+    this.ses = new SesConstruct(this, 'Ses', {
+      sesFromAddress,
+      sesConfigurationSetName: config.sesConfigurationSetName,
+    });
     this.ses.addArnOutput();
   }
 }

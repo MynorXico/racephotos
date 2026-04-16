@@ -15,16 +15,17 @@ const devConfig: EnvConfig = {
   watermarkStyle: 'text_overlay',
   photoRetentionDays: 90,
   enableDeletionProtection: false,
-    sqsMaxConcurrency: 3,
+  sqsMaxConcurrency: 3,
   domainName: 'none',
   certificateArn: 'none',
+  sesConfigurationSetName: 'none',
 };
 
 const prodConfig: EnvConfig = {
   ...devConfig,
   envName: 'prod',
   enableDeletionProtection: true,
-    sqsMaxConcurrency: 50,
+  sqsMaxConcurrency: 50,
 };
 
 // SES from-address is loaded from SSM at deploy time via a CloudFormation
@@ -308,5 +309,48 @@ describe('SesConstruct — grantSendEmail (AC3)', () => {
     for (const templateName of expectedTemplates) {
       expect(sesResourceJson).toContain(`template/${templateName}`);
     }
+  });
+
+  test('grantSendEmail uses specific configuration-set ARN when sesConfigurationSetName is provided', () => {
+    const configWithConfigSet: EnvConfig = {
+      ...devConfig,
+      sesConfigurationSetName: 'my-tracking-config-set',
+    };
+    const app = new cdk.App();
+    const stack = new SesStack(app, 'TestSesStack', {
+      config: configWithConfigSet,
+      env: { account: devConfig.account, region: devConfig.region },
+    });
+    const role = new iam.Role(stack, 'TestRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+    });
+
+    stack.ses.grantSendEmail(role);
+
+    const t = Template.fromStack(stack);
+    const policies = t.findResources('AWS::IAM::Policy');
+    const sesResourceJson = JSON.stringify(Object.values(policies));
+
+    expect(sesResourceJson).toContain('configuration-set/my-tracking-config-set');
+    expect(sesResourceJson).not.toContain('configuration-set/*');
+  });
+
+  test('grantSendEmail omits configuration-set resource entirely when sesConfigurationSetName is "none"', () => {
+    const app = new cdk.App();
+    const stack = new SesStack(app, 'TestSesStack', {
+      config: devConfig, // sesConfigurationSetName: 'none'
+      env: { account: devConfig.account, region: devConfig.region },
+    });
+    const role = new iam.Role(stack, 'TestRole', {
+      assumedBy: new iam.ServicePrincipal('lambda.amazonaws.com'),
+    });
+
+    stack.ses.grantSendEmail(role);
+
+    const t = Template.fromStack(stack);
+    const policies = t.findResources('AWS::IAM::Policy');
+    const sesResourceJson = JSON.stringify(Object.values(policies));
+
+    expect(sesResourceJson).not.toContain('configuration-set/');
   });
 });

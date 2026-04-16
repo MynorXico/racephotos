@@ -8,13 +8,21 @@ import { Construct } from 'constructs';
 interface SesConstructProps {
   /**
    * Verified SES sender email address.
-   * Loaded via ssm.StringParameter.valueFromLookup in the parent stack:
+   * Loaded via ssm.StringParameter.valueForStringParameter in the parent stack:
    *   /racephotos/env/{envName}/ses-from-address
    *
    * NOT stored in EnvConfig — email addresses must not appear in version
    * control. SSM is the correct layer for this value.
    */
   sesFromAddress: string;
+  /**
+   * SES configuration set name associated with the verified sender identity.
+   * When set (not "none"), grantSendEmail scopes the configuration-set IAM grant
+   * to this specific ARN rather than using configuration-set/*.
+   * Use "none" if no configuration set is associated with the sending identity.
+   * Sourced from EnvConfig.sesConfigurationSetName.
+   */
+  sesConfigurationSetName: string;
 }
 
 /**
@@ -50,6 +58,7 @@ export class SesConstruct extends Construct {
   readonly emailIdentityArn: string;
 
   private readonly emailIdentity: ses.EmailIdentity;
+  private readonly sesConfigurationSetName: string;
 
   /**
    * SES template definitions — the single source of truth for all four templates.
@@ -95,7 +104,8 @@ export class SesConstruct extends Construct {
   constructor(scope: Construct, id: string, props: SesConstructProps) {
     super(scope, id);
 
-    const { sesFromAddress } = props;
+    const { sesFromAddress, sesConfigurationSetName } = props;
+    this.sesConfigurationSetName = sesConfigurationSetName;
     const tmplDir = path.join(__dirname, 'ses-templates');
 
     // ── Verified sender identity ────────────────────────────────────────────
@@ -141,6 +151,13 @@ export class SesConstruct extends Construct {
    *     in addition to the sender identity. Template names are account-scoped
    *     static strings — no envName suffix needed.
    *
+   *   Configuration set ARN:
+   *     When a default configuration set is associated with the SES sending
+   *     identity (common in accounts that have SES configuration sets for
+   *     tracking/suppression), SES enforces IAM on the configuration-set resource
+   *     too. This grant is added only when a configuration set name is provided
+   *     (not "none").
+   *
    * The domain is extracted from the email address via CFN intrinsics
    * (cdk.Fn.split / cdk.Fn.select) so the ARN is resolved at deploy time from
    * the SSM parameter value, keeping the grant narrowly scoped to this one
@@ -157,18 +174,32 @@ export class SesConstruct extends Construct {
     // is resolved at deploy time (sesFromAddress is an SSM token at synth time).
     const domain = cdk.Fn.select(1, cdk.Fn.split('@', this.emailIdentity.emailIdentityName));
 
-    // Grant on identity + template ARNs in a single statement so the returned
-    // Grant object covers all permissions and the IAM policy stays consolidated.
+    // Build the resource ARN list. The configuration-set ARN is included only
+    // when a configuration set name is explicitly provided — omitting it when
+    // "none" avoids granting access to configuration sets that don't exist for
+    // this environment (principle of least privilege).
+    const resourceArns = [
+      this.emailIdentityArn,
+      stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
+      ...Object.values(SesConstruct.TEMPLATES).map(tmpl =>
+        stack.formatArn({ service: 'ses', resource: 'template', resourceName: tmpl.name }),
+      ),
+    ];
+
+    if (this.sesConfigurationSetName !== 'none') {
+      resourceArns.push(
+        stack.formatArn({
+          service: 'ses',
+          resource: 'configuration-set',
+          resourceName: this.sesConfigurationSetName,
+        }),
+      );
+    }
+
     return iam.Grant.addToPrincipal({
       grantee,
       actions: ['ses:SendEmail', 'ses:SendTemplatedEmail'],
-      resourceArns: [
-        this.emailIdentityArn,
-        stack.formatArn({ service: 'ses', resource: 'identity', resourceName: domain }),
-        ...Object.values(SesConstruct.TEMPLATES).map(tmpl =>
-          stack.formatArn({ service: 'ses', resource: 'template', resourceName: tmpl.name }),
-        ),
-      ],
+      resourceArns,
       scope: this,
     });
   }
