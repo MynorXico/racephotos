@@ -319,6 +319,7 @@ func (h *Handler) sendPhotographerEmail(ctx context.Context, to string, ev *mode
 // sendRunnerEmail sends the runner claim confirmation (AC9).
 // Email failures are logged but not returned to the caller.
 // Template variables match racephotos-runner-claim-confirmation: eventName, photoReference, paymentReference.
+// photoReference is the orderID; paymentReference is the RS-XXXXX bank transfer reference.
 func (h *Handler) sendRunnerEmail(ctx context.Context, to string, ev *models.Event, orderID string, paymentRef string) {
 	if err := h.Email.SendTemplatedEmail(ctx, to, "racephotos-runner-claim-confirmation", map[string]string{
 		"eventName":        ev.Name,
