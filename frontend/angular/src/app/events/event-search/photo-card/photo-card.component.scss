@@ -11,10 +11,15 @@
 
 .runner-photo-card {
   overflow: hidden;
-  transition: box-shadow 0.2s ease;
+  transition: box-shadow 0.2s ease, border-color 0.15s ease;
 
   &:hover {
     box-shadow: var(--mat-sys-level3);
+  }
+
+  &.is-selected {
+    border-color: var(--mat-sys-primary);
+    border-width: 2px;
   }
 }
 
@@ -23,6 +28,36 @@
   aspect-ratio: 4 / 3;
   overflow: hidden;
   background: var(--mat-sys-surface-container);
+
+  // Show checkbox on hover (desktop); always visible when checked
+  &:hover .checkbox-wrapper {
+    opacity: 1;
+  }
+}
+
+.checkbox-wrapper {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 1;
+  opacity: 0; // hidden by default on desktop; revealed on hover or when checked
+  min-width: 48px;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  border-radius: 24px;
+  transition: opacity 0.15s ease;
+
+  &.always-visible {
+    opacity: 1;
+  }
+
+  // Always visible on mobile (no hover state on touch)
+  @media (max-width: 1279px) {
+    opacity: 1;
+  }
 }
 
 .thumbnail-img {
@@ -60,24 +95,15 @@
   }
 }
 
-.card-content {
-  padding: 8px 16px 4px;
-
-  .price-line {
-    margin: 0;
-    font-size: 0.875rem;
-  }
+.card-footer {
+  padding: 6px 12px;
 }
 
-.card-actions {
-  padding: 4px 8px 8px;
-}
-
-.purchase-btn {
-  width: 100%;
-  min-height: 48px; // touch target
-
-  @media (min-width: 1280px) {
-    min-height: 36px; // Material default on desktop (hover precision available)
-  }
+.event-name-label {
+  font-size: 0.75rem;
+  color: var(--mat-sys-on-surface-variant);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
 }

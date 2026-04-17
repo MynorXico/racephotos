@@ -1,0 +1,63 @@
+<h3 class="step-heading" cdkFocusInitial tabindex="-1">Review your cart</h3>
+
+@if (photos().length === 0) {
+  <p class="empty-msg">No photos selected.</p>
+} @else {
+  <ul class="cart-list" aria-label="Selected photos">
+    @for (photo of photos(); track photo.id; let last = $last) {
+      <li class="cart-item">
+        <img
+          [src]="photo.watermarkedUrl"
+          [alt]="'Photo from ' + photo.eventName"
+          class="cart-thumbnail"
+        />
+        <div class="cart-item-text">
+          <span class="cart-item-event">{{ photo.eventName }}</span>
+          <span class="cart-item-price">
+            {{ photo.pricePerPhoto | currency: photo.currency : 'symbol' : '1.2-2' }}
+          </span>
+        </div>
+      </li>
+      @if (!last) {
+        <mat-divider />
+      }
+    }
+  </ul>
+
+  <mat-divider class="total-divider" />
+
+  <div class="total-row">
+    <span class="total-label">Total</span>
+    <span
+      class="total-value"
+      [attr.aria-label]="'Total: ' + (total() | currency: (currency() ?? 'USD') : 'symbol' : '1.2-2')"
+    >
+      {{ total() | currency: (currency() ?? 'USD') : 'symbol' : '1.2-2' }}
+    </span>
+  </div>
+}
+
+<div class="action-row">
+  <button
+    mat-button
+    class="edit-cart-btn"
+    aria-label="Edit cart — return to photo selection"
+    data-testid="edit-cart-btn"
+    (click)="onEditCart()"
+  >
+    <mat-icon>arrow_back</mat-icon>
+    Edit cart
+  </button>
+
+  @if (photos().length > 0) {
+    <button
+      mat-flat-button
+      color="primary"
+      class="continue-btn"
+      data-testid="continue-btn"
+      (click)="onContinue()"
+    >
+      Continue to checkout
+    </button>
+  }
+</div>

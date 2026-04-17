@@ -1,3 +1,19 @@
+@if (cartCount() > 0) {
+  <div class="selection-toolbar" role="toolbar" aria-label="Photo selection toolbar">
+    <span class="selection-summary" aria-live="polite">
+      <strong>{{ cartCount() }} photo(s)</strong> selected
+    </span>
+    <button
+      mat-flat-button
+      color="primary"
+      class="purchase-btn"
+      (click)="onPurchase()"
+    >
+      Purchase ({{ cartCount() }} photos)
+    </button>
+  </div>
+}
+
 <div
   class="photo-grid"
   role="list"
@@ -8,6 +24,8 @@
       [photo]="photo"
       [pricePerPhoto]="pricePerPhoto"
       [currency]="currency"
+      [eventId]="eventId"
+      [eventName]="eventName"
       [searchedBib]="searchedBib"
       (photoSelected)="photoSelected.emit($event)"
     />

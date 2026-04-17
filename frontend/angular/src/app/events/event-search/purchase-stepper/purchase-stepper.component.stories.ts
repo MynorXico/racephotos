@@ -12,12 +12,22 @@ import {
   selectPurchaseLoading,
   selectPurchaseError,
   selectMaskedEmail,
-  selectActivePhotoId,
+  selectActivePhotoIds,
   selectPaymentRef,
   selectTotalAmount,
   selectCurrency,
   selectBankDetails,
 } from '../../../store/purchases/purchases.selectors';
+import {
+  selectCartPhotoIds,
+  selectCartPhotos,
+  selectCartTotal,
+  selectCartCurrency,
+  selectCartCount,
+  selectCartEventId,
+  selectCartFull,
+} from '../../../store/cart/cart.selectors';
+import { PhotoSummary } from '../../../store/cart/cart.actions';
 
 // eslint-disable-next-line @typescript-eslint/no-empty-function
 const noop = () => {};
@@ -34,19 +44,35 @@ const bankDetails = {
   bankInstructions: '',
 };
 
+const cartPhoto: PhotoSummary = {
+  id: 'photo-1',
+  eventId: 'event-1',
+  eventName: 'City Marathon 2026',
+  watermarkedUrl: 'https://picsum.photos/seed/racephotos/400/300',
+  pricePerPhoto: 75,
+  currency: 'GTQ',
+};
+
 const baseSelectors = [
   { selector: selectPurchaseLoading, value: false },
   { selector: selectPurchaseError, value: null },
   { selector: selectMaskedEmail, value: 'r***@gmail.com' },
-  { selector: selectActivePhotoId, value: 'photo-1' },
+  { selector: selectActivePhotoIds, value: ['photo-1'] },
   { selector: selectPaymentRef, value: 'RS-AB12CD34' },
   { selector: selectTotalAmount, value: 75 },
   { selector: selectCurrency, value: 'GTQ' },
   { selector: selectBankDetails, value: bankDetails },
+  { selector: selectCartPhotoIds, value: ['photo-1'] },
+  { selector: selectCartPhotos, value: [cartPhoto] },
+  { selector: selectCartTotal, value: 75 },
+  { selector: selectCartCurrency, value: 'GTQ' },
+  { selector: selectCartCount, value: 1 },
+  { selector: selectCartEventId, value: 'event-1' },
+  { selector: selectCartFull, value: false },
 ];
 
 const sharedProviders = [
-  { provide: MAT_DIALOG_DATA, useValue: { photoId: 'photo-1' } },
+  { provide: MAT_DIALOG_DATA, useValue: { photoIds: ['photo-1'] } },
   { provide: MatDialogRef, useValue: noopDialogRef },
   { provide: Clipboard, useValue: { copy: () => true } },
   { provide: MatSnackBar, useValue: { open: noop } },
@@ -64,6 +90,18 @@ const meta: Meta<PurchaseStepperComponent> = {
 };
 export default meta;
 type Story = StoryObj<PurchaseStepperComponent>;
+
+export const Step0: Story = {
+  name: 'Step 0 — Cart review',
+  decorators: [
+    moduleMetadata({
+      providers: [
+        ...sharedProviders,
+        provideMockStore({ selectors: baseSelectors }),
+      ],
+    }),
+  ],
+};
 
 export const Step1: Story = {
   name: 'Step 1 — Email',
@@ -88,8 +126,7 @@ export const Step2: Story = {
     }),
   ],
   play: async ({ canvasElement }) => {
-    // Advance to step 2 by clicking "next" programmatically is complex in
-    // Storybook without a real store. This story documents the intended state.
+    // Advancing steps requires dispatching NgRx actions — documented here for reference.
     void canvasElement;
   },
 };

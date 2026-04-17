@@ -120,6 +120,8 @@
         [photos]="photos()"
         [pricePerPhoto]="selectedEvent()!.pricePerPhoto"
         [currency]="selectedEvent()!.currency"
+        [eventId]="eventId()"
+        [eventName]="selectedEvent()?.name ?? ''"
         [searchedBib]="searchedBib() ?? ''"
         (photoSelected)="onPhotoSelected($event)"
       />

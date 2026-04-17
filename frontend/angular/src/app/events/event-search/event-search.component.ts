@@ -35,7 +35,7 @@ import {
 import { EventsActions } from '../../store/events/events.actions';
 import { selectSelectedEvent, selectEventsLoading } from '../../store/events/events.selectors';
 import { PurchasesActions } from '../../store/purchases/purchases.actions';
-import { selectActivePhotoId } from '../../store/purchases/purchases.selectors';
+import { selectActivePhotoIds } from '../../store/purchases/purchases.selectors';
 import { RunnerPhotoGridComponent } from './photo-grid/photo-grid.component';
 import {
   PhotoDetailComponent,
@@ -125,6 +125,8 @@ export class EventSearchComponent implements OnInit, OnDestroy {
           photo,
           pricePerPhoto: event.pricePerPhoto,
           currency: event.currency,
+          eventId: this.eventId(),
+          eventName: event.name,
         };
         this.dialogRef = this.dialog.open(PhotoDetailComponent, {
           data,
@@ -150,7 +152,7 @@ export class EventSearchComponent implements OnInit, OnDestroy {
     // When the runner initiates a purchase: close the photo-detail dialog and open the stepper.
     this.actions$
       .pipe(ofType(PurchasesActions.initiatePurchase), takeUntilDestroyed(this._destroyRef))
-      .subscribe(({ photoId }) => {
+      .subscribe(({ photoIds }) => {
         // Guard: avoid opening a second stepper when initiatePurchase is dispatched
         // while one is already open (e.g. "Try again" from the error step retries
         // the same action inside the existing dialog).
@@ -165,7 +167,7 @@ export class EventSearchComponent implements OnInit, OnDestroy {
           this.dialogRef = null;
         }
 
-        const data: PurchaseStepperDialogData = { photoId };
+        const data: PurchaseStepperDialogData = { photoIds };
         this.purchaseDialogRef = this.dialog.open(PurchaseStepperComponent, {
           data,
           width: '560px',
@@ -180,14 +182,14 @@ export class EventSearchComponent implements OnInit, OnDestroy {
           .afterClosed()
           .pipe(takeUntilDestroyed(this._destroyRef))
           .subscribe(() => {
-            // Guard: only dispatch resetPurchase if the store still has an active photo,
+            // Guard: only dispatch resetPurchase if the store still has active photo IDs,
             // meaning the dialog was closed by backdrop/external means rather than the
             // "Done" button which already dispatched resetPurchase.
             this.store
-              .select(selectActivePhotoId)
+              .select(selectActivePhotoIds)
               .pipe(take(1))
-              .subscribe((activeId) => {
-                if (activeId) {
+              .subscribe((activeIds) => {
+                if (activeIds && activeIds.length > 0) {
                   this.store.dispatch(PurchasesActions.resetPurchase());
                 }
               });

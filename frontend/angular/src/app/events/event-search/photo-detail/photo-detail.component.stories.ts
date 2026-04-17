@@ -14,6 +14,8 @@ const dialogData: PhotoDetailDialogData = {
   },
   pricePerPhoto: 14.99,
   currency: 'USD',
+  eventId: 'event-1',
+  eventName: 'City Marathon 2026',
 };
 
 // Minimal MatDialogRef stub for Storybook — close() and afterClosed() are no-ops.

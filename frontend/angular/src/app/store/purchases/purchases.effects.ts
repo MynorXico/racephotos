@@ -29,10 +29,10 @@ export class PurchasesEffects {
   submitEmail$ = createEffect(() =>
     this.actions$.pipe(
       ofType(PurchasesActions.submitEmail),
-      exhaustMap(({ photoId, runnerEmail }) =>
+      exhaustMap(({ photoIds, runnerEmail }) =>
         this.http
           .post<CreateOrderResponse>(`${this.apiBase}/orders`, {
-            photoIds: [photoId],
+            photoIds,
             runnerEmail,
           })
           .pipe(
@@ -45,12 +45,12 @@ export class PurchasesEffects {
                 bankDetails: res.bankDetails,
               }),
             ),
-            catchError((err: HttpErrorResponse) =>
+            catchError((_err: HttpErrorResponse) =>
               of(
                 PurchasesActions.submitEmailFailure({
-                  error:
-                    (err.error as { error?: string })?.error ??
-                    'Something went wrong. Please try again.',
+                  // Never surface the server-supplied error body — it may contain
+                  // PII (runner email, order IDs) from the backend response.
+                  error: 'Something went wrong. Please try again.',
                 }),
               ),
             ),

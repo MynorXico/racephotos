@@ -1,4 +1,5 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { ActivatedRoute, convertToParamMap } from '@angular/router';
 import { MatDialog, MatDialogRef } from '@angular/material/dialog';
@@ -9,6 +10,24 @@ import { Action } from '@ngrx/store';
 import { of } from 'rxjs';
 
 import { EventSearchComponent } from './event-search.component';
+import { RunnerPhoto } from '../../store/runner-photos/runner-photos.actions';
+import { RunnerPhotoGridComponent } from './photo-grid/photo-grid.component';
+
+/** Stub that replaces RunnerPhotoGridComponent — avoids pulling in MatDialogModule. */
+@Component({
+  selector: 'app-runner-photo-grid',
+  template: '',
+  standalone: true,
+})
+class StubRunnerPhotoGridComponent {
+  @Input() photos: RunnerPhoto[] = [];
+  @Input() pricePerPhoto = 0;
+  @Input() currency = '';
+  @Input() eventId = '';
+  @Input() eventName = '';
+  @Input() searchedBib = '';
+  @Output() photoSelected = new EventEmitter<string>();
+}
 import { RunnerPhotosActions } from '../../store/runner-photos/runner-photos.actions';
 import { EventsActions } from '../../store/events/events.actions';
 import {
@@ -24,7 +43,7 @@ import {
   selectSelectedEvent,
   selectEventsLoading,
 } from '../../store/events/events.selectors';
-import { selectActivePhotoId } from '../../store/purchases/purchases.selectors';
+import { selectActivePhotoIds } from '../../store/purchases/purchases.selectors';
 
 const mockEvent = {
   id: 'event-123',
@@ -80,7 +99,14 @@ describe('EventSearchComponent', () => {
         { provide: ActivatedRoute, useValue: buildActivatedRoute('event-123') },
         { provide: MatDialog, useValue: dialogSpy },
       ],
-    }).compileComponents();
+    })
+      // Replace the real grid (which transitively imports MatDialogModule) with a stub
+      // so the MatDialog spy is not shadowed by a module-provided instance.
+      .overrideComponent(EventSearchComponent, {
+        remove: { imports: [RunnerPhotoGridComponent] },
+        add: { imports: [StubRunnerPhotoGridComponent] },
+      })
+      .compileComponents();
 
     store = TestBed.inject(MockStore);
 
@@ -94,7 +120,7 @@ describe('EventSearchComponent', () => {
     store.overrideSelector(selectSelectedPhoto, null);
     store.overrideSelector(selectSelectedEvent, null);
     store.overrideSelector(selectEventsLoading, false);
-    store.overrideSelector(selectActivePhotoId, null);
+    store.overrideSelector(selectActivePhotoIds, null);
 
     spyOn(store, 'dispatch');
 
