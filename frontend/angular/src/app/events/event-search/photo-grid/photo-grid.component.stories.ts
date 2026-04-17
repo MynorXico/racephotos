@@ -20,7 +20,9 @@ const makePhotos = (count: number): RunnerPhoto[] =>
     capturedAt: null,
   }));
 
-const noopDialogSpy = { open: () => ({ afterClosed: () => EMPTY, close: () => {} }) };
+// eslint-disable-next-line @typescript-eslint/no-empty-function
+const noop = (): void => {};
+const noopDialogSpy = { open: () => ({ afterClosed: () => EMPTY, close: noop }) };
 
 const emptyCartSelectors = [
   { selector: selectCartPhotoIds, value: [] },

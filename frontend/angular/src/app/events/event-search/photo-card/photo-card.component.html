@@ -1,17 +1,14 @@
 <mat-card appearance="outlined" class="runner-photo-card" [class.is-selected]="isInCart()">
   <div class="thumbnail-container">
     <!-- Checkbox overlay -->
-    <div
-      class="checkbox-wrapper"
-      [class.always-visible]="isInCart()"
-      (click)="$event.stopPropagation()"
-    >
+    <div class="checkbox-wrapper" role="presentation" [class.always-visible]="isInCart()">
       <mat-checkbox
         [checked]="isInCart()"
         [disabled]="checkboxDisabled()"
         [attr.aria-label]="checkboxAriaLabel"
         [matTooltip]="tooltipText"
         matTooltipTouchGestures="on"
+        (click)="$event.stopPropagation()"
         (change)="onCheckboxChange($event)"
       />
     </div>

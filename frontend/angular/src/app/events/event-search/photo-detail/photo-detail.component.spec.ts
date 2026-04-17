@@ -6,7 +6,6 @@ import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { PhotoDetailComponent, PhotoDetailDialogData } from './photo-detail.component';
 import { RunnerPhotosActions } from '../../../store/runner-photos/runner-photos.actions';
 import { PurchasesActions } from '../../../store/purchases/purchases.actions';
-import { CartActions } from '../../../store/cart/cart.actions';
 
 const dialogData: PhotoDetailDialogData = {
   photo: {

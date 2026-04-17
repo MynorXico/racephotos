@@ -1,6 +1,7 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MatDialog } from '@angular/material/dialog';
+import { MatCheckboxChange } from '@angular/material/checkbox';
 import { provideMockStore, MockStore } from '@ngrx/store/testing';
 
 import { RunnerPhotoCardComponent } from './photo-card.component';
@@ -131,7 +132,7 @@ describe('RunnerPhotoCardComponent', () => {
     store.overrideSelector(selectCartPhotoIds, ['photo-1']);
     store.refreshState();
     fixture.detectChanges();
-    component.onCheckboxChange({ checked: false } as any);
+    component.onCheckboxChange({ checked: false } as MatCheckboxChange);
     expect(dispatchSpy).toHaveBeenCalledWith(
       jasmine.objectContaining({ type: '[Cart] Remove From Cart', photoId: 'photo-1' }),
     );
@@ -139,7 +140,7 @@ describe('RunnerPhotoCardComponent', () => {
 
   it('dispatches addToCart when checkbox is checked and cart is empty', () => {
     const dispatchSpy = spyOn(store, 'dispatch');
-    component.onCheckboxChange({ checked: true } as any);
+    component.onCheckboxChange({ checked: true } as MatCheckboxChange);
     expect(dispatchSpy).toHaveBeenCalledWith(
       jasmine.objectContaining({ type: '[Cart] Add To Cart' }),
     );

@@ -19,7 +19,9 @@ const basePhoto: RunnerPhoto = {
   capturedAt: '2026-06-01T09:30:00Z',
 };
 
-const noopDialogSpy = { open: () => ({ afterClosed: () => EMPTY, close: () => {} }) };
+// eslint-disable-next-line @typescript-eslint/no-empty-function
+const noop = (): void => {};
+const noopDialogSpy = { open: () => ({ afterClosed: () => EMPTY, close: noop }) };
 
 const emptyCartSelectors = [
   { selector: selectCartPhotoIds, value: [] },
