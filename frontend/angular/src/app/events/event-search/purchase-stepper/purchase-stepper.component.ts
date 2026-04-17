@@ -141,6 +141,7 @@ export class PurchaseStepperComponent implements OnInit, OnDestroy {
 
   onErrorDismissed(): void {
     const photoIds = this.cartPhotoIds();
+    if (photoIds.length === 0) return;
     this.store.dispatch(PurchasesActions.initiatePurchase({ photoIds }));
   }
 
