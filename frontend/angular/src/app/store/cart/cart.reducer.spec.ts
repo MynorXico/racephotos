@@ -54,13 +54,11 @@ describe('cart reducer', () => {
       expect(state.eventId).toBe('event-1');
     });
 
-    it('does not duplicate a photo already in the cart', () => {
+    it('is idempotent — adding the same photo twice keeps cart size at 1', () => {
       const withA = reducer(emptyState, CartActions.addToCart({ photo: photoA }));
-      // Adding the same photo again — reducer should be idempotent
       const state = reducer(withA, CartActions.addToCart({ photo: photoA }));
-      // Note: the reducer allows duplicates; deduplication is a UI concern.
-      // This test documents the current behaviour (no dedup at reducer level).
-      expect(state.photoIds).toHaveSize(2);
+      expect(state.photoIds).toHaveSize(1);
+      expect(state.photos).toHaveSize(1);
     });
   });
 
@@ -80,6 +78,13 @@ describe('cart reducer', () => {
       const withAB = reducer(withA, CartActions.addToCart({ photo: photoB }));
       const state = reducer(withAB, CartActions.removeFromCart({ photoId: 'photo-a' }));
       expect(state.eventId).toBe('event-1');
+    });
+
+    it('resets eventId to null when the last photo is removed', () => {
+      const withA = reducer(emptyState, CartActions.addToCart({ photo: photoA }));
+      const state = reducer(withA, CartActions.removeFromCart({ photoId: 'photo-a' }));
+      expect(state.photoIds).toHaveSize(0);
+      expect(state.eventId).toBeNull();
     });
 
     it('no-ops when the photo is not in the cart', () => {

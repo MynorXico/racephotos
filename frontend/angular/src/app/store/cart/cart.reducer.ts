@@ -16,17 +16,25 @@ const initialState: CartState = {
 const cartReducer = createReducer<CartState>(
   initialState,
 
-  on(CartActions.addToCart, (state, { photo }) => ({
-    photoIds: [...state.photoIds, photo.id],
-    eventId: state.eventId ?? photo.eventId,
-    photos: [...state.photos, photo],
-  })),
+  on(CartActions.addToCart, (state, { photo }) => {
+    // Idempotent — adding a photo already in the cart is a no-op.
+    if (state.photoIds.includes(photo.id)) return state;
+    return {
+      photoIds: [...state.photoIds, photo.id],
+      eventId: state.eventId ?? photo.eventId,
+      photos: [...state.photos, photo],
+    };
+  }),
 
-  on(CartActions.removeFromCart, (state, { photoId }) => ({
-    ...state,
-    photoIds: state.photoIds.filter((id) => id !== photoId),
-    photos: state.photos.filter((p) => p.id !== photoId),
-  })),
+  on(CartActions.removeFromCart, (state, { photoId }) => {
+    const photoIds = state.photoIds.filter((id) => id !== photoId);
+    return {
+      photoIds,
+      photos: state.photos.filter((p) => p.id !== photoId),
+      // Reset eventId when the cart empties to avoid stale cross-event detection.
+      eventId: photoIds.length > 0 ? state.eventId : null,
+    };
+  }),
 
   on(CartActions.clearCart, () => initialState),
 
