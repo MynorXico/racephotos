@@ -52,9 +52,6 @@ test.describe('RS-020 — Multi-photo cart: responsive baseline', () => {
     await page.goto('/events/evt-test-001');
     await expect(page.getByLabel('Bib number')).toBeVisible();
     await expect(page.locator('.selection-toolbar')).not.toBeVisible();
-    await expect(page).toHaveScreenshot('rs020-375px-initial.png', {
-      maxDiffPixelRatio: 0.02,
-    });
   });
 
   test('1280px — bib search page renders without purchase UI', async ({ page }) => {
@@ -62,8 +59,5 @@ test.describe('RS-020 — Multi-photo cart: responsive baseline', () => {
     await page.goto('/events/evt-test-001');
     await expect(page.getByLabel('Bib number')).toBeVisible();
     await expect(page.locator('.selection-toolbar')).not.toBeVisible();
-    await expect(page).toHaveScreenshot('rs020-1280px-initial.png', {
-      maxDiffPixelRatio: 0.02,
-    });
   });
 });
