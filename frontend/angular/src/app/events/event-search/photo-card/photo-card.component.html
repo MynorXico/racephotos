@@ -1,5 +1,21 @@
-<mat-card appearance="outlined" class="runner-photo-card">
+<mat-card appearance="outlined" class="runner-photo-card" [class.is-selected]="isInCart()">
   <div class="thumbnail-container">
+    <!-- Checkbox overlay -->
+    <div
+      class="checkbox-wrapper"
+      [class.always-visible]="isInCart()"
+      (click)="$event.stopPropagation()"
+    >
+      <mat-checkbox
+        [checked]="isInCart()"
+        [disabled]="checkboxDisabled()"
+        [attr.aria-label]="checkboxAriaLabel"
+        [matTooltip]="tooltipText"
+        matTooltipTouchGestures="on"
+        (change)="onCheckboxChange($event)"
+      />
+    </div>
+
     @if (!imageError()) {
       <img
         [src]="photo.watermarkedUrl"
@@ -14,20 +30,30 @@
     }
   </div>
 
-  <mat-card-content class="card-content">
-    <p class="price-line">
-      <strong>{{ currency }} {{ pricePerPhoto }}</strong>
-    </p>
-  </mat-card-content>
+  <mat-card-footer class="card-footer">
+    <span class="event-name-label">{{ eventName }}</span>
+  </mat-card-footer>
+</mat-card>
 
-  <mat-card-actions class="card-actions">
+<!-- Cross-event confirmation dialog (inline template — no separate component file) -->
+<ng-template #crossEventConfirm let-dialogRef>
+  <h2 mat-dialog-title>Start a new cart?</h2>
+  <mat-dialog-content>
+    <p>
+      Your cart contains photos from another event. Starting a new cart will remove
+      <strong>{{ cartCount() }} photo(s)</strong>. Continue?
+    </p>
+  </mat-dialog-content>
+  <mat-dialog-actions align="end">
     <button
       mat-stroked-button
-      class="purchase-btn"
-      aria-label="Purchase photo"
-      (click)="$event.stopPropagation(); onCardClick()"
-    >
-      Purchase
-    </button>
-  </mat-card-actions>
-</mat-card>
+      cdkFocusInitial
+      [mat-dialog-close]="false"
+    >Cancel</button>
+    <button
+      mat-flat-button
+      color="primary"
+      [mat-dialog-close]="true"
+    >Continue</button>
+  </mat-dialog-actions>
+</ng-template>

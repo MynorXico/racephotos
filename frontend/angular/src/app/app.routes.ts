@@ -8,6 +8,7 @@ import { photosFeature } from './store/photos/photos.reducer';
 import { PhotosEffects } from './store/photos/photos.effects';
 import { runnerPhotosFeature } from './store/runner-photos/runner-photos.reducer';
 import { RunnerPhotosEffects } from './store/runner-photos/runner-photos.effects';
+import { cartFeature } from './store/cart/cart.reducer';
 
 export const routes: Routes = [
   {
@@ -95,7 +96,7 @@ export const routes: Routes = [
       import('./events/event-search/event-search.component').then(
         (m) => m.EventSearchComponent,
       ),
-    providers: [provideState(runnerPhotosFeature), provideEffects(RunnerPhotosEffects)],
+    providers: [provideState(runnerPhotosFeature), provideEffects(RunnerPhotosEffects), provideState(cartFeature)],
   },
   {
     path: '',

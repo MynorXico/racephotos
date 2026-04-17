@@ -14,12 +14,18 @@ import {
   selectPurchaseLoading,
   selectPurchaseError,
   selectMaskedEmail,
-  selectActivePhotoId,
+  selectActivePhotoIds,
   selectPaymentRef,
   selectTotalAmount,
   selectCurrency,
   selectBankDetails,
 } from '../../../store/purchases/purchases.selectors';
+import {
+  selectCartPhotoIds,
+  selectCartPhotos,
+  selectCartTotal,
+  selectCartCurrency,
+} from '../../../store/cart/cart.selectors';
 
 describe('PurchaseStepperComponent', () => {
   let component: PurchaseStepperComponent;
@@ -42,15 +48,19 @@ describe('PurchaseStepperComponent', () => {
             { selector: selectPurchaseLoading, value: false },
             { selector: selectPurchaseError, value: null },
             { selector: selectMaskedEmail, value: 'r***@gmail.com' },
-            { selector: selectActivePhotoId, value: 'photo-1' },
+            { selector: selectActivePhotoIds, value: ['photo-1'] },
             { selector: selectPaymentRef, value: 'RS-AB12CD34' },
             { selector: selectTotalAmount, value: 75 },
             { selector: selectCurrency, value: 'GTQ' },
             { selector: selectBankDetails, value: null },
+            { selector: selectCartPhotoIds, value: ['photo-1'] },
+            { selector: selectCartPhotos, value: [] },
+            { selector: selectCartTotal, value: 0 },
+            { selector: selectCartCurrency, value: null },
           ],
         }),
         provideMockActions(() => actions$),
-        { provide: MAT_DIALOG_DATA, useValue: { photoId: 'photo-1' } },
+        { provide: MAT_DIALOG_DATA, useValue: { photoIds: ['photo-1'] } },
         { provide: MatDialogRef, useValue: dialogRef },
         { provide: Clipboard, useValue: jasmine.createSpyObj('Clipboard', ['copy']) },
         { provide: MatSnackBar, useValue: jasmine.createSpyObj('MatSnackBar', ['open']) },
@@ -67,11 +77,11 @@ describe('PurchaseStepperComponent', () => {
     expect(component).toBeTruthy();
   });
 
-  it('should dispatch submitEmail when email is confirmed', () => {
+  it('should dispatch submitEmail with cart photo IDs when email is confirmed', () => {
     const dispatchSpy = spyOn(store, 'dispatch');
     component.onEmailConfirmed('runner@example.com');
     expect(dispatchSpy).toHaveBeenCalledWith(
-      PurchasesActions.submitEmail({ photoId: 'photo-1', runnerEmail: 'runner@example.com' }),
+      PurchasesActions.submitEmail({ photoIds: ['photo-1'], runnerEmail: 'runner@example.com' }),
     );
   });
 

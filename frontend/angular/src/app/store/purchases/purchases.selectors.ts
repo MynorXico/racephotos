@@ -3,7 +3,7 @@ import { purchasesFeature } from './purchases.reducer';
 
 export const {
   selectPurchasesState,
-  selectActivePhotoId,
+  selectActivePhotoIds,
   selectRunnerEmail,
   selectOrderId,
   selectPaymentRef,

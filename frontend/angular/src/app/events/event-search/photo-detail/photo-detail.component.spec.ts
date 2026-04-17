@@ -6,6 +6,7 @@ import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { PhotoDetailComponent, PhotoDetailDialogData } from './photo-detail.component';
 import { RunnerPhotosActions } from '../../../store/runner-photos/runner-photos.actions';
 import { PurchasesActions } from '../../../store/purchases/purchases.actions';
+import { CartActions } from '../../../store/cart/cart.actions';
 
 const dialogData: PhotoDetailDialogData = {
   photo: {
@@ -15,6 +16,8 @@ const dialogData: PhotoDetailDialogData = {
   },
   pricePerPhoto: 14.99,
   currency: 'USD',
+  eventId: 'event-1',
+  eventName: 'Test Race 2026',
 };
 
 describe('PhotoDetailComponent', () => {
@@ -74,10 +77,13 @@ describe('PhotoDetailComponent', () => {
     expect(dialogRef.close).toHaveBeenCalled();
   });
 
-  it('dispatches initiatePurchase with correct photoId on purchase', () => {
+  it('dispatches addToCart and initiatePurchase on purchase', () => {
     component.onPurchase();
     expect(store.dispatch).toHaveBeenCalledWith(
-      PurchasesActions.initiatePurchase({ photoId: 'photo-abc' }),
+      jasmine.objectContaining({ type: '[Cart] Add To Cart' }),
+    );
+    expect(store.dispatch).toHaveBeenCalledWith(
+      PurchasesActions.initiatePurchase({ photoIds: ['photo-abc'] }),
     );
   });
 });

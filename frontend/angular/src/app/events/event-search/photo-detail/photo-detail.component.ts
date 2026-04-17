@@ -11,11 +11,14 @@ import { Store } from '@ngrx/store';
 
 import { RunnerPhoto } from '../../../store/runner-photos/runner-photos.actions';
 import { PurchasesActions } from '../../../store/purchases/purchases.actions';
+import { CartActions, PhotoSummary } from '../../../store/cart/cart.actions';
 
 export interface PhotoDetailDialogData {
   photo: RunnerPhoto;
   pricePerPhoto: number;
   currency: string;
+  eventId: string;
+  eventName: string;
 }
 
 @Component({
@@ -47,6 +50,15 @@ export class PhotoDetailComponent {
   }
 
   onPurchase(): void {
-    this.store.dispatch(PurchasesActions.initiatePurchase({ photoId: this.data.photo.photoId }));
+    const summary: PhotoSummary = {
+      id: this.data.photo.photoId,
+      eventId: this.data.eventId,
+      eventName: this.data.eventName,
+      watermarkedUrl: this.data.photo.watermarkedUrl,
+      pricePerPhoto: this.data.pricePerPhoto,
+      currency: this.data.currency,
+    };
+    this.store.dispatch(CartActions.addToCart({ photo: summary }));
+    this.store.dispatch(PurchasesActions.initiatePurchase({ photoIds: [this.data.photo.photoId] }));
   }
 }

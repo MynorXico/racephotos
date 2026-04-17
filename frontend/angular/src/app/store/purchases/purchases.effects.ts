@@ -29,10 +29,10 @@ export class PurchasesEffects {
   submitEmail$ = createEffect(() =>
     this.actions$.pipe(
       ofType(PurchasesActions.submitEmail),
-      exhaustMap(({ photoId, runnerEmail }) =>
+      exhaustMap(({ photoIds, runnerEmail }) =>
         this.http
           .post<CreateOrderResponse>(`${this.apiBase}/orders`, {
-            photoIds: [photoId],
+            photoIds,
             runnerEmail,
           })
           .pipe(

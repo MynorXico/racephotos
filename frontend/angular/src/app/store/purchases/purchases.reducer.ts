@@ -2,7 +2,7 @@ import { createFeature, createReducer, on } from '@ngrx/store';
 import { BankDetails, PurchasesActions } from './purchases.actions';
 
 export interface PurchasesState {
-  activePhotoId: string | null;
+  activePhotoIds: string[] | null;
   runnerEmail: string | null;
   orderId: string | null;
   paymentRef: string | null;
@@ -14,7 +14,7 @@ export interface PurchasesState {
 }
 
 const initialState: PurchasesState = {
-  activePhotoId: null,
+  activePhotoIds: null,
   runnerEmail: null,
   orderId: null,
   paymentRef: null,
@@ -28,9 +28,9 @@ const initialState: PurchasesState = {
 const purchasesReducer = createReducer<PurchasesState>(
   initialState,
 
-  on(PurchasesActions.initiatePurchase, (state, { photoId }) => ({
+  on(PurchasesActions.initiatePurchase, (_state, { photoIds }) => ({
     ...initialState,
-    activePhotoId: photoId,
+    activePhotoIds: photoIds,
   })),
 
   on(PurchasesActions.submitEmail, (state, { runnerEmail }) => ({

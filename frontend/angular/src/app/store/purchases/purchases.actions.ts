@@ -18,10 +18,10 @@ export interface SubmitEmailSuccessPayload {
 export const PurchasesActions = createActionGroup({
   source: 'Purchases',
   events: {
-    /** Runner clicks "Purchase this photo" in PhotoDetailComponent. */
-    'Initiate Purchase': props<{ photoId: string }>(),
+    /** Runner clicks "Purchase (N photos)" or "Purchase this photo" — opens the stepper. */
+    'Initiate Purchase': props<{ photoIds: string[] }>(),
     /** Runner confirms email in step 1 — triggers POST /orders. */
-    'Submit Email': props<{ photoId: string; runnerEmail: string }>(),
+    'Submit Email': props<{ photoIds: string[]; runnerEmail: string }>(),
     /** Effect receives 201/200 from POST /orders. */
     'Submit Email Success': props<SubmitEmailSuccessPayload>(),
     /** Effect receives 4xx/5xx from POST /orders. */

@@ -1,5 +1,5 @@
 <div mat-dialog-title class="dialog-title-bar">
-  <h2 class="dialog-title">Purchase photo</h2>
+  <h2 class="dialog-title">Purchase photos</h2>
   <button
     mat-icon-button
     class="close-btn"
@@ -12,6 +12,14 @@
 
 <mat-dialog-content class="dialog-content">
   <mat-stepper #stepper linear orientation="horizontal" class="purchase-stepper">
+
+    <!-- Step 0: Cart review -->
+    <mat-step label="Cart" [editable]="false" [completed]="false">
+      <app-cart-review-step
+        (editCart)="onEditCart()"
+        (continue)="onCartReviewContinue()"
+      />
+    </mat-step>
 
     <!-- Step 1: Email -->
     <mat-step label="Your email" [editable]="false" [completed]="false">
