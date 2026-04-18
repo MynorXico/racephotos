@@ -14,8 +14,8 @@ import { map } from 'rxjs/operators';
 
 import { ApprovalsActions, PendingPurchase } from '../../../../store/approvals/approvals.actions';
 import {
-  selectActionError,
-  selectActionLoading,
+  selectActionErrorMap,
+  selectActionLoadingMap,
   selectApprovalsError,
   selectApprovalsLoading,
   selectPendingPurchases,
@@ -50,6 +50,18 @@ export class ApprovalsTabComponent implements OnInit {
   readonly loading$ = this.store.select(selectApprovalsLoading);
   readonly error$ = this.store.select(selectApprovalsError);
 
+  // Map-level signals avoid creating/destroying subscriptions on every
+  // change-detection cycle when isActionLoading/getActionError are called
+  // from the template.
+  private readonly actionLoadingMap = toSignal(
+    this.store.select(selectActionLoadingMap),
+    { initialValue: {} as Record<string, boolean> },
+  );
+  private readonly actionErrorMap = toSignal(
+    this.store.select(selectActionErrorMap),
+    { initialValue: {} as Record<string, string | null> },
+  );
+
   readonly isMobile = toSignal(
     this.breakpointObserver
       .observe([Breakpoints.XSmall, Breakpoints.Small])
@@ -66,21 +78,11 @@ export class ApprovalsTabComponent implements OnInit {
   }
 
   isActionLoading(purchaseId: string): boolean {
-    let loading = false;
-    this.store
-      .select(selectActionLoading(purchaseId))
-      .subscribe((v) => (loading = v))
-      .unsubscribe();
-    return loading;
+    return this.actionLoadingMap()[purchaseId] ?? false;
   }
 
   getActionError(purchaseId: string): string | null {
-    let error: string | null = null;
-    this.store
-      .select(selectActionError(purchaseId))
-      .subscribe((v) => (error = v))
-      .unsubscribe();
-    return error;
+    return this.actionErrorMap()[purchaseId] ?? null;
   }
 
   onRetry(): void {

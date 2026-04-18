@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync"
 
 	"github.com/aws/aws-lambda-go/events"
 )
@@ -72,36 +73,67 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 	}
 
-	// Collect all purchases across all orders, and collect unique photoIds.
+	// Step 2: query all orders' purchase line items concurrently.
+	// Each order is independent, so we fan out one goroutine per order and
+	// collect results through a buffered channel — eliminates the N×RTT serial cost.
 	type purchaseEntry struct {
 		purchase *purchaseRow
 		orderID  string
 	}
-	var entries []purchaseEntry
-	photoIDSet := make(map[string]bool)
+	type orderResult struct {
+		orderID   string
+		purchases []*purchaseRow
+		err       error
+	}
 
+	resultCh := make(chan orderResult, len(orders))
 	for _, o := range orders {
-		purchases, err := h.Purchases.QueryPurchasesByOrder(ctx, o.ID)
-		if err != nil {
-			slog.ErrorContext(ctx, "QueryPurchasesByOrder failed",
-				slog.String("service", "list-purchases-for-approval"),
-				slog.String("orderID", o.ID),
-				slog.String("error", err.Error()),
-			)
-			return errResponse(500, "internal server error"), nil
-		}
-		for _, p := range purchases {
-			entries = append(entries, purchaseEntry{
-				purchase: &purchaseRow{
+		o := o // capture loop variable
+		go func() {
+			purchases, err := h.Purchases.QueryPurchasesByOrder(ctx, o.ID)
+			if err != nil {
+				resultCh <- orderResult{orderID: o.ID, err: err}
+				return
+			}
+			rows := make([]*purchaseRow, 0, len(purchases))
+			for _, p := range purchases {
+				rows = append(rows, &purchaseRow{
 					id:          p.ID,
 					photoID:     p.PhotoID,
 					runnerEmail: p.RunnerEmail,
 					claimedAt:   p.ClaimedAt,
-				},
-				orderID: o.ID,
-			})
-			photoIDSet[p.PhotoID] = true
+				})
+			}
+			resultCh <- orderResult{orderID: o.ID, purchases: rows}
+		}()
+	}
+
+	var (
+		entries    []purchaseEntry
+		photoIDSet = make(map[string]bool)
+		mu         sync.Mutex // guards entries + photoIDSet during channel drain
+	)
+	var firstErr error
+	for range orders {
+		res := <-resultCh
+		if res.err != nil && firstErr == nil {
+			firstErr = res.err
+			slog.ErrorContext(ctx, "QueryPurchasesByOrder failed",
+				slog.String("service", "list-purchases-for-approval"),
+				slog.String("orderID", res.orderID),
+				slog.String("error", res.err.Error()),
+			)
+			continue // drain remaining goroutines
 		}
+		mu.Lock()
+		for _, p := range res.purchases {
+			entries = append(entries, purchaseEntry{purchase: p, orderID: res.orderID})
+			photoIDSet[p.photoID] = true
+		}
+		mu.Unlock()
+	}
+	if firstErr != nil {
+		return errResponse(500, "internal server error"), nil
 	}
 
 	// Deduplicate photoIds.

@@ -3,7 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of } from 'rxjs';
-import { catchError, map, mergeMap, tap } from 'rxjs/operators';
+import { catchError, map, mergeMap, switchMap, tap } from 'rxjs/operators';
 
 import { AppConfigService } from '../../core/config/app-config.service';
 import { ApprovalsActions, PendingPurchase } from './approvals.actions';
@@ -19,11 +19,13 @@ export class ApprovalsEffects {
     return this.configService.get().apiBaseUrl;
   }
 
-  /** GET /photographer/me/purchases?status=pending — load pending claims. */
+  /** GET /photographer/me/purchases?status=pending — load pending claims.
+   * switchMap cancels any in-flight load request when a new one arrives
+   * (e.g. rapid retries), preventing stale responses from overwriting fresh data. */
   loadPendingPurchases$ = createEffect(() =>
     this.actions$.pipe(
       ofType(ApprovalsActions.loadPendingPurchases),
-      mergeMap(() =>
+      switchMap(() =>
         this.http
           .get<PendingPurchase[]>(
             `${this.apiBase}/photographer/me/purchases?status=pending`,
