@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -214,14 +213,6 @@ func jwtSub(event events.APIGatewayV2HTTPRequest) (string, bool) {
 	return claims, true
 }
 
-func maskEmail(email string) string {
-	at := strings.IndexByte(email, '@')
-	if at <= 0 {
-		return "***"
-	}
-	return email[:1] + "***" + email[at:]
-}
-
 type errorBody struct {
 	Error string `json:"error"`
 }
@@ -254,6 +245,3 @@ func jsonResponse(statusCode int, body any) (events.APIGatewayV2HTTPResponse, er
 	}, nil
 }
 
-// maskEmail is used only for log entries in email-related errors — kept here as a
-// reminder that runnerEmail must never appear unmasked in any log statement.
-var _ = maskEmail
