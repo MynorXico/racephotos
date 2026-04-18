@@ -180,8 +180,8 @@ func (h *Handler) updateOrderStatus(ctx context.Context, orderID, now string) er
 // Failures are logged but not surfaced — the Purchase is already persisted.
 func (h *Handler) sendApprovalEmail(ctx context.Context, runnerEmail, eventName, downloadLink string) {
 	if err := h.Email.SendTemplatedEmail(ctx, runnerEmail, "racephotos-runner-purchase-approved", map[string]string{
-		"eventName":    eventName,
-		"downloadLink": downloadLink,
+		"eventName":   eventName,
+		"downloadUrl": downloadLink,
 	}); err != nil {
 		// runnerEmail is PII — never include it in log output.
 		slog.ErrorContext(ctx, "SendTemplatedEmail to runner failed",
