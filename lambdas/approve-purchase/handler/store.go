@@ -86,28 +86,40 @@ func (s *DynamoPurchaseStore) GetPurchase(ctx context.Context, id string) (*mode
 	return &p, nil
 }
 
+// QueryPurchasesByOrder returns all Purchase line items for the given orderId.
+// Paginates through all DynamoDB pages to ensure the order-status rollup sees
+// every purchase, even for orders with large numbers of line items.
 func (s *DynamoPurchaseStore) QueryPurchasesByOrder(ctx context.Context, orderID string) ([]*models.Purchase, error) {
-	out, err := s.Client.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(s.TableName),
-		IndexName:              aws.String("orderId-index"),
-		KeyConditionExpression: aws.String("#pk = :orderId"),
-		ExpressionAttributeNames: map[string]string{
-			"#pk": "orderId",
-		},
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":orderId": &types.AttributeValueMemberS{Value: orderID},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("QueryPurchasesByOrder: Query: %w", err)
-	}
-	purchases := make([]*models.Purchase, 0, len(out.Items))
-	for i, item := range out.Items {
-		var p models.Purchase
-		if err := attributevalue.UnmarshalMap(item, &p); err != nil {
-			return nil, fmt.Errorf("QueryPurchasesByOrder: unmarshal[%d]: %w", i, err)
+	var purchases []*models.Purchase
+	var lastKey map[string]types.AttributeValue
+
+	for {
+		out, err := s.Client.Query(ctx, &dynamodb.QueryInput{
+			TableName:              aws.String(s.TableName),
+			IndexName:              aws.String("orderId-index"),
+			KeyConditionExpression: aws.String("#pk = :orderId"),
+			ExpressionAttributeNames: map[string]string{
+				"#pk": "orderId",
+			},
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":orderId": &types.AttributeValueMemberS{Value: orderID},
+			},
+			ExclusiveStartKey: lastKey,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("QueryPurchasesByOrder: Query: %w", err)
 		}
-		purchases = append(purchases, &p)
+		for i, item := range out.Items {
+			var p models.Purchase
+			if err := attributevalue.UnmarshalMap(item, &p); err != nil {
+				return nil, fmt.Errorf("QueryPurchasesByOrder: unmarshal[%d]: %w", i, err)
+			}
+			purchases = append(purchases, &p)
+		}
+		if len(out.LastEvaluatedKey) == 0 {
+			break
+		}
+		lastKey = out.LastEvaluatedKey
 	}
 	return purchases, nil
 }
