@@ -177,8 +177,9 @@ func (s *DynamoOrderStore) UpdateOrderStatus(ctx context.Context, id, status, up
 	// When the derived status is approved (e.g. rejecting the last pending purchase
 	// while all siblings are already approved), also write approvedAt so the Order
 	// record is consistent with the approve-purchase code path.
+	// if_not_exists preserves the original approvedAt; retries must not overwrite it.
 	if status == models.OrderStatusApproved {
-		expr += ", #approvedAt = :approvedAt"
+		expr += ", #approvedAt = if_not_exists(#approvedAt, :approvedAt)"
 		exprVals[":approvedAt"] = &types.AttributeValueMemberS{Value: updatedAt}
 		exprNames["#approvedAt"] = "approvedAt"
 	} else if status == models.OrderStatusPending {

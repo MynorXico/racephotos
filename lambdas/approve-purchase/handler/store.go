@@ -192,7 +192,9 @@ func (s *DynamoOrderStore) UpdateOrderStatus(ctx context.Context, id, status, up
 
 	var conditionExpr *string
 	if status == models.OrderStatusApproved {
-		expr += ", #approvedAt = :approvedAt"
+		// if_not_exists preserves the original approvedAt set on first approval;
+		// idempotent retries and concurrent rollups must not overwrite it.
+		expr += ", #approvedAt = if_not_exists(#approvedAt, :approvedAt)"
 		exprVals[":approvedAt"] = &types.AttributeValueMemberS{Value: updatedAt}
 		exprNames["#approvedAt"] = "approvedAt"
 	} else if status == models.OrderStatusPending {
