@@ -114,13 +114,13 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}()
 	}
 
-	// Drain all results sequentially — no mutex needed since only this goroutine
-	// reads entries and photoIDSet.
-	var (
-		entries    []purchaseEntry
-		photoIDSet = make(map[string]bool)
-		firstErr   error
-	)
+	// Drain all results into a map keyed by orderID. Results arrive in non-deterministic
+	// order because goroutines finish at different times, so we collect first and then
+	// iterate the original orders slice to rebuild entries in claimedAt-descending order
+	// (matching the GSI sort guaranteed by QueryPendingOrdersByPhotographer).
+	purchasesByOrderID := make(map[string][]*purchaseRow, len(orders))
+	photoIDSet := make(map[string]bool)
+	var firstErr error
 	for range orders {
 		res := <-resultCh
 		if res.err != nil && firstErr == nil {
@@ -132,13 +132,21 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 			)
 			continue // drain remaining goroutines before returning
 		}
+		purchasesByOrderID[res.orderID] = res.purchases
 		for _, p := range res.purchases {
-			entries = append(entries, purchaseEntry{purchase: p, orderID: res.orderID})
 			photoIDSet[p.photoID] = true
 		}
 	}
 	if firstErr != nil {
 		return errResponse(500, "internal server error"), nil
+	}
+
+	// Rebuild entries in original orders order to preserve claimedAt-desc sort.
+	var entries []purchaseEntry
+	for _, o := range orders {
+		for _, p := range purchasesByOrderID[o.ID] {
+			entries = append(entries, purchaseEntry{purchase: p, orderID: o.ID})
+		}
 	}
 
 	// Deduplicate photoIds.

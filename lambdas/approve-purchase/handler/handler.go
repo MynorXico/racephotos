@@ -98,7 +98,16 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	// Generate downloadToken (UUID v4) — ADR-0002.
-	downloadToken := uuid.New().String()
+	// uuid.NewRandom returns an error rather than panicking if crypto/rand fails.
+	token, err := uuid.NewRandom()
+	if err != nil {
+		slog.ErrorContext(ctx, "failed to generate download token",
+			slog.String("service", "approve-purchase"),
+			slog.String("error", err.Error()),
+		)
+		return errResponse(500, "internal server error"), nil
+	}
+	downloadToken := token.String()
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	// Update the purchase to approved (conditional — fails if concurrent write landed).

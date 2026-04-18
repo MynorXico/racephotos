@@ -190,10 +190,17 @@ func (s *DynamoOrderStore) UpdateOrderStatus(ctx context.Context, id, status, up
 	}
 	exprNames := map[string]string{"#status": "status"}
 
+	var conditionExpr *string
 	if status == models.OrderStatusApproved {
 		expr += ", #approvedAt = :approvedAt"
 		exprVals[":approvedAt"] = &types.AttributeValueMemberS{Value: updatedAt}
 		exprNames["#approvedAt"] = "approvedAt"
+	} else if status == models.OrderStatusPending {
+		// Guard against a stale "pending" rollup overwriting a terminal state written by a
+		// concurrent Lambda that processed the last purchase in this order simultaneously.
+		// ConditionalCheckFailedException here means the terminal state is already correct.
+		conditionExpr = aws.String("attribute_not_exists(#status) OR #status = :pending")
+		exprVals[":pending"] = &types.AttributeValueMemberS{Value: models.OrderStatusPending}
 	}
 
 	_, err := s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
@@ -202,10 +209,16 @@ func (s *DynamoOrderStore) UpdateOrderStatus(ctx context.Context, id, status, up
 			"id": &types.AttributeValueMemberS{Value: id},
 		},
 		UpdateExpression:          aws.String(expr),
+		ConditionExpression:       conditionExpr,
 		ExpressionAttributeNames:  exprNames,
 		ExpressionAttributeValues: exprVals,
 	})
 	if err != nil {
+		var ccf *types.ConditionalCheckFailedException
+		if errors.As(err, &ccf) {
+			// Another Lambda already set the order to a terminal state; nothing to do.
+			return nil
+		}
 		return fmt.Errorf("UpdateOrderStatus: UpdateItem: %w", err)
 	}
 	return nil
