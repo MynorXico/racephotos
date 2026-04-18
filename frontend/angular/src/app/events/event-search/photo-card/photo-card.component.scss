@@ -50,6 +50,10 @@
   --mdc-checkbox-unselected-focus-icon-color: white;
   --mdc-checkbox-unselected-pressed-icon-color: white;
   --mdc-checkbox-unselected-hover-state-layer-color: rgba(255, 255, 255, 0.08);
+  --mdc-checkbox-unselected-focus-state-layer-color: rgba(255, 255, 255, 0.12);
+  --mdc-checkbox-unselected-pressed-state-layer-color: rgba(255, 255, 255, 0.16);
+  // Disabled state (cart full): faded white keeps the affordance legible on dark photos.
+  --mdc-checkbox-disabled-unselected-icon-color: rgba(255, 255, 255, 0.38);
 }
 
 .thumbnail-img {
