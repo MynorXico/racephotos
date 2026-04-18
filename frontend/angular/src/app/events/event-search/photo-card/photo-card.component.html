@@ -1,7 +1,7 @@
 <mat-card appearance="outlined" class="runner-photo-card" [class.is-selected]="isInCart()">
   <div class="thumbnail-container">
     <!-- Checkbox overlay -->
-    <div class="checkbox-wrapper" role="presentation" [class.always-visible]="isInCart()">
+    <div class="checkbox-wrapper" role="presentation">
       <mat-checkbox
         [checked]="isInCart()"
         [disabled]="checkboxDisabled()"
