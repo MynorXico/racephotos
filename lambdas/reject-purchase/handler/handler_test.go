@@ -96,7 +96,7 @@ func TestHandle(t *testing.T) {
 			wantStatus: 409,
 		},
 		{
-			name:           "AC5: already rejected is idempotent — returns 200",
+			name:           "AC5: already rejected is idempotent — returns 200 and repairs order status",
 			purchaseID:     testPurchaseID,
 			photographerID: testPhotographerID,
 			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore) {
@@ -104,6 +104,11 @@ func TestHandle(t *testing.T) {
 				pur.Status = models.OrderStatusRejected
 				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(pur, nil)
 				o.EXPECT().GetOrder(gomock.Any(), testOrderID).Return(ownerOrder(), nil)
+				// Idempotent path still runs updateOrderStatus to repair partial failures.
+				p.EXPECT().QueryPurchasesByOrder(gomock.Any(), testOrderID).Return([]*models.Purchase{
+					{ID: testPurchaseID, Status: models.OrderStatusRejected},
+				}, nil)
+				o.EXPECT().UpdateOrderStatus(gomock.Any(), testOrderID, models.OrderStatusRejected, gomock.Any()).Return(nil)
 			},
 			wantStatus: 200,
 			check: func(t *testing.T, body string) {

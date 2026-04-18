@@ -88,7 +88,19 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	// AC3: idempotent — already approved.
+	// Still run updateOrderStatus to repair any prior partial failure where the Purchase
+	// was written but the Order rollup failed (e.g., Lambda timeout between the two writes).
+	// The ConditionExpression guard in UpdateOrderStatus makes this a safe no-op if the
+	// Order is already in a terminal state.
 	if purchase.Status == models.OrderStatusApproved {
+		if err := h.updateOrderStatus(ctx, order.ID, time.Now().UTC().Format(time.RFC3339)); err != nil {
+			slog.ErrorContext(ctx, "updateOrderStatus failed on idempotent retry",
+				slog.String("service", "approve-purchase"),
+				slog.String("orderID", order.ID),
+				slog.String("error", err.Error()),
+			)
+			// Log but do not fail — the Purchase is already persisted.
+		}
 		return jsonResponse(200, toResponse(purchase))
 	}
 
@@ -158,36 +170,11 @@ func (h *Handler) updateOrderStatus(ctx context.Context, orderID, now string) er
 		return fmt.Errorf("updateOrderStatus: QueryPurchasesByOrder: %w", err)
 	}
 
-	newStatus := deriveOrderStatus(purchases)
+	newStatus := models.DeriveOrderStatus(purchases)
 	if err := h.Orders.UpdateOrderStatus(ctx, orderID, newStatus, now); err != nil {
 		return fmt.Errorf("updateOrderStatus: UpdateOrderStatus: %w", err)
 	}
 	return nil
-}
-
-// deriveOrderStatus computes the aggregate Order status from its Purchase line items.
-// All approved → approved. All rejected → rejected. Any pending → pending.
-func deriveOrderStatus(purchases []*models.Purchase) string {
-	if len(purchases) == 0 {
-		return models.OrderStatusPending
-	}
-	approved, rejected := 0, 0
-	for _, p := range purchases {
-		switch p.Status {
-		case models.OrderStatusApproved:
-			approved++
-		case models.OrderStatusRejected:
-			rejected++
-		}
-	}
-	switch {
-	case approved == len(purchases):
-		return models.OrderStatusApproved
-	case rejected == len(purchases):
-		return models.OrderStatusRejected
-	default:
-		return models.OrderStatusPending
-	}
 }
 
 // sendApprovalEmail sends the runner approval email (ADR-0002).
