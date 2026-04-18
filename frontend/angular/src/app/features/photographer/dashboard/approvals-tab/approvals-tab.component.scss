@@ -118,6 +118,17 @@
   }
 }
 
+// ── Photo placeholder (shown when watermarkedUrl is empty) ───────────────────
+
+.placeholder-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--mat-sys-surface-variant, #e0e0e0);
+  border-radius: 4px;
+  color: var(--mat-sys-on-surface-variant, #757575);
+}
+
 // ── Reject button (error colour) ─────────────────────────────────────────────
 
 .reject-btn {

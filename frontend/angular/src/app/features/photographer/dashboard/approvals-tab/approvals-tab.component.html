@@ -58,11 +58,17 @@
             &nbsp;
           </th>
           <td mat-cell *matCellDef="let row">
-            <img
-              [src]="row.watermarkedUrl"
-              [alt]="'Watermarked photo for ' + row.eventName"
-              class="thumb"
-            />
+            @if (row.watermarkedUrl) {
+              <img
+                [src]="row.watermarkedUrl"
+                [alt]="'Watermarked photo for ' + row.eventName"
+                class="thumb"
+              />
+            } @else {
+              <div class="thumb placeholder-thumb" aria-hidden="true">
+                <mat-icon>image</mat-icon>
+              </div>
+            }
           </td>
         </ng-container>
 
@@ -129,7 +135,7 @@
               @if (getActionError(row.purchaseId)) {
                 <mat-chip-set>
                   <mat-chip class="error-chip" disabled role="alert">
-                    Action failed — try again.
+                    {{ getActionError(row.purchaseId) }}
                   </mat-chip>
                 </mat-chip-set>
               }
@@ -149,11 +155,17 @@
           <mat-card-content>
             <!-- Thumbnail + event name row -->
             <div class="card-thumb-row">
-              <img
-                [src]="purchase.watermarkedUrl"
-                [alt]="'Watermarked photo for ' + purchase.eventName"
-                class="card-thumb"
-              />
+              @if (purchase.watermarkedUrl) {
+                <img
+                  [src]="purchase.watermarkedUrl"
+                  [alt]="'Watermarked photo for ' + purchase.eventName"
+                  class="card-thumb"
+                />
+              } @else {
+                <div class="card-thumb placeholder-thumb" aria-hidden="true">
+                  <mat-icon>image</mat-icon>
+                </div>
+              }
               <span class="mat-title-small event-name">{{ purchase.eventName }}</span>
             </div>
 
@@ -203,7 +215,7 @@
               @if (getActionError(purchase.purchaseId)) {
                 <mat-chip-set>
                   <mat-chip class="error-chip" disabled role="alert">
-                    Action failed — try again.
+                    {{ getActionError(purchase.purchaseId) }}
                   </mat-chip>
                 </mat-chip-set>
               }
