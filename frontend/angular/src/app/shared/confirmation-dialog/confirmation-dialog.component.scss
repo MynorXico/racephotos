@@ -1,0 +1,18 @@
+.dialog-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+
+  span {
+    flex: 1;
+  }
+}
+
+mat-dialog-content p {
+  margin: 0;
+}
+
+mat-dialog-actions {
+  gap: 8px;
+}

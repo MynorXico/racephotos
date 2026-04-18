@@ -4,12 +4,15 @@ import { Construct } from 'constructs';
 import { EnvConfig } from '../config/types';
 import { DatabaseConstruct } from '../constructs/database-construct';
 import { PaymentConstruct } from '../constructs/payment-construct';
+import { PhotoStorageConstruct } from '../constructs/photo-storage-construct';
 import { SesConstruct } from '../constructs/ses-construct';
 
 interface PaymentStackProps extends cdk.StackProps {
   config: EnvConfig;
   /** DatabaseConstruct from StorageStack — provides orders, purchases, photos, events, photographers tables. */
   db: DatabaseConstruct;
+  /** PhotoStorageConstruct from StorageStack — provides cdnDomainName for watermarked photo URLs. */
+  photoStorage: PhotoStorageConstruct;
   /** SesConstruct from SesStack — grants SendTemplatedEmail on the verified identity. */
   ses: SesConstruct;
 }
@@ -35,11 +38,16 @@ export class PaymentStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props: PaymentStackProps) {
     super(scope, id, props);
 
-    const { config, db, ses } = props;
+    const { config, db, photoStorage, ses } = props;
 
     const httpApiId = ssm.StringParameter.valueForStringParameter(
       this,
       `/racephotos/env/${config.envName}/api-id`,
+    );
+
+    const httpAuthorizerId = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/racephotos/env/${config.envName}/api-authorizer-id`,
     );
 
     const sesFromAddress = ssm.StringParameter.valueForStringParameter(
@@ -61,8 +69,10 @@ export class PaymentStack extends cdk.Stack {
       photographersTable: db.photographersTable,
       ses,
       httpApiId,
+      httpAuthorizerId,
       sesFromAddress,
       approvalsUrl,
+      cdnBaseUrl: photoStorage.cdnDomainName,
     });
   }
 }

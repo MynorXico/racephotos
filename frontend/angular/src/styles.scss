@@ -78,3 +78,12 @@ body {
     border-radius: 0;
   }
 }
+
+// ── Confirmation dialog — full-width on narrow mobile ────────────────────────
+// Component SCSS cannot pierce the CDK overlay panel, so this lives globally.
+@media (max-width: 767px) {
+  .mat-mdc-dialog-panel {
+    width: calc(100vw - 32px) !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+}

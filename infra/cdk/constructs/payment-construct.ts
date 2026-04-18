@@ -31,40 +31,69 @@ interface PaymentConstructProps {
    */
   httpApiId: string;
   /**
+   * The Cognito JWT authorizer ID (from SSM valueForStringParameter).
+   * Used for photographer-facing routes (RS-011).
+   */
+  httpAuthorizerId: string;
+  /**
    * SES sender address (from SSM valueForStringParameter).
    * Injected as RACEPHOTOS_SES_FROM_ADDRESS.
    */
   sesFromAddress: string;
   /**
    * Base URL for the photographer approvals dashboard.
-   * Injected as RACEPHOTOS_APPROVALS_URL.
+   * Injected as RACEPHOTOS_APPROVALS_URL (create-order) and
+   * RACEPHOTOS_APP_BASE_URL (approve-purchase download links).
    */
   approvalsUrl: string;
+  /**
+   * CloudFront CDN domain for watermarked photos (no trailing slash, no scheme).
+   * Injected as RACEPHOTOS_CDN_BASE_URL for list-purchases-for-approval.
+   */
+  cdnBaseUrl: string;
 }
 
 /**
- * PaymentConstruct — RS-010
+ * PaymentConstruct — RS-010, RS-011
  *
  * Creates:
- *   - create-order Lambda  POST /orders  (no auth — runner-facing)
+ *   - create-order Lambda              POST /orders                       (no auth — runner-facing)
+ *   - list-purchases-for-approval Lambda GET /photographer/me/purchases   (JWT auth — RS-011)
+ *   - approve-purchase Lambda          PUT  /purchases/{id}/approve       (JWT auth — RS-011)
+ *   - reject-purchase Lambda           PUT  /purchases/{id}/reject        (JWT auth — RS-011)
  *
  * IAM grants:
- *   - dynamodb:PutItem on ordersTable
- *   - dynamodb:GetItem on ordersTable
- *   - dynamodb:PutItem, dynamodb:Query, dynamodb:GetItem on purchasesTable
- *   - dynamodb:GetItem on photosTable
- *   - dynamodb:GetItem on eventsTable
- *   - dynamodb:GetItem on photographersTable
- *   - ses:SendEmail, ses:SendTemplatedEmail (via SesConstruct.grantSendEmail)
+ *   create-order:
+ *     - dynamodb:PutItem, GetItem on ordersTable
+ *     - dynamodb:PutItem, GetItem on purchasesTable
+ *     - dynamodb:Query on purchasesTable/index/photoId-runnerEmail-index
+ *     - dynamodb:GetItem on photosTable, eventsTable, photographersTable
+ *     - ses:SendEmail, ses:SendTemplatedEmail (via SesConstruct.grantSendEmail)
+ *   list-purchases-for-approval:
+ *     - dynamodb:Query on ordersTable/index/photographerId-claimedAt-index
+ *     - dynamodb:Query on purchasesTable/index/orderId-index
+ *     - dynamodb:BatchGetItem on photosTable
+ *   approve-purchase:
+ *     - dynamodb:GetItem, UpdateItem on purchasesTable
+ *     - dynamodb:Query on purchasesTable/index/orderId-index
+ *     - dynamodb:GetItem, UpdateItem on ordersTable
+ *     - ses:SendEmail, ses:SendTemplatedEmail (via SesConstruct.grantSendEmail)
+ *   reject-purchase:
+ *     - dynamodb:GetItem, UpdateItem on purchasesTable
+ *     - dynamodb:Query on purchasesTable/index/orderId-index
+ *     - dynamodb:GetItem, UpdateItem on ordersTable
  *
  * Authorization:
  *   POST /orders is public — no Cognito JWT authorizer is attached.
- *   Runners submit purchase claims without authentication (Journey 3).
+ *   All photographer routes (RS-011) require the Cognito JWT authorizer.
  *
- * AC: RS-010 AC1–AC9
+ * AC: RS-010 AC1–AC9, RS-011 AC1–AC13
  */
 export class PaymentConstruct extends Construct {
   readonly createOrderFn: lambda.Function;
+  readonly listPurchasesForApprovalFn: lambda.Function;
+  readonly approvePurchaseFn: lambda.Function;
+  readonly rejectPurchaseFn: lambda.Function;
 
   constructor(scope: Construct, id: string, props: PaymentConstructProps) {
     super(scope, id);
@@ -78,11 +107,22 @@ export class PaymentConstruct extends Construct {
       photographersTable,
       ses,
       httpApiId,
+      httpAuthorizerId,
       sesFromAddress,
       approvalsUrl,
+      cdnBaseUrl,
     } = props;
 
     const httpApi = apigatewayv2.HttpApi.fromHttpApiAttributes(this, 'HttpApi', { httpApiId });
+
+    // Build an IHttpRouteAuthorizer from the stored authorizer ID — same pattern
+    // as PhotographerConstruct. Required for all RS-011 photographer routes.
+    const jwtAuthorizer: apigatewayv2.IHttpRouteAuthorizer = {
+      bind: () => ({
+        authorizerId: httpAuthorizerId,
+        authorizationType: apigatewayv2.HttpAuthorizerType.JWT,
+      }),
+    };
 
     // ── create-order Lambda ───────────────────────────────────────────────────
     this.createOrderFn = new lambda.Function(this, 'CreateOrderFn', {
@@ -139,6 +179,169 @@ export class PaymentConstruct extends Construct {
         'CreateOrderIntegration',
         this.createOrderFn,
       ),
+    });
+
+    // ── list-purchases-for-approval Lambda ────────────────────────────────────
+    // GET /photographer/me/purchases?status=pending — JWT auth (RS-011 AC1, AC12, AC13).
+    this.listPurchasesForApprovalFn = new lambda.Function(this, 'ListPurchasesForApprovalFn', {
+      functionName: `racephotos-list-purchases-for-approval-${config.envName}`,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
+      architecture: lambda.Architecture.ARM_64,
+      handler: 'bootstrap',
+      memorySize: 256,
+      timeout: cdk.Duration.seconds(15),
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, '../../../lambdas/list-purchases-for-approval'),
+      ),
+      environment: {
+        RACEPHOTOS_ENV: config.envName,
+        RACEPHOTOS_ORDERS_TABLE: ordersTable.tableName,
+        RACEPHOTOS_PURCHASES_TABLE: purchasesTable.tableName,
+        RACEPHOTOS_PHOTOS_TABLE: photosTable.tableName,
+        RACEPHOTOS_CDN_BASE_URL: `https://${cdnBaseUrl}`,
+      },
+    });
+
+    // Query on photographerId-claimedAt-index GSI (orders table).
+    this.listPurchasesForApprovalFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['dynamodb:Query'],
+        resources: [
+          `${ordersTable.tableArn}/index/photographerId-claimedAt-index`,
+        ],
+      }),
+    );
+    // Query on orderId-index GSI (purchases table).
+    this.listPurchasesForApprovalFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['dynamodb:Query'],
+        resources: [
+          `${purchasesTable.tableArn}/index/orderId-index`,
+        ],
+      }),
+    );
+    // BatchGetItem on the photos base table.
+    photosTable.grant(this.listPurchasesForApprovalFn, 'dynamodb:BatchGetItem');
+
+    new ObservabilityConstruct(this, 'ListPurchasesForApprovalObs', {
+      lambda: this.listPurchasesForApprovalFn,
+      logRetentionDays: config.photoRetentionDays,
+    });
+
+    new apigatewayv2.HttpRoute(this, 'ListPurchasesForApprovalRoute', {
+      httpApi,
+      routeKey: apigatewayv2.HttpRouteKey.with(
+        '/photographer/me/purchases',
+        apigatewayv2.HttpMethod.GET,
+      ),
+      integration: new integrations.HttpLambdaIntegration(
+        'ListPurchasesForApprovalIntegration',
+        this.listPurchasesForApprovalFn,
+      ),
+      authorizer: jwtAuthorizer,
+    });
+
+    // ── approve-purchase Lambda ───────────────────────────────────────────────
+    // PUT /purchases/{id}/approve — JWT auth (RS-011 AC2, AC3, AC6, AC7, AC8).
+    this.approvePurchaseFn = new lambda.Function(this, 'ApprovePurchaseFn', {
+      functionName: `racephotos-approve-purchase-${config.envName}`,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
+      architecture: lambda.Architecture.ARM_64,
+      handler: 'bootstrap',
+      memorySize: 256,
+      timeout: cdk.Duration.seconds(15),
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, '../../../lambdas/approve-purchase'),
+      ),
+      environment: {
+        RACEPHOTOS_ENV: config.envName,
+        RACEPHOTOS_PURCHASES_TABLE: purchasesTable.tableName,
+        RACEPHOTOS_ORDERS_TABLE: ordersTable.tableName,
+        RACEPHOTOS_SES_FROM_ADDRESS: sesFromAddress,
+        RACEPHOTOS_APP_BASE_URL: approvalsUrl,
+      },
+    });
+
+    // GetItem + UpdateItem on the purchases base table.
+    purchasesTable.grant(this.approvePurchaseFn, 'dynamodb:GetItem', 'dynamodb:UpdateItem');
+    // Query on orderId-index GSI (purchases table).
+    this.approvePurchaseFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['dynamodb:Query'],
+        resources: [`${purchasesTable.tableArn}/index/orderId-index`],
+      }),
+    );
+    // GetItem + UpdateItem on the orders base table.
+    ordersTable.grant(this.approvePurchaseFn, 'dynamodb:GetItem', 'dynamodb:UpdateItem');
+
+    // SES grant — send runner approval email.
+    ses.grantSendEmail(this.approvePurchaseFn);
+
+    new ObservabilityConstruct(this, 'ApprovePurchaseObs', {
+      lambda: this.approvePurchaseFn,
+      logRetentionDays: config.photoRetentionDays,
+    });
+
+    new apigatewayv2.HttpRoute(this, 'ApprovePurchaseRoute', {
+      httpApi,
+      routeKey: apigatewayv2.HttpRouteKey.with(
+        '/purchases/{id}/approve',
+        apigatewayv2.HttpMethod.PUT,
+      ),
+      integration: new integrations.HttpLambdaIntegration(
+        'ApprovePurchaseIntegration',
+        this.approvePurchaseFn,
+      ),
+      authorizer: jwtAuthorizer,
+    });
+
+    // ── reject-purchase Lambda ────────────────────────────────────────────────
+    // PUT /purchases/{id}/reject — JWT auth (RS-011 AC4, AC5, AC6, AC7, AC8).
+    this.rejectPurchaseFn = new lambda.Function(this, 'RejectPurchaseFn', {
+      functionName: `racephotos-reject-purchase-${config.envName}`,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
+      architecture: lambda.Architecture.ARM_64,
+      handler: 'bootstrap',
+      memorySize: 256,
+      timeout: cdk.Duration.seconds(15),
+      code: lambda.Code.fromAsset(
+        path.join(__dirname, '../../../lambdas/reject-purchase'),
+      ),
+      environment: {
+        RACEPHOTOS_ENV: config.envName,
+        RACEPHOTOS_PURCHASES_TABLE: purchasesTable.tableName,
+        RACEPHOTOS_ORDERS_TABLE: ordersTable.tableName,
+      },
+    });
+
+    // GetItem + UpdateItem on the purchases base table.
+    purchasesTable.grant(this.rejectPurchaseFn, 'dynamodb:GetItem', 'dynamodb:UpdateItem');
+    // Query on orderId-index GSI (purchases table).
+    this.rejectPurchaseFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['dynamodb:Query'],
+        resources: [`${purchasesTable.tableArn}/index/orderId-index`],
+      }),
+    );
+    // GetItem + UpdateItem on the orders base table.
+    ordersTable.grant(this.rejectPurchaseFn, 'dynamodb:GetItem', 'dynamodb:UpdateItem');
+
+    new ObservabilityConstruct(this, 'RejectPurchaseObs', {
+      lambda: this.rejectPurchaseFn,
+      logRetentionDays: config.photoRetentionDays,
+    });
+
+    new apigatewayv2.HttpRoute(this, 'RejectPurchaseRoute', {
+      httpApi,
+      routeKey: apigatewayv2.HttpRouteKey.with(
+        '/purchases/{id}/reject',
+        apigatewayv2.HttpMethod.PUT,
+      ),
+      integration: new integrations.HttpLambdaIntegration(
+        'RejectPurchaseIntegration',
+        this.rejectPurchaseFn,
+      ),
+      authorizer: jwtAuthorizer,
     });
   }
 }

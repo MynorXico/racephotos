@@ -1,0 +1,25 @@
+<div mat-dialog-title class="dialog-title">
+  <span>{{ data.title }}</span>
+  <button mat-icon-button aria-label="Close dialog" (click)="dialogRef.close(false)">
+    <mat-icon>close</mat-icon>
+  </button>
+</div>
+
+<mat-dialog-content>
+  <p class="mat-body-medium">{{ data.message }}</p>
+</mat-dialog-content>
+
+<mat-dialog-actions align="end">
+  <button mat-stroked-button cdkFocusInitial (click)="dialogRef.close(false)">
+    {{ cancelLabel }}
+  </button>
+  @if (data.confirmVariant === 'primary') {
+    <button mat-flat-button color="primary" (click)="dialogRef.close(true)">
+      {{ data.confirmLabel }}
+    </button>
+  } @else {
+    <button mat-flat-button color="warn" (click)="dialogRef.close(true)">
+      {{ data.confirmLabel }}
+    </button>
+  }
+</mat-dialog-actions>

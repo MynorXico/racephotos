@@ -31,7 +31,8 @@ interface RacePhotosStageProps extends cdk.StageProps {
  *   RS-005  → PhotoProcessorStack (Lambda + SQS consumer)
  *   RS-006  → WatermarkStack (Lambda + S3 trigger)
  *   RS-007  → SearchStack (Lambda + API Gateway route)
- *   RS-008  → PaymentStack (Lambda + DynamoDB purchase table)
+ *   RS-008  → PaymentStack (create-order Lambda)
+ *   RS-011  → PaymentStack (approve/reject/list-for-approval Lambdas) + DatabaseConstruct (orderId-index GSI)
  */
 export class RacePhotosStage extends cdk.Stage {
   constructor(scope: Construct, id: string, props: RacePhotosStageProps) {
@@ -127,13 +128,15 @@ export class RacePhotosStage extends cdk.Stage {
     searchStack.addDependency(storage);
     searchStack.addDependency(auth);
 
-    // PaymentStack — RS-010
+    // PaymentStack — RS-010, RS-011
     // create-order Lambda: POST /orders (public, no auth)
-    // Depends on StorageStack (tables) and AuthStack (API) and SesStack (email).
+    // list-purchases-for-approval, approve-purchase, reject-purchase: JWT auth (RS-011)
+    // Depends on StorageStack (tables + CDN), AuthStack (API + JWT authorizer), SesStack (email).
     const paymentStack = new PaymentStack(this, 'Payment', {
       env: props.env,
       config,
       db: storage.db,
+      photoStorage: storage.photoStorage,
       ses: ses.ses,
     });
     paymentStack.addDependency(storage);

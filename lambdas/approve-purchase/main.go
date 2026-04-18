@@ -1,0 +1,72 @@
+// Lambda: approve-purchase
+// HTTP method + route: PUT /purchases/{id}/approve
+// Auth: Cognito JWT required (photographer-facing)
+// Story: RS-011 — Photographer approves or rejects a purchase claim
+//
+// Environment variables:
+//
+//	RACEPHOTOS_ENV             required — "local"|"dev"|"qa"|"staging"|"prod"
+//	RACEPHOTOS_PURCHASES_TABLE required — DynamoDB purchases table name
+//	RACEPHOTOS_ORDERS_TABLE    required — DynamoDB orders table name
+//	RACEPHOTOS_SES_FROM_ADDRESS required — verified SES sender address
+//	RACEPHOTOS_APP_BASE_URL    required — base URL for the download link in the approval email
+package main
+
+import (
+	"context"
+	"log/slog"
+	"os"
+
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/aws-sdk-go-v2/service/ses"
+
+	"github.com/racephotos/approve-purchase/handler"
+)
+
+func main() {
+	purchasesTable := mustGetenv("RACEPHOTOS_PURCHASES_TABLE")
+	ordersTable := mustGetenv("RACEPHOTOS_ORDERS_TABLE")
+	sesFromAddress := mustGetenv("RACEPHOTOS_SES_FROM_ADDRESS")
+	appBaseURL := mustGetenv("RACEPHOTOS_APP_BASE_URL")
+
+	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
+
+	// cold-start: no request context available yet; context.TODO() is intentional here.
+	cfg, err := config.LoadDefaultConfig(context.TODO())
+	if err != nil {
+		slog.Error("failed to load AWS config", slog.String("error", err.Error()))
+		os.Exit(1)
+	}
+
+	ddbClient := dynamodb.NewFromConfig(cfg)
+	sesClient := ses.NewFromConfig(cfg)
+
+	h := &handler.Handler{
+		Purchases: &handler.DynamoPurchaseStore{
+			Client:    ddbClient,
+			TableName: purchasesTable,
+		},
+		Orders: &handler.DynamoOrderStore{
+			Client:    ddbClient,
+			TableName: ordersTable,
+		},
+		Email: &handler.SESEmailSender{
+			Client:      sesClient,
+			FromAddress: sesFromAddress,
+		},
+		AppBaseURL: appBaseURL,
+	}
+
+	lambda.Start(h.Handle)
+}
+
+func mustGetenv(key string) string {
+	v := os.Getenv(key)
+	if v == "" {
+		slog.Error("required env var not set", slog.String("key", key))
+		os.Exit(1)
+	}
+	return v
+}

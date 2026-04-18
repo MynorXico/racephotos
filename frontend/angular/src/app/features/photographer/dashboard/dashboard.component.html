@@ -1,0 +1,19 @@
+<mat-tab-group>
+  <mat-tab>
+    <ng-template mat-tab-label>
+      @if (pendingCount() > 0) {
+        <span
+          [matBadge]="pendingCount()"
+          matBadgeColor="warn"
+          matBadgeSize="small"
+          [attr.aria-label]="'Approvals: ' + pendingCount() + ' pending'"
+        >
+          Approvals
+        </span>
+      } @else {
+        <span>Approvals</span>
+      }
+    </ng-template>
+    <app-approvals-tab />
+  </mat-tab>
+</mat-tab-group>

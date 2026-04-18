@@ -1,6 +1,6 @@
-.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark test-watermark invoke-list-event-photos invoke-search invoke-create-order
+.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark test-watermark invoke-list-event-photos invoke-search invoke-create-order invoke-list-purchases-for-approval invoke-approve-purchase invoke-reject-purchase
 
-LAMBDAS := presign-photos photo-processor watermark search payment create-order get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events list-event-photos
+LAMBDAS := presign-photos photo-processor watermark search payment create-order get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events list-event-photos list-purchases-for-approval approve-purchase reject-purchase
 
 # Run all tests
 test: test-unit test-integration
@@ -32,7 +32,7 @@ test-integration:
 # Each Lambda is built in a subshell so a failure exits immediately (|| exit 1)
 # and the working directory is never left in a corrupted state.
 # CGO_ENABLED=0 ensures static linking — avoids GLIBC version mismatches on AL2023.
-ARM64_LAMBDAS := presign-photos list-event-photos search create-order
+ARM64_LAMBDAS := presign-photos list-event-photos search create-order list-purchases-for-approval approve-purchase reject-purchase
 build:
 	@for lambda in $(LAMBDAS); do \
 		if [ -d lambdas/$$lambda ]; then \
@@ -159,6 +159,15 @@ invoke-search:
 
 invoke-create-order:
 	$(call invoke_lambda,create-order,CreateOrderFunction)
+
+invoke-list-purchases-for-approval:
+	$(call invoke_lambda,list-purchases-for-approval,ListPurchasesForApprovalFunction)
+
+invoke-approve-purchase:
+	$(call invoke_lambda,approve-purchase,ApprovePurchaseFunction)
+
+invoke-reject-purchase:
+	$(call invoke_lambda,reject-purchase,RejectPurchaseFunction)
 
 ## test-watermark: apply watermark locally and open the result — no AWS needed.
 ## Usage:
