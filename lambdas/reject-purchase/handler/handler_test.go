@@ -113,6 +113,18 @@ func TestHandle(t *testing.T) {
 			},
 		},
 		{
+			name:           "concurrent reject race returns 409",
+			purchaseID:     testPurchaseID,
+			photographerID: testPhotographerID,
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore) {
+				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(pendingPurchase(), nil)
+				o.EXPECT().GetOrder(gomock.Any(), testOrderID).Return(ownerOrder(), nil)
+				// ConditionalCheckFailedException mapped to ErrConflict by the store.
+				p.EXPECT().UpdatePurchaseRejected(gomock.Any(), testPurchaseID).Return(apperrors.ErrConflict)
+			},
+			wantStatus: 409,
+		},
+		{
 			name:           "AC4: happy path — rejects purchase, no email, returns 200",
 			purchaseID:     testPurchaseID,
 			photographerID: testPhotographerID,

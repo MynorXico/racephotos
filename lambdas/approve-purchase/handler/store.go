@@ -4,6 +4,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -111,15 +112,17 @@ func (s *DynamoPurchaseStore) QueryPurchasesByOrder(ctx context.Context, orderID
 	return purchases, nil
 }
 
-// UpdatePurchaseApproved sets status=approved, downloadToken, and approvedAt
-// on the Purchase record using a conditional UpdateItem (only updates pending records).
+// UpdatePurchaseApproved atomically sets status=approved, downloadToken, and approvedAt
+// only when the current status is pending. Returns apperrors.ErrConflict if the
+// DynamoDB condition fails (concurrent approve or reject already landed).
 func (s *DynamoPurchaseStore) UpdatePurchaseApproved(ctx context.Context, id, downloadToken, approvedAt string) error {
 	_, err := s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.TableName),
 		Key: map[string]types.AttributeValue{
 			"id": &types.AttributeValueMemberS{Value: id},
 		},
-		UpdateExpression: aws.String("SET #status = :approved, #downloadToken = :token, #approvedAt = :approvedAt"),
+		ConditionExpression:      aws.String("#status = :pending"),
+		UpdateExpression:         aws.String("SET #status = :approved, #downloadToken = :token, #approvedAt = :approvedAt"),
 		ExpressionAttributeNames: map[string]string{
 			"#status":        "status",
 			"#downloadToken": "downloadToken",
@@ -129,9 +132,14 @@ func (s *DynamoPurchaseStore) UpdatePurchaseApproved(ctx context.Context, id, do
 			":approved":   &types.AttributeValueMemberS{Value: models.OrderStatusApproved},
 			":token":      &types.AttributeValueMemberS{Value: downloadToken},
 			":approvedAt": &types.AttributeValueMemberS{Value: approvedAt},
+			":pending":    &types.AttributeValueMemberS{Value: models.OrderStatusPending},
 		},
 	})
 	if err != nil {
+		var ccf *types.ConditionalCheckFailedException
+		if errors.As(err, &ccf) {
+			return apperrors.ErrConflict
+		}
 		return fmt.Errorf("UpdatePurchaseApproved: UpdateItem: %w", err)
 	}
 	return nil

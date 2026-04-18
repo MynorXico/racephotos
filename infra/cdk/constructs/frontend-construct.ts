@@ -198,6 +198,16 @@ export class FrontendConstruct extends Construct {
       description: `Photographer approvals dashboard URL for ${config.envName}`,
     });
 
+    // Runner-facing app base URL — consumed by approve-purchase Lambda to build
+    // download links emailed to runners: {appBaseUrl}/download/{token}.
+    // Separate from approvals-url so multi-domain deployments can configure them
+    // independently (e.g. photographer.example.com vs example.com).
+    new ssm.StringParameter(this, 'AppBaseUrlParam', {
+      parameterName: `/racephotos/env/${config.envName}/app-base-url`,
+      stringValue: frontendUrl,
+      description: `Runner-facing app base URL for ${config.envName}`,
+    });
+
     // ── CloudFormation outputs ─────────────────────────────────────────────
     new cdk.CfnOutput(this, 'FrontendUrl', {
       value: frontendUrl,

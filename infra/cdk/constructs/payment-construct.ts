@@ -42,10 +42,18 @@ interface PaymentConstructProps {
   sesFromAddress: string;
   /**
    * Base URL for the photographer approvals dashboard.
-   * Injected as RACEPHOTOS_APPROVALS_URL (create-order) and
-   * RACEPHOTOS_APP_BASE_URL (approve-purchase download links).
+   * Injected as RACEPHOTOS_APPROVALS_URL into the create-order Lambda so
+   * the photographer is notified of incoming purchase claims.
    */
   approvalsUrl: string;
+  /**
+   * Base URL for the runner-facing app (no trailing slash).
+   * Injected as RACEPHOTOS_APP_BASE_URL into the approve-purchase Lambda
+   * to build runner download links: {appBaseUrl}/download/{token}.
+   * Separate from approvalsUrl — the photographer dashboard and runner-facing
+   * app may be served from different domains in multi-domain deployments.
+   */
+  appBaseUrl: string;
   /**
    * CloudFront CDN domain for watermarked photos (no trailing slash, no scheme).
    * Injected as RACEPHOTOS_CDN_BASE_URL for list-purchases-for-approval.
@@ -110,6 +118,7 @@ export class PaymentConstruct extends Construct {
       httpAuthorizerId,
       sesFromAddress,
       approvalsUrl,
+      appBaseUrl,
       cdnBaseUrl,
     } = props;
 
@@ -258,7 +267,7 @@ export class PaymentConstruct extends Construct {
         RACEPHOTOS_PURCHASES_TABLE: purchasesTable.tableName,
         RACEPHOTOS_ORDERS_TABLE: ordersTable.tableName,
         RACEPHOTOS_SES_FROM_ADDRESS: sesFromAddress,
-        RACEPHOTOS_APP_BASE_URL: approvalsUrl,
+        RACEPHOTOS_APP_BASE_URL: appBaseUrl,
       },
     });
 

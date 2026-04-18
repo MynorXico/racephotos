@@ -87,8 +87,13 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(409, "purchase is approved and cannot be rejected; the runner must resubmit"), nil
 	}
 
-	// Update the purchase to rejected. No email is sent to the runner in v1 (Out of scope).
+	// Update the purchase to rejected (conditional — fails if concurrent write landed).
+	// No email is sent to the runner in v1 (Out of scope).
 	if err := h.Purchases.UpdatePurchaseRejected(ctx, purchaseID); err != nil {
+		if errors.Is(err, apperrors.ErrConflict) {
+			// A concurrent approve or reject landed between our status read and this write.
+			return errResponse(409, "purchase status changed concurrently; please refresh and retry"), nil
+		}
 		slog.ErrorContext(ctx, "UpdatePurchaseRejected failed",
 			slog.String("service", "reject-purchase"),
 			slog.String("purchaseID", purchaseID),

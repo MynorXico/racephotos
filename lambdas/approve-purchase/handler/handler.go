@@ -25,13 +25,15 @@ type Handler struct {
 }
 
 type purchaseResponse struct {
-	ID            string  `json:"id"`
-	OrderID       string  `json:"orderId"`
-	PhotoID       string  `json:"photoId"`
-	Status        string  `json:"status"`
-	DownloadToken *string `json:"downloadToken,omitempty"`
-	ApprovedAt    string  `json:"approvedAt,omitempty"`
-	ClaimedAt     string  `json:"claimedAt"`
+	ID         string `json:"id"`
+	OrderID    string `json:"orderId"`
+	PhotoID    string `json:"photoId"`
+	Status     string `json:"status"`
+	ApprovedAt string `json:"approvedAt,omitempty"`
+	ClaimedAt  string `json:"claimedAt"`
+	// DownloadToken deliberately omitted — the token is the runner's credential,
+	// delivered via SES. Returning it to the photographer's browser is unnecessary
+	// and exposes a permanent download link to an unintended party.
 }
 
 // Handle processes PUT /purchases/{id}/approve.
@@ -99,8 +101,12 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	downloadToken := uuid.New().String()
 	now := time.Now().UTC().Format(time.RFC3339)
 
-	// Update the purchase to approved.
+	// Update the purchase to approved (conditional — fails if concurrent write landed).
 	if err := h.Purchases.UpdatePurchaseApproved(ctx, purchaseID, downloadToken, now); err != nil {
+		if errors.Is(err, apperrors.ErrConflict) {
+			// A concurrent approve or reject landed between our status read and this write.
+			return errResponse(409, "purchase status changed concurrently; please refresh and retry"), nil
+		}
 		slog.ErrorContext(ctx, "UpdatePurchaseApproved failed",
 			slog.String("service", "approve-purchase"),
 			slog.String("purchaseID", purchaseID),
@@ -130,9 +136,8 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		slog.String("orderID", order.ID),
 	)
 
-	// Build response with updated fields.
+	// Build response with updated fields (downloadToken not included — delivered via SES).
 	purchase.Status = models.OrderStatusApproved
-	purchase.DownloadToken = &downloadToken
 	purchase.ApprovedAt = now
 	return jsonResponse(200, toResponse(purchase))
 }
@@ -193,13 +198,12 @@ func (h *Handler) sendApprovalEmail(ctx context.Context, runnerEmail, eventName,
 
 func toResponse(p *models.Purchase) purchaseResponse {
 	return purchaseResponse{
-		ID:            p.ID,
-		OrderID:       p.OrderID,
-		PhotoID:       p.PhotoID,
-		Status:        p.Status,
-		DownloadToken: p.DownloadToken,
-		ApprovedAt:    p.ApprovedAt,
-		ClaimedAt:     p.ClaimedAt,
+		ID:         p.ID,
+		OrderID:    p.OrderID,
+		PhotoID:    p.PhotoID,
+		Status:     p.Status,
+		ApprovedAt: p.ApprovedAt,
+		ClaimedAt:  p.ClaimedAt,
 	}
 }
 

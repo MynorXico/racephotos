@@ -57,36 +57,50 @@ type DynamoOrderStore struct {
 }
 
 // QueryPendingOrdersByPhotographer queries the photographerId-claimedAt-index GSI
-// with a filter expression on status=pending.
+// with a filter expression on status=pending. Paginates through all pages using
+// LastEvaluatedKey to ensure complete results for photographers with large order histories.
 func (s *DynamoOrderStore) QueryPendingOrdersByPhotographer(ctx context.Context, photographerID string) ([]*models.Order, error) {
-	out, err := s.Client.Query(ctx, &dynamodb.QueryInput{
-		TableName:              aws.String(s.TableName),
-		IndexName:              aws.String("photographerId-claimedAt-index"),
-		KeyConditionExpression: aws.String("#pk = :photographerId"),
-		FilterExpression:       aws.String("#status = :pending"),
-		ExpressionAttributeNames: map[string]string{
-			"#pk":     "photographerId",
-			"#status": "status",
-		},
-		ExpressionAttributeValues: map[string]types.AttributeValue{
-			":photographerId": &types.AttributeValueMemberS{Value: photographerID},
-			":pending":        &types.AttributeValueMemberS{Value: models.OrderStatusPending},
-		},
-		// ScanIndexForward: false — most recent first. Default true (ascending).
-		ScanIndexForward: aws.Bool(false),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("QueryPendingOrdersByPhotographer: Query: %w", err)
+	var orders []*models.Order
+	var lastKey map[string]types.AttributeValue
+
+	for {
+		input := &dynamodb.QueryInput{
+			TableName:              aws.String(s.TableName),
+			IndexName:              aws.String("photographerId-claimedAt-index"),
+			KeyConditionExpression: aws.String("#pk = :photographerId"),
+			FilterExpression:       aws.String("#status = :pending"),
+			ExpressionAttributeNames: map[string]string{
+				"#pk":     "photographerId",
+				"#status": "status",
+			},
+			ExpressionAttributeValues: map[string]types.AttributeValue{
+				":photographerId": &types.AttributeValueMemberS{Value: photographerID},
+				":pending":        &types.AttributeValueMemberS{Value: models.OrderStatusPending},
+			},
+			// ScanIndexForward: false — most recent first.
+			ScanIndexForward:          aws.Bool(false),
+			ExclusiveStartKey:         lastKey,
+		}
+
+		out, err := s.Client.Query(ctx, input)
+		if err != nil {
+			return nil, fmt.Errorf("QueryPendingOrdersByPhotographer: Query: %w", err)
+		}
+
+		for i, item := range out.Items {
+			var o models.Order
+			if err := attributevalue.UnmarshalMap(item, &o); err != nil {
+				return nil, fmt.Errorf("QueryPendingOrdersByPhotographer: unmarshal[%d]: %w", i, err)
+			}
+			orders = append(orders, &o)
+		}
+
+		if len(out.LastEvaluatedKey) == 0 {
+			break
+		}
+		lastKey = out.LastEvaluatedKey
 	}
 
-	orders := make([]*models.Order, 0, len(out.Items))
-	for i, item := range out.Items {
-		var o models.Order
-		if err := attributevalue.UnmarshalMap(item, &o); err != nil {
-			return nil, fmt.Errorf("QueryPendingOrdersByPhotographer: unmarshal[%d]: %w", i, err)
-		}
-		orders = append(orders, &o)
-	}
 	return orders, nil
 }
 
@@ -131,41 +145,56 @@ type DynamoPhotoStore struct {
 	TableName string
 }
 
-// BatchGetPhotos fetches photos by ID in a single BatchGetItem call.
-// DynamoDB BatchGetItem limit is 100 items per call; the caller ensures the
-// number of photoIDs is bounded by the order fan-out (at most 20 per order ×
-// expected pending orders volume).
+// batchGetChunkSize is the DynamoDB BatchGetItem hard limit per call.
+const batchGetChunkSize = 100
+
+// BatchGetPhotos fetches photos by ID in chunks of up to 100 (DynamoDB limit).
+// Automatically retries UnprocessedKeys until all items are retrieved.
+// Missing IDs are silently omitted — callers handle absent photos gracefully.
 func (s *DynamoPhotoStore) BatchGetPhotos(ctx context.Context, photoIDs []string) ([]*models.Photo, error) {
 	if len(photoIDs) == 0 {
 		return nil, nil
 	}
 
-	keys := make([]map[string]types.AttributeValue, 0, len(photoIDs))
-	for _, id := range photoIDs {
-		keys = append(keys, map[string]types.AttributeValue{
-			"id": &types.AttributeValueMemberS{Value: id},
-		})
-	}
+	var photos []*models.Photo
 
-	out, err := s.Client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
-		RequestItems: map[string]types.KeysAndAttributes{
-			s.TableName: {
-				Keys: keys,
-			},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("BatchGetPhotos: BatchGetItem: %w", err)
-	}
-
-	items := out.Responses[s.TableName]
-	photos := make([]*models.Photo, 0, len(items))
-	for i, item := range items {
-		var p models.Photo
-		if err := attributevalue.UnmarshalMap(item, &p); err != nil {
-			return nil, fmt.Errorf("BatchGetPhotos: unmarshal[%d]: %w", i, err)
+	// Process in chunks of up to batchGetChunkSize.
+	for start := 0; start < len(photoIDs); start += batchGetChunkSize {
+		end := start + batchGetChunkSize
+		if end > len(photoIDs) {
+			end = len(photoIDs)
 		}
-		photos = append(photos, &p)
+
+		keys := make([]map[string]types.AttributeValue, 0, end-start)
+		for _, id := range photoIDs[start:end] {
+			keys = append(keys, map[string]types.AttributeValue{
+				"id": &types.AttributeValueMemberS{Value: id},
+			})
+		}
+
+		// Retry loop for UnprocessedKeys (throttling back-pressure).
+		pending := map[string]types.KeysAndAttributes{
+			s.TableName: {Keys: keys},
+		}
+		for len(pending) > 0 {
+			out, err := s.Client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
+				RequestItems: pending,
+			})
+			if err != nil {
+				return nil, fmt.Errorf("BatchGetPhotos: BatchGetItem: %w", err)
+			}
+
+			for i, item := range out.Responses[s.TableName] {
+				var p models.Photo
+				if err := attributevalue.UnmarshalMap(item, &p); err != nil {
+					return nil, fmt.Errorf("BatchGetPhotos: unmarshal[%d]: %w", i, err)
+				}
+				photos = append(photos, &p)
+			}
+
+			pending = out.UnprocessedKeys
+		}
 	}
+
 	return photos, nil
 }

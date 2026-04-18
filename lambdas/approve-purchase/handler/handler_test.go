@@ -134,9 +134,23 @@ func TestHandle(t *testing.T) {
 				var resp map[string]any
 				require.NoError(t, json.Unmarshal([]byte(body), &resp))
 				assert.Equal(t, models.OrderStatusApproved, resp["status"])
-				assert.NotEmpty(t, resp["downloadToken"])
+				// downloadToken is intentionally absent from the response — it is
+				// delivered to the runner via SES only.
+				assert.Empty(t, resp["downloadToken"])
 				assert.NotEmpty(t, resp["approvedAt"])
 			},
+		},
+		{
+			name:           "concurrent approve race returns 409",
+			purchaseID:     testPurchaseID,
+			photographerID: testPhotographerID,
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, e *mocks.MockEmailSender) {
+				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(pendingPurchase(), nil)
+				o.EXPECT().GetOrder(gomock.Any(), testOrderID).Return(ownerOrder(), nil)
+				// ConditionalCheckFailedException mapped to ErrConflict by the store.
+				p.EXPECT().UpdatePurchaseApproved(gomock.Any(), testPurchaseID, gomock.Any(), gomock.Any()).Return(apperrors.ErrConflict)
+			},
+			wantStatus: 409,
 		},
 		{
 			name:           "order status stays pending when another purchase is still pending",

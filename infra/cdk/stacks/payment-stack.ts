@@ -60,6 +60,11 @@ export class PaymentStack extends cdk.Stack {
       `/racephotos/env/${config.envName}/approvals-url`,
     );
 
+    const appBaseUrl = ssm.StringParameter.valueForStringParameter(
+      this,
+      `/racephotos/env/${config.envName}/app-base-url`,
+    );
+
     this.payment = new PaymentConstruct(this, 'Payment', {
       config,
       ordersTable: db.ordersTable,
@@ -72,6 +77,7 @@ export class PaymentStack extends cdk.Stack {
       httpAuthorizerId,
       sesFromAddress,
       approvalsUrl,
+      appBaseUrl,
       cdnBaseUrl: photoStorage.cdnDomainName,
     });
   }
