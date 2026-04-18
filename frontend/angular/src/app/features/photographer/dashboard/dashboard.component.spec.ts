@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
-import { MockStore, provideMockStore } from '@ngrx/store/testing';
+import { provideMockStore } from '@ngrx/store/testing';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatDialogModule } from '@angular/material/dialog';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
@@ -13,8 +13,6 @@ import { NavigationTitleService } from '../../../core/services/navigation-title.
 const mockConfigService = { get: () => ({ apiBaseUrl: 'http://localhost:3000' }) };
 
 describe('DashboardComponent', () => {
-  let store: MockStore;
-
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [
@@ -32,7 +30,6 @@ describe('DashboardComponent', () => {
       ],
     }).compileComponents();
 
-    store = TestBed.inject(MockStore);
   });
 
   it('should create', () => {

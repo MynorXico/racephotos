@@ -8,10 +8,6 @@ import { catchError, map, mergeMap, tap } from 'rxjs/operators';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { ApprovalsActions, PendingPurchase } from './approvals.actions';
 
-interface ListPurchasesResponse {
-  purchases?: PendingPurchase[];
-}
-
 @Injectable()
 export class ApprovalsEffects {
   private readonly actions$ = inject(Actions);
