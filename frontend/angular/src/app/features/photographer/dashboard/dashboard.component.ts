@@ -1,4 +1,4 @@
-import { Component, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
 import { MatTabsModule } from '@angular/material/tabs';
 
 import { NavigationTitleService } from '../../../core/services/navigation-title.service';
@@ -10,6 +10,7 @@ import { ApprovalsTabComponent } from './approvals-tab/approvals-tab.component';
   imports: [MatTabsModule, ApprovalsTabComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class DashboardComponent implements OnInit {
   private readonly titleService = inject(NavigationTitleService);
