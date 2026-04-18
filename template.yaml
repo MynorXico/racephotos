@@ -131,3 +131,40 @@ Resources:
           RACEPHOTOS_PHOTOGRAPHERS_TABLE: racephotos-photographers
           RACEPHOTOS_SES_FROM_ADDRESS: noreply@example.com
           RACEPHOTOS_APPROVALS_URL: http://localhost:4200/approvals
+
+  ListPurchasesForApprovalFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-list-purchases-for-approval-local
+      Handler: bootstrap
+      CodeUri: lambdas/list-purchases-for-approval/
+      Environment:
+        Variables:
+          RACEPHOTOS_ORDERS_TABLE: racephotos-orders
+          RACEPHOTOS_PURCHASES_TABLE: racephotos-purchases
+          RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
+          RACEPHOTOS_CDN_BASE_URL: http://localhost:4566/racephotos-processed-local
+
+  ApprovePurchaseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-approve-purchase-local
+      Handler: bootstrap
+      CodeUri: lambdas/approve-purchase/
+      Environment:
+        Variables:
+          RACEPHOTOS_PURCHASES_TABLE: racephotos-purchases
+          RACEPHOTOS_ORDERS_TABLE: racephotos-orders
+          RACEPHOTOS_SES_FROM_ADDRESS: noreply@example.com
+          RACEPHOTOS_APP_BASE_URL: http://localhost:4200
+
+  RejectPurchaseFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-reject-purchase-local
+      Handler: bootstrap
+      CodeUri: lambdas/reject-purchase/
+      Environment:
+        Variables:
+          RACEPHOTOS_PURCHASES_TABLE: racephotos-purchases
+          RACEPHOTOS_ORDERS_TABLE: racephotos-orders

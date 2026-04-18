@@ -7,6 +7,32 @@ const (
 	OrderStatusRejected = "rejected"
 )
 
+// DeriveOrderStatus computes the aggregate Order status from its Purchase line items.
+// All approved → approved. All rejected → rejected. Any pending → pending.
+// This logic is shared by the approve-purchase and reject-purchase Lambdas.
+func DeriveOrderStatus(purchases []*Purchase) string {
+	if len(purchases) == 0 {
+		return OrderStatusPending
+	}
+	approved, rejected := 0, 0
+	for _, p := range purchases {
+		switch p.Status {
+		case OrderStatusApproved:
+			approved++
+		case OrderStatusRejected:
+			rejected++
+		}
+	}
+	switch {
+	case approved == len(purchases):
+		return OrderStatusApproved
+	case rejected == len(purchases):
+		return OrderStatusRejected
+	default:
+		return OrderStatusPending
+	}
+}
+
 // Order is the primary purchase entity (ADR-0010).
 //
 // A single bank transfer for one or more photos from the same event and

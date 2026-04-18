@@ -9,6 +9,8 @@ import { PhotosEffects } from './store/photos/photos.effects';
 import { runnerPhotosFeature } from './store/runner-photos/runner-photos.reducer';
 import { RunnerPhotosEffects } from './store/runner-photos/runner-photos.effects';
 import { cartFeature } from './store/cart/cart.reducer';
+import { approvalsFeature } from './store/approvals/approvals.reducer';
+import { ApprovalsEffects } from './store/approvals/approvals.effects';
 
 export const routes: Routes = [
   {
@@ -78,9 +80,10 @@ export const routes: Routes = [
       {
         path: 'dashboard',
         loadComponent: () =>
-          import('./features/photographer/events-placeholder/events-placeholder.component').then(
-            (m) => m.EventsPlaceholderComponent,
+          import('./features/photographer/dashboard/dashboard.component').then(
+            (m) => m.DashboardComponent,
           ),
+        providers: [provideState(approvalsFeature), provideEffects(ApprovalsEffects)],
       },
       {
         path: '',

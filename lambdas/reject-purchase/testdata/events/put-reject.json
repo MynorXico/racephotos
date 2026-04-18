@@ -1,0 +1,37 @@
+{
+  "version": "2.0",
+  "routeKey": "PUT /purchases/{id}/reject",
+  "rawPath": "/purchases/REPLACE_WITH_REAL_PURCHASE_ID/reject",
+  "rawQueryString": "",
+  "headers": {
+    "authorization": "Bearer REPLACE_WITH_REAL_JWT"
+  },
+  "pathParameters": {
+    "id": "REPLACE_WITH_REAL_PURCHASE_ID"
+  },
+  "requestContext": {
+    "accountId": "123456789012",
+    "apiId": "test-api",
+    "authorizer": {
+      "jwt": {
+        "claims": {
+          "sub": "REPLACE_WITH_PHOTOGRAPHER_COGNITO_SUB"
+        }
+      }
+    },
+    "domainName": "example.execute-api.us-east-1.amazonaws.com",
+    "http": {
+      "method": "PUT",
+      "path": "/purchases/REPLACE_WITH_REAL_PURCHASE_ID/reject",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "1.2.3.4",
+      "userAgent": "curl/7.68.0"
+    },
+    "requestId": "test-request-id",
+    "routeKey": "PUT /purchases/{id}/reject",
+    "stage": "local",
+    "time": "17/Apr/2026:10:00:00 +0000",
+    "timeEpoch": 1744884000000
+  },
+  "isBase64Encoded": false
+}

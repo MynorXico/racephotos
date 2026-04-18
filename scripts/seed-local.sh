@@ -229,8 +229,9 @@ $AWS dynamodb create-table \
   2>/dev/null || true
 log "table: ${ORDERS_TABLE}"
 
-# racephotos-purchases — PK: id, 4 GSIs (RS-010)
+# racephotos-purchases — PK: id, 5 GSIs (RS-010 + RS-011)
 # photographerId-claimedAt-index removed — superseded by same GSI on racephotos-orders (ADR-0010).
+# orderId-index added — RS-011 approve/reject/list fan-out (query all purchases for an order).
 $AWS dynamodb create-table \
   --table-name "${PURCHASES_TABLE}" \
   --attribute-definitions \
@@ -239,6 +240,7 @@ $AWS dynamodb create-table \
     AttributeName=claimedAt,AttributeType=S \
     AttributeName=runnerEmail,AttributeType=S \
     AttributeName=downloadToken,AttributeType=S \
+    AttributeName=orderId,AttributeType=S \
   --key-schema \
     AttributeName=id,KeyType=HASH \
   --global-secondary-indexes '[
@@ -272,6 +274,13 @@ $AWS dynamodb create-table \
         {"AttributeName":"runnerEmail","KeyType":"RANGE"}
       ],
       "Projection": {"ProjectionType":"KEYS_ONLY"}
+    },
+    {
+      "IndexName": "orderId-index",
+      "KeySchema": [
+        {"AttributeName":"orderId","KeyType":"HASH"}
+      ],
+      "Projection": {"ProjectionType":"ALL"}
     }
   ]' \
   --billing-mode PAY_PER_REQUEST \

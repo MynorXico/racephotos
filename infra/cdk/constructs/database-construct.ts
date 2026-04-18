@@ -220,6 +220,16 @@ export class DatabaseConstruct extends Construct {
       projectionType: dynamodb.ProjectionType.KEYS_ONLY,
     });
 
+    // RS-011: orderId-index — query all Purchase line items for a given Order.
+    // Used by approve-purchase and reject-purchase to reload sibling purchases
+    // when computing the aggregate Order.status after an approval/rejection.
+    // Also used by list-purchases-for-approval to fan out from Orders → Purchases.
+    this.purchasesTable.addGlobalSecondaryIndex({
+      indexName: 'orderId-index',
+      partitionKey: { name: 'orderId', type: dynamodb.AttributeType.STRING },
+      projectionType: dynamodb.ProjectionType.ALL,
+    });
+
     // ── racephotos-photographers ──────────────────────────────────────────────
     // PK: id (Cognito sub for the photographer)
     // Simple key-value profile store — no secondary access patterns needed at v1.
