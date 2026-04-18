@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"sync"
 
 	"github.com/aws/aws-lambda-go/events"
 )
@@ -74,8 +73,12 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	// Step 2: query all orders' purchase line items concurrently.
-	// Each order is independent, so we fan out one goroutine per order and
-	// collect results through a buffered channel — eliminates the N×RTT serial cost.
+	// A buffered-channel semaphore caps concurrency at maxConcurrentOrderQueries
+	// to avoid overwhelming the DynamoDB connection pool under large pending lists.
+	// Results are drained sequentially from resultCh in the main goroutine, so no
+	// mutex is needed to protect entries/photoIDSet.
+	const maxConcurrentOrderQueries = 20
+
 	type purchaseEntry struct {
 		purchase *purchaseRow
 		orderID  string
@@ -86,10 +89,13 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		err       error
 	}
 
+	sem := make(chan struct{}, maxConcurrentOrderQueries)
 	resultCh := make(chan orderResult, len(orders))
 	for _, o := range orders {
 		o := o // capture loop variable
+		sem <- struct{}{} // acquire slot
 		go func() {
+			defer func() { <-sem }() // release slot
 			purchases, err := h.Purchases.QueryPurchasesByOrder(ctx, o.ID)
 			if err != nil {
 				resultCh <- orderResult{orderID: o.ID, err: err}
@@ -108,12 +114,13 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}()
 	}
 
+	// Drain all results sequentially — no mutex needed since only this goroutine
+	// reads entries and photoIDSet.
 	var (
 		entries    []purchaseEntry
 		photoIDSet = make(map[string]bool)
-		mu         sync.Mutex // guards entries + photoIDSet during channel drain
+		firstErr   error
 	)
-	var firstErr error
 	for range orders {
 		res := <-resultCh
 		if res.err != nil && firstErr == nil {
@@ -123,14 +130,12 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 				slog.String("orderID", res.orderID),
 				slog.String("error", res.err.Error()),
 			)
-			continue // drain remaining goroutines
+			continue // drain remaining goroutines before returning
 		}
-		mu.Lock()
 		for _, p := range res.purchases {
 			entries = append(entries, purchaseEntry{purchase: p, orderID: res.orderID})
 			photoIDSet[p.photoID] = true
 		}
-		mu.Unlock()
 	}
 	if firstErr != nil {
 		return errResponse(500, "internal server error"), nil

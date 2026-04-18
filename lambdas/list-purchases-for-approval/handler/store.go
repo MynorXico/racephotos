@@ -4,6 +4,7 @@ package handler
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -182,9 +183,13 @@ func (s *DynamoPhotoStore) BatchGetPhotos(ctx context.Context, photoIDs []string
 		}
 
 		// Retry loop for UnprocessedKeys (throttling back-pressure).
+		// UnprocessedKeys is returned as HTTP 200 so the SDK retry policy does not
+		// apply — we must handle it manually. Exponential backoff (50ms → 5s cap)
+		// gives DynamoDB time to recover capacity before each retry attempt.
 		pending := map[string]types.KeysAndAttributes{
 			s.TableName: {Keys: keys},
 		}
+		backoff := 50 * time.Millisecond
 		for len(pending) > 0 {
 			out, err := s.Client.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
 				RequestItems: pending,
@@ -202,6 +207,17 @@ func (s *DynamoPhotoStore) BatchGetPhotos(ctx context.Context, photoIDs []string
 			}
 
 			pending = out.UnprocessedKeys
+			if len(pending) > 0 {
+				select {
+				case <-ctx.Done():
+					return nil, fmt.Errorf("BatchGetPhotos: context cancelled during UnprocessedKeys retry: %w", ctx.Err())
+				case <-time.After(backoff):
+				}
+				backoff *= 2
+				if backoff > 5*time.Second {
+					backoff = 5 * time.Second
+				}
+			}
 		}
 	}
 
