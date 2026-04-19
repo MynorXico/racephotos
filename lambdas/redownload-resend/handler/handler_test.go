@@ -3,7 +3,9 @@ package handler_test
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/golang/mock/gomock"
@@ -18,7 +20,13 @@ import (
 const (
 	testEmail      = "runner@example.com"
 	testAppBaseURL = "https://app.example.com"
+	rateLimitWindow = 3600 // must match handler constant
 )
+
+// rateLimitKey returns the windowed key the handler will produce for email at call time.
+func rateLimitKey(email string) string {
+	return fmt.Sprintf("REDOWNLOAD#%s#%d", email, time.Now().Unix()/rateLimitWindow)
+}
 
 func makeEvent(email string) events.APIGatewayV2HTTPRequest {
 	body, _ := json.Marshal(map[string]string{"email": email})
@@ -51,7 +59,7 @@ func TestHandle(t *testing.T) {
 			name:  "AC3: happy path — within rate limit, purchases found, sends email, returns 200",
 			event: makeEvent(testEmail),
 			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
-				r.EXPECT().IncrementAndCheck(gomock.Any(), "REDOWNLOAD#"+testEmail, 3600, 3).Return(true, nil)
+				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
 				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(
 					[]models.Purchase{purchaseWithToken("tok-abc")}, nil,
 				)
@@ -68,7 +76,7 @@ func TestHandle(t *testing.T) {
 			name:  "AC3: no purchases for email still returns 200 (no enumeration)",
 			event: makeEvent(testEmail),
 			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
-				r.EXPECT().IncrementAndCheck(gomock.Any(), "REDOWNLOAD#"+testEmail, 3600, 3).Return(true, nil)
+				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
 				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(nil, nil)
 				// No email sent when no purchases exist.
 			},
@@ -78,7 +86,7 @@ func TestHandle(t *testing.T) {
 			name:  "AC4: rate limit exceeded returns 429",
 			event: makeEvent(testEmail),
 			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
-				r.EXPECT().IncrementAndCheck(gomock.Any(), "REDOWNLOAD#"+testEmail, 3600, 3).Return(false, nil)
+				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(false, nil)
 			},
 			wantStatus: 429,
 			check: func(t *testing.T, body string) {
@@ -103,7 +111,7 @@ func TestHandle(t *testing.T) {
 			name:  "display-name email is normalized to bare address for rate-limit key",
 			event: makeEvent("Runner Name <" + testEmail + ">"),
 			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
-				r.EXPECT().IncrementAndCheck(gomock.Any(), "REDOWNLOAD#"+testEmail, 3600, 3).Return(true, nil)
+				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
 				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(nil, nil)
 			},
 			wantStatus: 200,
@@ -112,7 +120,7 @@ func TestHandle(t *testing.T) {
 			name:  "rate limit store error returns 500",
 			event: makeEvent(testEmail),
 			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
-				r.EXPECT().IncrementAndCheck(gomock.Any(), "REDOWNLOAD#"+testEmail, 3600, 3).Return(false, assert.AnError)
+				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(false, assert.AnError)
 			},
 			wantStatus: 500,
 		},
@@ -120,7 +128,7 @@ func TestHandle(t *testing.T) {
 			name:  "purchase store error returns 500",
 			event: makeEvent(testEmail),
 			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
-				r.EXPECT().IncrementAndCheck(gomock.Any(), "REDOWNLOAD#"+testEmail, 3600, 3).Return(true, nil)
+				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
 				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(nil, assert.AnError)
 			},
 			wantStatus: 500,
@@ -129,7 +137,7 @@ func TestHandle(t *testing.T) {
 			name:  "SES error is logged but response is still 200",
 			event: makeEvent(testEmail),
 			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
-				r.EXPECT().IncrementAndCheck(gomock.Any(), "REDOWNLOAD#"+testEmail, 3600, 3).Return(true, nil)
+				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
 				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(
 					[]models.Purchase{purchaseWithToken("tok-abc")}, nil,
 				)

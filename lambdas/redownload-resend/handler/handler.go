@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/mail"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 
@@ -51,7 +52,9 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 	req.Email = strings.ToLower(addr.Address)
 
-	rateLimitKey := fmt.Sprintf("REDOWNLOAD#%s", req.Email)
+	// Window key ensures predictable hourly resets regardless of DynamoDB TTL
+	// deletion lag (TTL is best-effort; deletion can be delayed up to 48 hours).
+	rateLimitKey := fmt.Sprintf("REDOWNLOAD#%s#%d", req.Email, time.Now().Unix()/rateLimitWindow)
 	allowed, err := h.RateLimit.IncrementAndCheck(ctx, rateLimitKey, rateLimitWindow, rateLimitMax)
 	if err != nil {
 		slog.ErrorContext(ctx, "RateLimit.IncrementAndCheck failed",
