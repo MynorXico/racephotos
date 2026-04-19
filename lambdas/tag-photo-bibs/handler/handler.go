@@ -61,6 +61,10 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 	}
 
+	// Deduplicate bibs to prevent a DynamoDB BatchWriteItem ValidationException
+	// when duplicate keys appear in the same request.
+	req.BibNumbers = dedupeBibs(req.BibNumbers)
+
 	// Fetch the photo — needed for EventID and existence check.
 	photo, err := h.Photos.GetPhoto(ctx, photoID)
 	if err != nil {
@@ -141,6 +145,19 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		Status:     newStatus,
 		UploadedAt: photo.UploadedAt,
 	})
+}
+
+// dedupeBibs returns a new slice with duplicate bib strings removed, preserving order.
+func dedupeBibs(bibs []string) []string {
+	seen := make(map[string]struct{}, len(bibs))
+	out := make([]string, 0, len(bibs))
+	for _, b := range bibs {
+		if _, ok := seen[b]; !ok {
+			seen[b] = struct{}{}
+			out = append(out, b)
+		}
+	}
+	return out
 }
 
 // buildBibEntries creates a BibEntry for each bib number using the composite
