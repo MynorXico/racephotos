@@ -16,6 +16,8 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
+import { take } from 'rxjs';
+
 import { DownloadService } from './download.service';
 
 @Component({
@@ -66,7 +68,7 @@ export class RedownloadRequestComponent implements OnInit {
     this.emailControl.disable();
     this.cdr.markForCheck();
 
-    this.downloadService.resendDownloadLinks(this.emailControl.value).subscribe({
+    this.downloadService.resendDownloadLinks(this.emailControl.value).pipe(take(1)).subscribe({
       next: () => {
         this.submitState = 'success';
         this.emailControl.enable();
