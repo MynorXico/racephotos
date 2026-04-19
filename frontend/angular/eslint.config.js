@@ -46,8 +46,8 @@ module.exports = tseslint.config(
     },
   },
   {
-    // NgRx Effects are the only place HttpClient injection is allowed.
-    files: ['**/*.effects.ts'],
+    // NgRx Effects and dedicated HTTP services are the only places HttpClient injection is allowed.
+    files: ['**/*.effects.ts', '**/*.service.ts', '**/*.spec.ts'],
     rules: {
       'no-restricted-imports': 'off',
     },

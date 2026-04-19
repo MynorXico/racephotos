@@ -1,0 +1,47 @@
+:host {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.page-center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  text-align: center;
+}
+
+.loading-label {
+  margin: 0;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.error-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  color: var(--mat-sys-error);
+}
+
+.error-heading {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.error-body {
+  margin: 0;
+  max-width: 320px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.cta-btn {
+  @media (max-width: 374px) {
+    width: 100%;
+    min-height: 48px;
+  }
+}

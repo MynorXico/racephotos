@@ -92,6 +92,21 @@ export const routes: Routes = [
       },
     ],
   },
+  // Public runner download pages — RS-012
+  {
+    path: 'download/:token',
+    loadComponent: () =>
+      import('./events/download/download-redirect.component').then(
+        (m) => m.DownloadRedirectComponent,
+      ),
+  },
+  {
+    path: 'redownload',
+    loadComponent: () =>
+      import('./events/download/redownload-request.component').then(
+        (m) => m.RedownloadRequestComponent,
+      ),
+  },
   // Public runner-facing event search page — no auth guard
   {
     path: 'events/:id',

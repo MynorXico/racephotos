@@ -1,0 +1,20 @@
+@if (state === 'loading') {
+  <div class="page-center" aria-label="Preparing your download" aria-live="polite">
+    <mat-spinner diameter="48" mode="indeterminate" />
+    <p class="loading-label">Preparing your download&hellip;</p>
+  </div>
+}
+
+@if (state === 'error') {
+  <main class="page-center" role="alert">
+    <mat-icon class="error-icon" aria-hidden="true">link_off</mat-icon>
+    <h1 class="error-heading">Download link not found</h1>
+    <p class="error-body">
+      This download link is invalid or has already been used. If you believe this is an error,
+      you can request a new link.
+    </p>
+    <button mat-raised-button color="primary" class="cta-btn" (click)="onRequestNewLink()">
+      Request a new link
+    </button>
+  </main>
+}
