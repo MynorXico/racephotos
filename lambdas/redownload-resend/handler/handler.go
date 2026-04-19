@@ -36,7 +36,11 @@ type resendRequest struct {
 // AC4: rate limit exceeded → 429
 func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	var req resendRequest
-	if err := json.Unmarshal([]byte(event.Body), &req); err != nil || req.Email == "" {
+	if err := json.Unmarshal([]byte(event.Body), &req); err != nil {
+		return errResponse(400, "email is required"), nil
+	}
+	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	if req.Email == "" {
 		return errResponse(400, "email is required"), nil
 	}
 	if _, err := mail.ParseAddress(req.Email); err != nil {
@@ -80,21 +84,17 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 // sendResendEmail sends the redownload-resend SES email.
 // Failures are logged but not surfaced — the 200 is already committed.
 func (h *Handler) sendResendEmail(ctx context.Context, email string, purchases []models.Purchase) {
-	// Build a newline-separated list of download links for the template.
-	var sb strings.Builder
+	var linkSlice []string
 	for _, p := range purchases {
 		if p.DownloadToken == nil {
 			continue
 		}
-		if sb.Len() > 0 {
-			sb.WriteString("\n")
-		}
-		sb.WriteString(fmt.Sprintf("%s/download/%s", h.AppBaseURL, *p.DownloadToken))
+		linkSlice = append(linkSlice, fmt.Sprintf("%s/download/%s", h.AppBaseURL, *p.DownloadToken))
 	}
-	links := sb.String()
-	if links == "" {
+	if len(linkSlice) == 0 {
 		return
 	}
+	links := strings.Join(linkSlice, "\n")
 	if err := h.Email.SendTemplatedEmail(ctx, email, sesTemplateName, map[string]string{
 		"downloadLinks": links,
 	}); err != nil {

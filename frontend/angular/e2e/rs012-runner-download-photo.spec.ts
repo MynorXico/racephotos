@@ -70,6 +70,9 @@ test.describe('RS-012 — Download error state (AC6)', () => {
 test.describe('RS-012 — Redownload request route (AC7)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/redownload');
+    // Wait for the lazy-loaded component to render before each test.
+    // Angular Material floating labels can race on mobile viewports without this gate.
+    await expect(page.getByRole('heading', { name: 'Resend download links' })).toBeVisible();
   });
 
   test('redownload route is accessible without authentication', async ({ page }) => {
@@ -77,7 +80,7 @@ test.describe('RS-012 — Redownload request route (AC7)', () => {
   });
 
   test('shows email input with label', async ({ page }) => {
-    await expect(page.getByLabel('Email address')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Email address' })).toBeVisible();
   });
 
   test('shows "Send links" submit button', async ({ page }) => {
@@ -97,7 +100,7 @@ test.describe('RS-012 — Redownload request route (AC7)', () => {
     await page.route(isApiRedownloadRequest, (route) =>
       route.fulfill({ status: 200, body: '{}' }),
     );
-    await page.getByLabel('Email address').fill('runner@example.com');
+    await page.getByRole('textbox', { name: 'Email address' }).fill('runner@example.com');
     await page.getByRole('button', { name: 'Send links' }).click();
     await expect(page.getByText(/receive a link shortly/)).toBeVisible();
   });
@@ -106,7 +109,7 @@ test.describe('RS-012 — Redownload request route (AC7)', () => {
     await page.route(isApiRedownloadRequest, (route) =>
       route.fulfill({ status: 429, body: '{}' }),
     );
-    await page.getByLabel('Email address').fill('runner@example.com');
+    await page.getByRole('textbox', { name: 'Email address' }).fill('runner@example.com');
     await page.getByRole('button', { name: 'Send links' }).click();
     await expect(page.getByText(/Too many attempts/)).toBeVisible();
   });
