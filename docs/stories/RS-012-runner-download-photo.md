@@ -2,7 +2,7 @@
 
 **ID**: RS-012
 **Epic**: Payment / Frontend
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
