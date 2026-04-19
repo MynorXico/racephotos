@@ -1,7 +1,12 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { MatChipInputEvent } from '@angular/material/chips';
 
 import { BibTagInputComponent } from './bib-tag-input.component';
+
+function makeChipEvent(value: string): MatChipInputEvent {
+  return { value, chipInput: { clear: jasmine.createSpy('clear') } } as unknown as MatChipInputEvent;
+}
 
 describe('BibTagInputComponent', () => {
   let fixture: ComponentFixture<BibTagInputComponent>;
@@ -32,30 +37,26 @@ describe('BibTagInputComponent', () => {
     const emitted: string[][] = [];
     component.bibsChanged.subscribe((v) => emitted.push(v));
 
-    const mockEvent = { value: '101', chipInput: { clear: () => {} } } as never;
-    component.addBib(mockEvent);
+    component.addBib(makeChipEvent('101'));
 
     expect(component.validationError()).toBe('Bib 101 is already added.');
     expect(emitted).toHaveSize(0);
   });
 
   it('rejects non-numeric bib', () => {
-    const mockEvent = { value: 'abc', chipInput: { clear: () => {} } } as never;
-    component.addBib(mockEvent);
+    component.addBib(makeChipEvent('abc'));
     expect(component.validationError()).toBe('Bib numbers must contain digits only.');
   });
 
   it('rejects bib longer than 10 characters', () => {
-    const mockEvent = { value: '12345678901', chipInput: { clear: () => {} } } as never;
-    component.addBib(mockEvent);
+    component.addBib(makeChipEvent('12345678901'));
     expect(component.validationError()).toBe('Bib number is too long.');
   });
 
   it('silently ignores empty input', () => {
     const emitted: string[][] = [];
     component.bibsChanged.subscribe((v) => emitted.push(v));
-    const mockEvent = { value: '  ', chipInput: { clear: () => {} } } as never;
-    component.addBib(mockEvent);
+    component.addBib(makeChipEvent('  '));
     expect(component.validationError()).toBeNull();
     expect(emitted).toHaveSize(0);
   });
@@ -63,8 +64,7 @@ describe('BibTagInputComponent', () => {
   it('adds valid bib and emits', () => {
     const emitted: string[][] = [];
     component.bibsChanged.subscribe((v) => emitted.push(v));
-    const mockEvent = { value: '303', chipInput: { clear: () => {} } } as never;
-    component.addBib(mockEvent);
+    component.addBib(makeChipEvent('303'));
     expect(component.bibs()).toEqual(['303']);
     expect(emitted).toEqual([['303']]);
   });
