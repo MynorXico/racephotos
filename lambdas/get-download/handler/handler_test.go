@@ -147,6 +147,17 @@ func TestHandle(t *testing.T) {
 			},
 			wantStatus: 500,
 		},
+		{
+			name:  "empty rawS3Key returns 500 without calling presigner",
+			token: testToken,
+			setup: func(p *mocks.MockPurchaseStore, ph *mocks.MockPhotoStore, pr *mocks.MockPhotoPresigner) {
+				photo := indexedPhoto()
+				photo.RawS3Key = ""
+				p.EXPECT().GetPurchaseByDownloadToken(gomock.Any(), testToken).Return(approvedPurchase(), nil)
+				ph.EXPECT().GetPhotoByID(gomock.Any(), testPhotoID).Return(photo, nil)
+			},
+			wantStatus: 500,
+		},
 	}
 
 	for _, tc := range tests {

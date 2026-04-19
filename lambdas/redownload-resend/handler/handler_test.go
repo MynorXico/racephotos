@@ -2,6 +2,7 @@ package handler_test
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -18,14 +19,15 @@ import (
 )
 
 const (
-	testEmail      = "runner@example.com"
-	testAppBaseURL = "https://app.example.com"
+	testEmail       = "runner@example.com"
+	testAppBaseURL  = "https://app.example.com"
 	rateLimitWindow = 3600 // must match handler constant
 )
 
 // rateLimitKey returns the windowed key the handler will produce for email at call time.
 func rateLimitKey(email string) string {
-	return fmt.Sprintf("REDOWNLOAD#%s#%d", email, time.Now().Unix()/rateLimitWindow)
+	h := sha256.Sum256([]byte(email))
+	return fmt.Sprintf("REDOWNLOAD#%x#%d", h, time.Now().Unix()/rateLimitWindow)
 }
 
 func makeEvent(email string) events.APIGatewayV2HTTPRequest {

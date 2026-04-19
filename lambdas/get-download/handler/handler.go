@@ -75,6 +75,15 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(500, "internal server error"), nil
 	}
 
+	if photo.RawS3Key == "" {
+		slog.ErrorContext(ctx, "photo has empty rawS3Key",
+			slog.String("service", "get-download"),
+			slog.String("purchaseID", purchase.ID),
+			slog.String("photoID", photo.ID),
+		)
+		return errResponse(500, "internal server error"), nil
+	}
+
 	presignedURL, err := h.Presigner.PresignGetObject(ctx, h.RawBucket, photo.RawS3Key, presignTTL)
 	if err != nil {
 		slog.ErrorContext(ctx, "PresignGetObject failed",

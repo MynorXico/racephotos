@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"crypto/sha256"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -52,9 +53,11 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 	req.Email = strings.ToLower(addr.Address)
 
-	// Window key ensures predictable hourly resets regardless of DynamoDB TTL
-	// deletion lag (TTL is best-effort; deletion can be delayed up to 48 hours).
-	rateLimitKey := fmt.Sprintf("REDOWNLOAD#%s#%d", req.Email, time.Now().Unix()/rateLimitWindow)
+	// SHA-256 the email so runner PII is never stored as a DynamoDB partition key
+	// (keys appear in AWS console, CloudTrail, and monitoring tools).
+	// Window suffix ensures predictable hourly resets independent of DynamoDB TTL lag.
+	emailHash := sha256.Sum256([]byte(req.Email))
+	rateLimitKey := fmt.Sprintf("REDOWNLOAD#%x#%d", emailHash, time.Now().Unix()/rateLimitWindow)
 	allowed, err := h.RateLimit.IncrementAndCheck(ctx, rateLimitKey, rateLimitWindow, rateLimitMax)
 	if err != nil {
 		slog.ErrorContext(ctx, "RateLimit.IncrementAndCheck failed",
