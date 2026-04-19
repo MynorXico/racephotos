@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"net/mail"
 	"strings"
-	"time"
 
 	"github.com/aws/aws-lambda-go/events"
 
@@ -57,7 +56,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	// (keys appear in AWS console, CloudTrail, and monitoring tools).
 	// Window suffix ensures predictable hourly resets independent of DynamoDB TTL lag.
 	emailHash := sha256.Sum256([]byte(req.Email))
-	rateLimitKey := fmt.Sprintf("REDOWNLOAD#%x#%d", emailHash, time.Now().Unix()/rateLimitWindow)
+	rateLimitKey := fmt.Sprintf("REDOWNLOAD#%x#%d", emailHash, nowUnix()/rateLimitWindow)
 	allowed, err := h.RateLimit.IncrementAndCheck(ctx, rateLimitKey, rateLimitWindow, rateLimitMax)
 	if err != nil {
 		slog.ErrorContext(ctx, "RateLimit.IncrementAndCheck failed",
