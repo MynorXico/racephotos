@@ -2,7 +2,7 @@
 
 **ID**: RS-013
 **Epic**: Photo Processing / Frontend
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
