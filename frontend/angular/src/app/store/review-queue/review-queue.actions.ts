@@ -2,7 +2,8 @@ import { createActionGroup, props } from '@ngrx/store';
 
 export interface ReviewPhoto {
   id: string;
-  status: 'review_required' | 'error';
+  /** review_required | error on initial load; may become indexed after a successful save */
+  status: 'review_required' | 'error' | 'indexed';
   thumbnailUrl: string | null;
   bibNumbers: string[];
   uploadedAt: string;
