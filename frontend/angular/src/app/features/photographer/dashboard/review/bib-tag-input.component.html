@@ -1,0 +1,31 @@
+<mat-form-field appearance="outline" class="bib-field" [class.disabled]="disabled">
+  <mat-label>Bib numbers</mat-label>
+  <mat-chip-grid #chipGrid aria-label="Bib numbers" [disabled]="disabled">
+    @for (bib of bibs(); track bib) {
+      <mat-chip-row
+        [removable]="!disabled"
+        (removed)="removeBib(bib)"
+        [aria-label]="'Bib ' + bib">
+        {{ bib }}
+        @if (!disabled) {
+          <button matChipRemove [attr.aria-label]="'Remove bib ' + bib">
+            <mat-icon>cancel</mat-icon>
+          </button>
+        }
+      </mat-chip-row>
+    }
+    <input
+      placeholder="Type a bib and press Enter"
+      [matChipInputFor]="chipGrid"
+      [matChipInputSeparatorKeyCodes]="separatorKeysCodes"
+      [matChipInputAddOnBlur]="true"
+      (matChipInputTokenEnd)="addBib($event)"
+      (input)="onInputChange()"
+      aria-label="Add bib number"
+      [disabled]="disabled" />
+  </mat-chip-grid>
+  @if (validationError()) {
+    <mat-error>{{ validationError() }}</mat-error>
+  }
+  <mat-hint>Separate multiple bibs with Enter or comma.</mat-hint>
+</mat-form-field>

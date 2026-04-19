@@ -1,0 +1,19 @@
+{
+  "version": "2.0",
+  "routeKey": "PUT /photos/{id}/bibs",
+  "rawPath": "/photos/550e8400-e29b-41d4-a716-446655440001/bibs",
+  "pathParameters": {
+    "id": "550e8400-e29b-41d4-a716-446655440001"
+  },
+  "requestContext": {
+    "authorizer": {
+      "jwt": {
+        "claims": {
+          "sub": "test-photographer-sub"
+        }
+      }
+    }
+  },
+  "body": "{\"bibNumbers\":[\"101\",\"102\"]}",
+  "isBase64Encoded": false
+}
