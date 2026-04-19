@@ -505,9 +505,9 @@ Authorization: Bearer <valid JWT, owner>
 { "bibNumbers": ["999"] }
 ```
 
-**Expected**: All BibIndex entries are deleted. The current `DeleteBibEntriesByPhoto` implementation issues a single `Query` call with no `Limit` and no pagination loop. If the GSI partition for this `photoId` is large enough to return a `LastEvaluatedKey`, only the first page of existing entries is deleted. Remaining stale entries are never removed.
+**Expected**: All BibIndex entries across all pages are deleted.
 
-**Why it matters**: The implementation reads all results from a single `Query` call and assumes `out.Items` contains every existing entry. DynamoDB Query results are capped at 1MB per call. A photo in a large race event (5,000 photos, each with many bibs) could accumulate enough BibIndex entries for a single photoId to exceed this limit — unlikely for a single photo but worth flagging. The fix is to loop the Query until `LastEvaluatedKey` is nil. **Flag for developer attention — this is a correctness hole at scale.**
+**Why it matters**: DynamoDB Query results are capped at 1MB per call. `DeleteBibEntriesByPhoto` already implements a `LastEvaluatedKey` pagination loop (handler/store.go lines 149–168), so this case is handled correctly. This test case validates that the loop is exercised under multi-page conditions — confirm via integration test with a seeded photo that has >1MB of BibIndex entries, or by mocking the DynamoDB client to return a non-nil `LastEvaluatedKey` on the first Query response.
 
 ---
 
@@ -517,4 +517,4 @@ Authorization: Bearer <valid JWT, owner>
 
 2. **BibIndex and Photo record can diverge under concurrent retag (TC-021)**: The four-step retag sequence has no transaction boundary and no conditional write. Two simultaneous PUT requests for the same photo will race across the delete and write steps. The final BibIndex state may not match the final Photo record `bibNumbers`. This is the highest-severity correctness risk in RS-013. A DynamoDB condition expression on `UpdatePhotoBibs` (e.g. `attribute_exists(id)`) does not help here because the divergence occurs between the BibIndex table and the photos table, not within a single item. The only mitigation available without transactions is a per-photo application-level lock (e.g. a DynamoDB conditional put on a lock item) or a DynamoDB TransactWriteItems call that spans both tables. Neither is currently implemented.
 
-3. **Single Query with no pagination in `DeleteBibEntriesByPhoto` (TC-026)**: The GSI query for existing bib entries does not loop on `LastEvaluatedKey`. For a photo with a very large number of historical retag operations (or a photo inadvertently shared across many events via a data migration), the first page of query results may not include all existing entries. Stale BibIndex records will remain after retag, causing ghost search results. This is a latent bug that will not surface in normal usage but is a correctness concern for production at scale (5,000-photo events per PRODUCT_CONTEXT.md non-functional requirements).
+3. **Multi-page GSI deletion verified in `DeleteBibEntriesByPhoto` (TC-026)**: The GSI query loops on `LastEvaluatedKey` (handler/store.go lines 149–168), correctly handling photos with more than 1MB of BibIndex entries. TC-026 exercises this path; no latent bug remains. Validate via integration test with a mocked paginated Query response.
