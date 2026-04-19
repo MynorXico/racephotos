@@ -240,8 +240,13 @@ export class PhotoProcessingConstruct extends Construct {
 
     // IAM: photos table (GetItem + UpdateItem)
     photosTable.grant(this.tagPhotoBibsFn, 'dynamodb:GetItem', 'dynamodb:UpdateItem');
-    // IAM: bib-index table (Query via GSI + BatchWriteItem for delete + put)
-    bibIndexTable.grant(this.tagPhotoBibsFn, 'dynamodb:Query', 'dynamodb:BatchWriteItem');
+    // IAM: bib-index table — BatchWriteItem on the table; Query must also cover the GSI ARN
+    // because dynamodb:Query on the table resource alone does not grant access to its GSIs.
+    bibIndexTable.grant(this.tagPhotoBibsFn, 'dynamodb:BatchWriteItem');
+    this.tagPhotoBibsFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:Query'],
+      resources: [`${bibIndexTable.tableArn}/index/photoId-index`],
+    }));
     // IAM: events table (GetItem for ownership check)
     eventsTable.grant(this.tagPhotoBibsFn, 'dynamodb:GetItem');
 
