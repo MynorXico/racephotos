@@ -16,6 +16,7 @@ import (
 	"context"
 	"log/slog"
 	"os"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -29,7 +30,7 @@ func main() {
 	purchasesTable := mustGetenv("RACEPHOTOS_PURCHASES_TABLE")
 	sesFromAddress := mustGetenv("RACEPHOTOS_SES_FROM_ADDRESS")
 	rateLimitsTable := mustGetenv("RACEPHOTOS_RATE_LIMITS_TABLE")
-	appBaseURL := mustGetenv("RACEPHOTOS_APP_BASE_URL")
+	appBaseURL := strings.TrimSuffix(mustGetenv("RACEPHOTOS_APP_BASE_URL"), "/")
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
