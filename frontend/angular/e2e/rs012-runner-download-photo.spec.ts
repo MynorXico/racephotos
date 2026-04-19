@@ -16,37 +16,36 @@ import { test, expect } from '@playwright/test';
  *   AC3 — POST /purchases/redownload-resend returns 200 for known email.
  *   AC4 — POST /purchases/redownload-resend returns 429 after 3 attempts in 1 hour.
  *
- * The full redirect flow (API call → window.location.href) is covered by
- * Angular unit tests (ng test) using DownloadService spy.
+ * The full redirect flow (API call → window.location.href) and rate-limit
+ * logic are covered by Angular unit tests (ng test) using DownloadService spy.
+ *
+ * Route interception pattern: match requests where the path starts with
+ * /download/ or /purchases/redownload-resend AND the port is NOT 4200
+ * (the Angular dev server). This avoids intercepting the SPA navigation itself.
  */
+
+/** Returns true for API calls — excludes the Angular dev server at port 4200. */
+const isApiDownloadRequest = (url: URL) =>
+  url.pathname.match(/^\/download\//) !== null && url.port !== '4200';
+
+const isApiRedownloadRequest = (url: URL) =>
+  url.pathname === '/purchases/redownload-resend' && url.port !== '4200';
 
 test.describe('RS-012 — Download redirect route (AC5)', () => {
   test('download route is accessible without authentication', async ({ page }) => {
-    // Use a fake token; the page will call the API which returns 404 in dev,
-    // but the route itself must not redirect to /login.
+    await page.route(isApiDownloadRequest, (route) =>
+      route.fulfill({ status: 404, body: JSON.stringify({ message: 'Not found' }) }),
+    );
     await page.goto('/download/fake-token-for-route-test');
-    await expect(page).not.toHaveURL(/\/login/);
-  });
-
-  test('shows loading spinner on initial mount', async ({ page }) => {
-    // Intercept API call to hang — keeps component in loading state.
-    await page.route('**/download/**', async (route) => {
-      // Never fulfil — simulates a slow network to observe loading state.
-      // We cancel after screenshot to avoid test timeout.
-      await route.abort('connectionreset');
-    });
-    await page.goto('/download/fake-token-123');
-    // After abort, the component transitions to error — verify the page is
-    // the download page (not login) and error state is shown.
     await expect(page).not.toHaveURL(/\/login/);
   });
 });
 
 test.describe('RS-012 — Download error state (AC6)', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/download/**', async (route) => {
-      await route.fulfill({ status: 404, body: JSON.stringify({ message: 'Not found' }) });
-    });
+    await page.route(isApiDownloadRequest, (route) =>
+      route.fulfill({ status: 404, body: JSON.stringify({ message: 'Not found' }) }),
+    );
     await page.goto('/download/invalid-token');
   });
 
@@ -95,18 +94,18 @@ test.describe('RS-012 — Redownload request route (AC7)', () => {
   });
 
   test('shows success message on 200 response', async ({ page }) => {
-    await page.route('**/purchases/redownload-resend', async (route) => {
-      await route.fulfill({ status: 200, body: '{}' });
-    });
+    await page.route(isApiRedownloadRequest, (route) =>
+      route.fulfill({ status: 200, body: '{}' }),
+    );
     await page.getByLabel('Email address').fill('runner@example.com');
     await page.getByRole('button', { name: 'Send links' }).click();
     await expect(page.getByText(/receive a link shortly/)).toBeVisible();
   });
 
   test('shows rate-limit message on 429 response', async ({ page }) => {
-    await page.route('**/purchases/redownload-resend', async (route) => {
-      await route.fulfill({ status: 429, body: '{}' });
-    });
+    await page.route(isApiRedownloadRequest, (route) =>
+      route.fulfill({ status: 429, body: '{}' }),
+    );
     await page.getByLabel('Email address').fill('runner@example.com');
     await page.getByRole('button', { name: 'Send links' }).click();
     await expect(page.getByText(/Too many attempts/)).toBeVisible();
