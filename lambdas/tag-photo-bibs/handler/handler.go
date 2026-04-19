@@ -119,6 +119,9 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	if err := h.Photos.UpdatePhotoBibs(ctx, photoID, req.BibNumbers, newStatus); err != nil {
+		if errors.Is(err, ErrPhotoNotTaggable) {
+			return errResponse(409, "photo is no longer in a taggable state — refresh and try again"), nil
+		}
 		slog.ErrorContext(ctx, "UpdatePhotoBibs failed",
 			slog.String("photoID", photoID),
 			slog.String("error", err.Error()),

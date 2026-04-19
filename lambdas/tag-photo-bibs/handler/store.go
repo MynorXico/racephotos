@@ -53,10 +53,12 @@ type DynamoPhotoStore struct {
 }
 
 // GetPhoto retrieves a photo by ID. Returns ErrPhotoNotFound if the item does
-// not exist.
+// not exist. Uses a strongly consistent read so that ownership checks following
+// a recent event creation see the latest data.
 func (s *DynamoPhotoStore) GetPhoto(ctx context.Context, id string) (*models.Photo, error) {
 	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(s.TableName),
+		TableName:      aws.String(s.TableName),
+		ConsistentRead: aws.Bool(true),
 		Key: map[string]types.AttributeValue{
 			"id": &types.AttributeValueMemberS{Value: id},
 		},
@@ -74,7 +76,15 @@ func (s *DynamoPhotoStore) GetPhoto(ctx context.Context, id string) (*models.Pho
 	return &p, nil
 }
 
+// ErrPhotoNotTaggable is returned when the photo's status does not allow manual
+// bib tagging (only review_required and error photos may be retagged).
+var ErrPhotoNotTaggable = errors.New("photo status does not allow manual tagging")
+
 // UpdatePhotoBibs overwrites the photo's bibNumbers and status in DynamoDB.
+// The ConditionExpression ensures the write only succeeds if the photo is still
+// in a taggable state (review_required or error), guarding against concurrent
+// retag requests clobbering each other: if two requests race, the second write
+// will fail with ConditionalCheckFailedException → ErrPhotoNotTaggable → 409.
 func (s *DynamoPhotoStore) UpdatePhotoBibs(ctx context.Context, id string, bibNumbers []string, status string) error {
 	bibsAV, err := attributevalue.Marshal(bibNumbers)
 	if err != nil {
@@ -85,16 +95,23 @@ func (s *DynamoPhotoStore) UpdatePhotoBibs(ctx context.Context, id string, bibNu
 		Key: map[string]types.AttributeValue{
 			"id": &types.AttributeValueMemberS{Value: id},
 		},
-		UpdateExpression: aws.String("SET bibNumbers = :bibs, #st = :status"),
+		UpdateExpression:    aws.String("SET bibNumbers = :bibs, #st = :status"),
+		ConditionExpression: aws.String("#st = :sr OR #st = :err"),
 		ExpressionAttributeNames: map[string]string{
 			"#st": "status",
 		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":bibs":   bibsAV,
 			":status": &types.AttributeValueMemberS{Value: status},
+			":sr":     &types.AttributeValueMemberS{Value: models.PhotoStatusReviewRequired},
+			":err":    &types.AttributeValueMemberS{Value: models.PhotoStatusError},
 		},
 	})
 	if err != nil {
+		var condFailed *types.ConditionalCheckFailedException
+		if errors.As(err, &condFailed) {
+			return ErrPhotoNotTaggable
+		}
 		return fmt.Errorf("UpdatePhotoBibs: dynamodb.UpdateItem: %w", err)
 	}
 	return nil
@@ -115,8 +132,10 @@ const maxBatchSize = 25
 
 // DeleteBibEntriesByPhoto queries the photoId-index GSI for all bib entries
 // belonging to photoID and batch-deletes them. No-ops if there are none.
+// Paginates via LastEvaluatedKey to handle photos with more than one GSI result
+// page (unlikely at current bib counts, but required for correctness).
 func (s *DynamoBibIndexStore) DeleteBibEntriesByPhoto(ctx context.Context, photoID string) error {
-	out, err := s.Client.Query(ctx, &dynamodb.QueryInput{
+	queryInput := &dynamodb.QueryInput{
 		TableName:              aws.String(s.TableName),
 		IndexName:              aws.String(bibIndexGSIName),
 		KeyConditionExpression: aws.String("photoId = :pid"),
@@ -124,24 +143,28 @@ func (s *DynamoBibIndexStore) DeleteBibEntriesByPhoto(ctx context.Context, photo
 			":pid": &types.AttributeValueMemberS{Value: photoID},
 		},
 		ProjectionExpression: aws.String("bibKey, photoId"),
-	})
-	if err != nil {
-		return fmt.Errorf("DeleteBibEntriesByPhoto: query: %w", err)
-	}
-	if len(out.Items) == 0 {
-		return nil
 	}
 
 	var reqs []types.WriteRequest
-	for _, item := range out.Items {
-		reqs = append(reqs, types.WriteRequest{
-			DeleteRequest: &types.DeleteRequest{
-				Key: map[string]types.AttributeValue{
-					"bibKey":  item["bibKey"],
-					"photoId": item["photoId"],
+	for {
+		out, err := s.Client.Query(ctx, queryInput)
+		if err != nil {
+			return fmt.Errorf("DeleteBibEntriesByPhoto: query: %w", err)
+		}
+		for _, item := range out.Items {
+			reqs = append(reqs, types.WriteRequest{
+				DeleteRequest: &types.DeleteRequest{
+					Key: map[string]types.AttributeValue{
+						"bibKey":  item["bibKey"],
+						"photoId": item["photoId"],
+					},
 				},
-			},
-		})
+			})
+		}
+		if len(out.LastEvaluatedKey) == 0 {
+			break
+		}
+		queryInput.ExclusiveStartKey = out.LastEvaluatedKey
 	}
 
 	for i := 0; i < len(reqs); i += maxBatchSize {
@@ -149,11 +172,7 @@ func (s *DynamoBibIndexStore) DeleteBibEntriesByPhoto(ctx context.Context, photo
 		if end > len(reqs) {
 			end = len(reqs)
 		}
-		if _, err := s.Client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
-			RequestItems: map[string][]types.WriteRequest{
-				s.TableName: reqs[i:end],
-			},
-		}); err != nil {
+		if err := batchWriteWithRetry(ctx, s.Client, s.TableName, reqs[i:end]); err != nil {
 			return fmt.Errorf("DeleteBibEntriesByPhoto: batch delete: %w", err)
 		}
 	}
@@ -180,13 +199,27 @@ func (s *DynamoBibIndexStore) WriteBibEntries(ctx context.Context, entries []mod
 				PutRequest: &types.PutRequest{Item: item},
 			})
 		}
-		if _, err := s.Client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
-			RequestItems: map[string][]types.WriteRequest{
-				s.TableName: reqs,
-			},
-		}); err != nil {
+		if err := batchWriteWithRetry(ctx, s.Client, s.TableName, reqs); err != nil {
 			return fmt.Errorf("WriteBibEntries: batch write: %w", err)
 		}
+	}
+	return nil
+}
+
+// batchWriteWithRetry calls BatchWriteItem and retries UnprocessedItems until
+// all items are processed or the context is cancelled. DynamoDB may return
+// HTTP 200 with a non-empty UnprocessedItems map under throughput pressure —
+// treating that as success would silently drop writes (domain rule 12 violation).
+func batchWriteWithRetry(ctx context.Context, client DynamoClient, tableName string, reqs []types.WriteRequest) error {
+	remaining := map[string][]types.WriteRequest{tableName: reqs}
+	for len(remaining) > 0 {
+		out, err := client.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
+			RequestItems: remaining,
+		})
+		if err != nil {
+			return fmt.Errorf("BatchWriteItem: %w", err)
+		}
+		remaining = out.UnprocessedItems
 	}
 	return nil
 }
@@ -200,10 +233,12 @@ type DynamoEventStore struct {
 }
 
 // GetEvent retrieves an event by ID. Returns ErrEventNotFound if the item does
-// not exist.
+// not exist. Uses a strongly consistent read so that ownership checks following
+// a recent event creation see the latest data.
 func (s *DynamoEventStore) GetEvent(ctx context.Context, id string) (*models.Event, error) {
 	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
-		TableName: aws.String(s.TableName),
+		TableName:      aws.String(s.TableName),
+		ConsistentRead: aws.Bool(true),
 		Key: map[string]types.AttributeValue{
 			"id": &types.AttributeValueMemberS{Value: id},
 		},

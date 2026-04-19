@@ -15,7 +15,7 @@ interface ListPhotosResponse {
 
 interface SaveBibsResponse {
   id: string;
-  status: 'review_required' | 'error';
+  status: 'review_required' | 'error' | 'indexed';
   bibNumbers: string[];
   thumbnailUrl: string | null;
   uploadedAt: string;

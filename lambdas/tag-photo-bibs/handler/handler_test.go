@@ -292,6 +292,27 @@ func TestHandler_Handle(t *testing.T) {
 			},
 			wantCode: 500,
 		},
+		{
+			name:    "concurrent retag (photo no longer taggable) — returns 409",
+			sub:     testOwnerSub,
+			photoID: testPhotoID,
+			body:    `{"bibNumbers":["101"]}`,
+			mockPhotos: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(reviewPhoto(nil), nil)
+				m.EXPECT().UpdatePhotoBibs(gomock.Any(), testPhotoID, []string{"101"}, models.PhotoStatusIndexed).Return(handler.ErrPhotoNotTaggable)
+			},
+			mockBibs: func(m *mocks.MockBibIndexStore) {
+				m.EXPECT().DeleteBibEntriesByPhoto(gomock.Any(), testPhotoID).Return(nil)
+				m.EXPECT().WriteBibEntries(gomock.Any(), gomock.Any()).Return(nil)
+			},
+			mockEvents: func(m *mocks.MockEventStore) {
+				m.EXPECT().GetEvent(gomock.Any(), testEventID).Return(&models.Event{
+					ID:             testEventID,
+					PhotographerID: testOwnerSub,
+				}, nil)
+			},
+			wantCode: 409,
+		},
 	}
 
 	for _, tt := range tests {

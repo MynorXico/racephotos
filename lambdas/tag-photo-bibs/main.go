@@ -59,12 +59,7 @@ func main() {
 		Events:   eventStore,
 	}
 
-	slog.Info("tag-photo-bibs Lambda starting",
-		slog.String("env", env),
-		slog.String("photosTable", photosTable),
-		slog.String("bibIndexTable", bibIndexTable),
-		slog.String("eventsTable", eventsTable),
-	)
+	slog.Info("tag-photo-bibs Lambda starting", slog.String("env", env))
 
 	lambda.Start(h.Handle)
 }
