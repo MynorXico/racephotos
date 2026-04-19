@@ -100,6 +100,15 @@ func TestHandle(t *testing.T) {
 			wantStatus: 400,
 		},
 		{
+			name:  "display-name email is normalized to bare address for rate-limit key",
+			event: makeEvent("Runner Name <" + testEmail + ">"),
+			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
+				r.EXPECT().IncrementAndCheck(gomock.Any(), "REDOWNLOAD#"+testEmail, 3600, 3).Return(true, nil)
+				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(nil, nil)
+			},
+			wantStatus: 200,
+		},
+		{
 			name:  "rate limit store error returns 500",
 			event: makeEvent(testEmail),
 			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {

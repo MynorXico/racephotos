@@ -106,6 +106,24 @@ describe('DownloadRedirectComponent', () => {
     tick();
     expect(navigateSpy).toHaveBeenCalledWith('https://s3.example.com/photo.jpg');
   }));
+
+  it('transitions to downloading state after redirect (Content-Disposition: attachment)', fakeAsync(() => {
+    spyOn(component, 'navigateTo');
+    downloadServiceSpy.getDownloadUrl.and.returnValue(
+      of({ url: 'https://s3.example.com/photo.jpg' }),
+    );
+    fixture.detectChanges();
+    tick();
+    fixture.detectChanges();
+    expect(component.state).toBe('downloading');
+  }));
+
+  it('shows success heading in downloading state', () => {
+    fixture.componentRef.setInput('state', 'downloading');
+    fixture.detectChanges();
+    const heading: HTMLElement = fixture.nativeElement.querySelector('h1');
+    expect(heading.textContent).toContain('Your download is starting');
+  });
 });
 
 describe('DownloadRedirectComponent — no token', () => {

@@ -39,13 +39,17 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	if err := json.Unmarshal([]byte(event.Body), &req); err != nil {
 		return errResponse(400, "email is required"), nil
 	}
-	req.Email = strings.ToLower(strings.TrimSpace(req.Email))
+	req.Email = strings.TrimSpace(req.Email)
 	if req.Email == "" {
 		return errResponse(400, "email is required"), nil
 	}
-	if _, err := mail.ParseAddress(req.Email); err != nil {
+	// ParseAddress extracts the bare address from optional display-name form
+	// (e.g. "Runner <user@example.com>" → "user@example.com") and validates format.
+	addr, err := mail.ParseAddress(req.Email)
+	if err != nil {
 		return errResponse(400, "email is required"), nil
 	}
+	req.Email = strings.ToLower(addr.Address)
 
 	rateLimitKey := fmt.Sprintf("REDOWNLOAD#%s", req.Email)
 	allowed, err := h.RateLimit.IncrementAndCheck(ctx, rateLimitKey, rateLimitWindow, rateLimitMax)

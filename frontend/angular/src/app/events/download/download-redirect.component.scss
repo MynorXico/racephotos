@@ -20,6 +20,25 @@
   color: var(--mat-sys-on-surface-variant);
 }
 
+.success-icon {
+  font-size: 48px;
+  width: 48px;
+  height: 48px;
+  color: var(--mat-sys-primary);
+}
+
+.success-heading {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 500;
+}
+
+.success-body {
+  margin: 0;
+  max-width: 320px;
+  color: var(--mat-sys-on-surface-variant);
+}
+
 .error-icon {
   font-size: 48px;
   width: 48px;

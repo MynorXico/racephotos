@@ -9,6 +9,7 @@ import {
 import { ActivatedRoute, Router } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Title } from '@angular/platform-browser';
+import { take } from 'rxjs';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -29,7 +30,7 @@ export class DownloadRedirectComponent implements OnInit {
    * In production this input is ignored — the component always starts
    * in 'loading' and transitions via the API response.
    */
-  @Input() state: 'loading' | 'error' = 'loading';
+  @Input() state: 'loading' | 'downloading' | 'error' = 'loading';
 
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
@@ -46,10 +47,13 @@ export class DownloadRedirectComponent implements OnInit {
       return;
     }
 
-    this.downloadService.getDownloadUrl(token).subscribe({
+    this.downloadService.getDownloadUrl(token).pipe(take(1)).subscribe({
       next: (res) => {
-        // Trigger file download via browser redirect (AC5).
+        // Trigger file download. With Content-Disposition: attachment the browser
+        // starts the download without navigating away, so transition to 'downloading'.
         this.navigateTo(res.url);
+        this.state = 'downloading';
+        this.cdr.markForCheck();
       },
       error: (_err: HttpErrorResponse) => {
         this.setError();

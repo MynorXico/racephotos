@@ -5,6 +5,14 @@
   </div>
 }
 
+@if (state === 'downloading') {
+  <main class="page-center" role="status" aria-live="polite">
+    <mat-icon class="success-icon" aria-hidden="true">download_done</mat-icon>
+    <h1 class="success-heading">Your download is starting</h1>
+    <p class="success-body">Your photo is downloading. Check your browser&rsquo;s downloads folder.</p>
+  </main>
+}
+
 @if (state === 'error') {
   <main class="page-center" role="alert">
     <mat-icon class="error-icon" aria-hidden="true">link_off</mat-icon>

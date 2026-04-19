@@ -122,8 +122,9 @@ type AWSS3GetPresigner struct {
 
 func (p *AWSS3GetPresigner) PresignGetObject(ctx context.Context, bucket, key string, ttl time.Duration) (string, error) {
 	req, err := p.Client.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(bucket),
-		Key:    aws.String(key),
+		Bucket:                     aws.String(bucket),
+		Key:                        aws.String(key),
+		ResponseContentDisposition: aws.String("attachment"),
 	}, func(opts *s3.PresignOptions) {
 		opts.Expires = ttl
 	})
