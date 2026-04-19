@@ -32,8 +32,10 @@ type RateLimitStore interface {
 }
 
 // EmailSender sends SES templated emails.
+// data is marshalled to JSON and passed as SES TemplateData; use map[string]any
+// to support nested arrays required by Handlebars {{#each}} templates.
 type EmailSender interface {
-	SendTemplatedEmail(ctx context.Context, to, template string, data map[string]string) error
+	SendTemplatedEmail(ctx context.Context, to, template string, data map[string]any) error
 }
 
 // ── DynamoDB client interfaces ────────────────────────────────────────────────
@@ -81,12 +83,13 @@ func (s *DynamoPurchaseStore) GetApprovedPurchasesByEmail(ctx context.Context, e
 			IndexName:              aws.String("runnerEmail-claimedAt-index"),
 			KeyConditionExpression: aws.String("#email = :email"),
 			FilterExpression:       aws.String("#status = :approved"),
-			// Only downloadToken is needed to build the resend email links.
-			ProjectionExpression: aws.String("#dt"),
+			// Fetch downloadToken and photoId — enough to build link + photo reference.
+			ProjectionExpression: aws.String("#dt, #pid"),
 			ExpressionAttributeNames: map[string]string{
 				"#email":  "runnerEmail",
 				"#status": "status",
 				"#dt":     "downloadToken",
+				"#pid":    "photoId",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":email":    &types.AttributeValueMemberS{Value: email},
@@ -175,7 +178,7 @@ type SESEmailSender struct {
 	FromAddress string
 }
 
-func (s *SESEmailSender) SendTemplatedEmail(ctx context.Context, to, template string, data map[string]string) error {
+func (s *SESEmailSender) SendTemplatedEmail(ctx context.Context, to, template string, data map[string]any) error {
 	templateDataJSON, err := json.Marshal(data)
 	if err != nil {
 		return fmt.Errorf("SendTemplatedEmail: marshal: %w", err)

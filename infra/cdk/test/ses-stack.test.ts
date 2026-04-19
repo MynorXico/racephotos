@@ -165,7 +165,7 @@ describe('SesConstruct — email templates (AC2)', () => {
     });
   });
 
-  test('runner-redownload-resend template includes url and eventName variables inside each block', () => {
+  test('runner-redownload-resend template includes url and photoReference variables inside each block', () => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::SES::Template', {
       Template: Match.objectLike({
@@ -176,7 +176,7 @@ describe('SesConstruct — email templates (AC2)', () => {
     t.hasResourceProperties('AWS::SES::Template', {
       Template: Match.objectLike({
         TemplateName: 'racephotos-runner-redownload-resend',
-        HtmlPart: Match.stringLikeRegexp('\\{\\{eventName\\}\\}'),
+        HtmlPart: Match.stringLikeRegexp('\\{\\{photoReference\\}\\}'),
       }),
     });
   });

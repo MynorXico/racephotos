@@ -96,7 +96,7 @@ func (m *MockEmailSender) EXPECT() *MockEmailSenderMockRecorder {
 	return m.recorder
 }
 
-func (m *MockEmailSender) SendTemplatedEmail(ctx context.Context, to, template string, data map[string]string) error {
+func (m *MockEmailSender) SendTemplatedEmail(ctx context.Context, to, template string, data map[string]any) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SendTemplatedEmail", ctx, to, template, data)
 	ret0, _ := ret[0].(error)

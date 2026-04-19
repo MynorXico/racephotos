@@ -88,22 +88,30 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	})
 }
 
+// downloadEntry is one item in the SES template's {{#each downloads}} array.
+type downloadEntry struct {
+	URL            string `json:"url"`
+	PhotoReference string `json:"photoReference"`
+}
+
 // sendResendEmail sends the redownload-resend SES email.
 // Failures are logged but not surfaced — the 200 is already committed.
 func (h *Handler) sendResendEmail(ctx context.Context, email string, purchases []models.Purchase) {
-	var linkSlice []string
+	var downloads []downloadEntry
 	for _, p := range purchases {
 		if p.DownloadToken == nil {
 			continue
 		}
-		linkSlice = append(linkSlice, fmt.Sprintf("%s/download/%s", h.AppBaseURL, *p.DownloadToken))
+		downloads = append(downloads, downloadEntry{
+			URL:            fmt.Sprintf("%s/download/%s", h.AppBaseURL, *p.DownloadToken),
+			PhotoReference: p.PhotoID,
+		})
 	}
-	if len(linkSlice) == 0 {
+	if len(downloads) == 0 {
 		return
 	}
-	links := strings.Join(linkSlice, "\n")
-	if err := h.Email.SendTemplatedEmail(ctx, email, sesTemplateName, map[string]string{
-		"downloadLinks": links,
+	if err := h.Email.SendTemplatedEmail(ctx, email, sesTemplateName, map[string]any{
+		"downloads": downloads,
 	}); err != nil {
 		// runnerEmail is PII — never include it in log output.
 		slog.ErrorContext(ctx, "SendTemplatedEmail failed",

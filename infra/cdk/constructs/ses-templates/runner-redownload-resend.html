@@ -2,11 +2,11 @@
 <body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
   <h2>Your Download Links</h2>
   <p>Here are your active download links for approved purchases:</p>
-  <!-- TemplateData: { "downloads": [ { "url": "...", "eventName": "...", "photoReference": "..." } ] }
+  <!-- TemplateData: { "downloads": [ { "url": "...", "photoReference": "..." } ] }
        Use Handlebars #each iteration — never pass pre-built HTML as a variable. -->
   <ul>
     {{#each downloads}}
-    <li><a href="{{url}}">{{eventName}} — {{photoReference}}</a></li>
+    <li><a href="{{url}}">Photo {{photoReference}}</a></li>
     {{/each}}
   </ul>
   <p style="color:#666;font-size:13px;margin-top:24px">
