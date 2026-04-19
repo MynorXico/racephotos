@@ -207,6 +207,22 @@ func TestHandler_Handle(t *testing.T) {
 			wantCode: 403,
 		},
 		{
+			name:    "photo already indexed — returns 409 before touching BibIndex",
+			sub:     testOwnerSub,
+			photoID: testPhotoID,
+			body:    `{"bibNumbers":["101"]}`,
+			mockPhotos: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(&models.Photo{
+					ID:      testPhotoID,
+					EventID: testEventID,
+					Status:  models.PhotoStatusIndexed,
+				}, nil)
+			},
+			mockBibs:   func(m *mocks.MockBibIndexStore) {},
+			mockEvents: func(m *mocks.MockEventStore) {},
+			wantCode:   409,
+		},
+		{
 			name:    "photo store error on get — returns 500",
 			sub:     testOwnerSub,
 			photoID: testPhotoID,

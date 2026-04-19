@@ -78,6 +78,14 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(500, "internal server error"), nil
 	}
 
+	// Guard: reject early if the photo is not in a taggable state, before touching
+	// BibIndex. Without this check, DeleteBibEntriesByPhoto + WriteBibEntries would
+	// run and then UpdateItem's ConditionExpression would reject, leaving BibIndex
+	// and the photo record diverged.
+	if photo.Status != models.PhotoStatusReviewRequired && photo.Status != models.PhotoStatusError {
+		return errResponse(409, "photo is not in a taggable state — refresh and try again"), nil
+	}
+
 	// Ownership: fetch event to check photographerId against JWT sub.
 	ev, err := h.Events.GetEvent(ctx, photo.EventID)
 	if err != nil {
