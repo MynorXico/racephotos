@@ -53,7 +53,7 @@ export const reviewQueueFeature = createFeature({
       ...state,
       saveLoading: { ...state.saveLoading, [photoId]: false },
       saveError: { ...state.saveError, [photoId]: null },
-      photos: state.photos.map((p) => (p.id === photoId ? updatedPhoto : p)),
+      photos: state.photos.map((p) => (p.id === photoId ? { ...p, ...updatedPhoto } : p)),
     })),
 
     on(ReviewQueueActions.savePhotoBibsFailure, (state, { photoId, error }) => ({
