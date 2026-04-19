@@ -7,6 +7,7 @@ import { HttpClientTestingModule } from '@angular/common/http/testing';
 
 import { DashboardComponent } from './dashboard.component';
 import { initialApprovalsState } from '../../../store/approvals/approvals.reducer';
+import { initialReviewQueueState } from '../../../store/review-queue/review-queue.reducer';
 import { AppConfigService } from '../../../core/config/app-config.service';
 import { NavigationTitleService } from '../../../core/services/navigation-title.service';
 
@@ -24,7 +25,11 @@ describe('DashboardComponent', () => {
       ],
       providers: [
         provideMockStore({
-          initialState: { approvals: initialApprovalsState },
+          initialState: {
+            approvals: initialApprovalsState,
+            reviewQueue: initialReviewQueueState,
+            events: { selectedEvent: null },
+          },
         }),
         { provide: AppConfigService, useValue: mockConfigService },
       ],

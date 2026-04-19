@@ -77,5 +77,12 @@ export const photosFeature = createFeature({
 
     // ── Clear Photos ──────────────────────────────────────────────────────────
     on(PhotosActions.clearPhotos, () => initialPhotosState),
+
+    // ── Upsert Photo ─────────────────────────────────────────────────────────
+    // Patch a single photo after bib re-tag without a full reload (RS-013).
+    on(PhotosActions.upsertPhoto, (state, { photo }) => ({
+      ...state,
+      photos: state.photos.map((p) => (p.id === photo.id ? photo : p)),
+    })),
   ),
 });

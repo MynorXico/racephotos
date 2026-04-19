@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 
@@ -91,9 +92,27 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(400, "missing or invalid event id"), nil
 	}
 
+	// ?status= accepts a single value or a comma-separated list (e.g. "review_required,error").
+	// Each token is validated individually. "in_progress" is a virtual alias and may only
+	// appear as the sole filter value — not combined with other statuses — because it
+	// expands to a compound OR expression internally and combining it with real statuses
+	// would produce ambiguous DynamoDB filter expressions.
 	filter := event.QueryStringParameters["status"]
-	if filter != "" && !validStatuses[filter] {
-		return errResponse(400, "invalid status filter"), nil
+	if filter != "" {
+		tokens := strings.Split(filter, ",")
+		if len(tokens) > 1 {
+			for _, tok := range tokens {
+				tok = strings.TrimSpace(tok)
+				if tok == "in_progress" {
+					return errResponse(400, "in_progress may not be combined with other status values"), nil
+				}
+				if !validStatuses[tok] {
+					return errResponse(400, "invalid status filter"), nil
+				}
+			}
+		} else if !validStatuses[filter] {
+			return errResponse(400, "invalid status filter"), nil
+		}
 	}
 	cursor := event.QueryStringParameters["cursor"]
 	limit := defaultPageSize

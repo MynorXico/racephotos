@@ -1,0 +1,67 @@
+import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
+import { Store } from '@ngrx/store';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
+import { map } from 'rxjs/operators';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+
+import { ReviewQueueActions } from '../../../../store/review-queue/review-queue.actions';
+import {
+  selectReviewPhotoCount,
+  selectReviewPhotos,
+  selectReviewQueueError,
+  selectReviewQueueLoading,
+} from '../../../../store/review-queue/review-queue.selectors';
+import { selectSelectedEvent } from '../../../../store/events/events.selectors';
+import { ReviewPhotoCardComponent } from './review-photo-card.component';
+
+@Component({
+  selector: 'app-review-queue',
+  standalone: true,
+  imports: [
+    MatButtonModule,
+    MatIconModule,
+    MatProgressSpinnerModule,
+    ReviewPhotoCardComponent,
+  ],
+  templateUrl: './review-queue.component.html',
+  styleUrl: './review-queue.component.scss',
+  changeDetection: ChangeDetectionStrategy.OnPush,
+})
+export class ReviewQueueComponent implements OnInit {
+  private readonly store = inject(Store);
+  private readonly breakpointObserver = inject(BreakpointObserver);
+
+  readonly loading = toSignal(this.store.select(selectReviewQueueLoading), { initialValue: false });
+  readonly error = toSignal(this.store.select(selectReviewQueueError), { initialValue: null });
+  readonly photos = toSignal(this.store.select(selectReviewPhotos), { initialValue: [] });
+  readonly photoCount = toSignal(this.store.select(selectReviewPhotoCount), { initialValue: 0 });
+  readonly selectedEvent = toSignal(this.store.select(selectSelectedEvent), {
+    initialValue: null,
+  });
+
+  readonly isMobile = toSignal(
+    this.breakpointObserver
+      .observe([Breakpoints.XSmall, Breakpoints.Small])
+      .pipe(map((result) => result.matches)),
+    { initialValue: false },
+  );
+
+  readonly skeletons = Array.from({ length: 8 });
+
+  ngOnInit(): void {
+    const event = this.selectedEvent();
+    if (event) {
+      this.store.dispatch(ReviewQueueActions.loadReviewQueue({ eventId: event.id }));
+    }
+  }
+
+  onRefresh(): void {
+    const event = this.selectedEvent();
+    if (event) {
+      this.store.dispatch(ReviewQueueActions.loadReviewQueue({ eventId: event.id }));
+    }
+  }
+}

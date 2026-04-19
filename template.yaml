@@ -168,3 +168,16 @@ Resources:
         Variables:
           RACEPHOTOS_PURCHASES_TABLE: racephotos-purchases
           RACEPHOTOS_ORDERS_TABLE: racephotos-orders
+
+  TagPhotoBibsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-tag-photo-bibs-local
+      Handler: bootstrap
+      CodeUri: lambdas/tag-photo-bibs/
+      Environment:
+        Variables:
+          RACEPHOTOS_ENV: local
+          RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
+          RACEPHOTOS_BIB_INDEX_TABLE: racephotos-bib-index
+          RACEPHOTOS_EVENTS_TABLE: racephotos-events

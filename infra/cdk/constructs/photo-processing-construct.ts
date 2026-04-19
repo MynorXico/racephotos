@@ -1,4 +1,6 @@
 import * as path from 'path';
+import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
+import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
 import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
@@ -31,6 +33,17 @@ interface PhotoProcessingConstructProps {
   watermarkQueue: sqs.Queue;
   /** racephotos-watermark-dlq — DLQ alarm target for watermark Lambda */
   watermarkDlq: sqs.Queue;
+  /**
+   * HTTP API ID from SSM (valueForStringParameter) — used to attach the
+   * tag-photo-bibs route. Passed as a string to avoid a cross-stack cyclic
+   * dependency between PhotoProcessingStack and AuthStack.
+   */
+  httpApiId: string;
+  /**
+   * Cognito JWT authorizer ID from SSM (valueForStringParameter) — attached
+   * to the PUT /photos/{id}/bibs route to require a valid photographer JWT.
+   */
+  httpAuthorizerId: string;
 }
 
 /**
@@ -56,6 +69,7 @@ interface PhotoProcessingConstructProps {
 export class PhotoProcessingConstruct extends Construct {
   readonly photoProcessorFn: lambda.Function;
   readonly watermarkFn: lambda.Function;
+  readonly tagPhotoBibsFn: lambda.Function;
 
   constructor(scope: Construct, id: string, props: PhotoProcessingConstructProps) {
     super(scope, id);
@@ -71,6 +85,8 @@ export class PhotoProcessingConstruct extends Construct {
       processingDlq,
       watermarkQueue,
       watermarkDlq,
+      httpApiId,
+      httpAuthorizerId,
     } = props;
 
     // ── photo-processor Lambda ────────────────────────────────────────────────
@@ -197,6 +213,67 @@ export class PhotoProcessingConstruct extends Construct {
       lambda: this.watermarkFn,
       logRetentionDays: config.photoRetentionDays,
       dlq: watermarkDlq,
+    });
+
+    // ── tag-photo-bibs Lambda ─────────────────────────────────────────────────
+    // RS-013: PUT /photos/{id}/bibs — photographer manually tags bib numbers
+    // for review_required or error photos. Runs the idempotent retag sequence:
+    //   query photoId-index GSI → batch-delete old entries → batch-write new
+    //   entries → UpdateItem photo record (bibNumbers + status).
+    this.tagPhotoBibsFn = new lambda.Function(this, 'TagPhotoBibsFn', {
+      functionName: `racephotos-tag-photo-bibs-${config.envName}`,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
+      architecture: lambda.Architecture.X86_64,
+      handler: 'bootstrap',
+      memorySize: 256,
+      // 10 s: three sequential DynamoDB round-trips (GetItem + GetItem + UpdateItem)
+      // plus up to two BatchWriteItem calls. No Rekognition or S3 involvement.
+      timeout: cdk.Duration.seconds(10),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/tag-photo-bibs')),
+      environment: {
+        RACEPHOTOS_ENV: config.envName,
+        RACEPHOTOS_PHOTOS_TABLE: photosTable.tableName,
+        RACEPHOTOS_BIB_INDEX_TABLE: bibIndexTable.tableName,
+        RACEPHOTOS_EVENTS_TABLE: eventsTable.tableName,
+      },
+    });
+
+    // IAM: photos table (GetItem + UpdateItem)
+    photosTable.grant(this.tagPhotoBibsFn, 'dynamodb:GetItem', 'dynamodb:UpdateItem');
+    // IAM: bib-index table — BatchWriteItem on the table; Query must also cover the GSI ARN
+    // because dynamodb:Query on the table resource alone does not grant access to its GSIs.
+    bibIndexTable.grant(this.tagPhotoBibsFn, 'dynamodb:BatchWriteItem');
+    this.tagPhotoBibsFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:Query'],
+      resources: [`${bibIndexTable.tableArn}/index/photoId-index`],
+    }));
+    // IAM: events table (GetItem for ownership check)
+    eventsTable.grant(this.tagPhotoBibsFn, 'dynamodb:GetItem');
+
+    new ObservabilityConstruct(this, 'TagPhotoBibsObs', {
+      lambda: this.tagPhotoBibsFn,
+      logRetentionDays: config.photoRetentionDays,
+      // No DLQ — API Gateway-triggered Lambda, not SQS
+    });
+
+    // API Gateway route: PUT /photos/{id}/bibs — Cognito JWT required.
+    const httpApi = apigatewayv2.HttpApi.fromHttpApiAttributes(this, 'HttpApiForTagBibs', {
+      httpApiId,
+    });
+    const jwtAuthorizer: apigatewayv2.IHttpRouteAuthorizer = {
+      bind: () => ({
+        authorizerId: httpAuthorizerId,
+        authorizationType: apigatewayv2.HttpAuthorizerType.JWT,
+      }),
+    };
+    new apigatewayv2.HttpRoute(this, 'TagPhotoBibsRoute', {
+      httpApi,
+      routeKey: apigatewayv2.HttpRouteKey.with('/photos/{id}/bibs', apigatewayv2.HttpMethod.PUT),
+      integration: new integrations.HttpLambdaIntegration(
+        'TagPhotoBibsIntegration',
+        this.tagPhotoBibsFn,
+      ),
+      authorizer: jwtAuthorizer,
     });
   }
 }

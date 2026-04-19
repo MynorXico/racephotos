@@ -2,7 +2,7 @@
 
 **ID**: RS-013
 **Epic**: Photo Processing / Frontend
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
@@ -11,14 +11,15 @@ When Rekognition fails to detect a bib number (photo has `status=review_required
 
 ## Acceptance criteria
 
-- [ ] AC1: Given `PUT /photos/{id}/bibs` is called with a valid Cognito JWT and `{ bibNumbers: ["101", "102"] }`, when the caller owns the photo's event, then: the Photo record's `bibNumbers` is overwritten; `status` is updated to `"indexed"` if `bibNumbers` is non-empty, otherwise remains `"review_required"`; all existing BibIndex entries for this `photoId` are deleted (query `photoId-index` GSI, batch delete); new BibIndex entries are written for each bib (`PK={eventId}#{bib}`, `SK=photoId`). Returns the updated Photo.
-- [ ] AC2: Given the caller does not own the photo's event, then 403 is returned.
-- [ ] AC3: Given `bibNumbers` contains empty strings or whitespace-only strings, then a 400 error is returned.
-- [ ] AC4: Given a photographer visits `/photographer/dashboard/review`, then a grid of photos with `status=review_required` or `status=error` is shown, fetched via the existing `GET /events/{id}/photos?status=` endpoint (RS-008 Lambda, filtered client-side by event or via a combined query).
-- [ ] AC5: Given a `review_required` photo is shown, then: the watermarked thumbnail is displayed; current `bibNumbers` are shown as chips; a tag input field allows entering one or more bib numbers (comma-separated or Enter-to-add); a "Save" button calls `PUT /photos/{id}/bibs`.
-- [ ] AC6: Given a photographer saves bib numbers successfully, then the photo card updates to show `status=indexed` and moves out of the queue on next refresh.
-- [ ] AC7: Given an `error` photo is shown, then it displays an "Error" badge and the message "Processing failed — assign bibs manually or leave for review."
-- [ ] AC8: Given the review queue is empty, then a success state is shown: "All photos have been processed. Nothing to review."
+- [ ] AC1: Given `PUT /photos/{id}/bibs` is called with a valid Cognito JWT and `{ bibNumbers: ["101", "102"] }`, when the caller owns the photo's event, then: the Photo record's `bibNumbers` is overwritten; `status` is updated to `"indexed"` if `bibNumbers` is non-empty, otherwise remains `"review_required"`; all existing BibIndex entries for this `photoId` are deleted (query `photoId-index` GSI, batch delete); new BibIndex entries are written for each bib (`PK={eventId}#{bib}`, `SK=photoId`). Returns the updated Photo. Returns 401 if the JWT is missing or invalid.
+- [ ] AC2: Given the photo ID does not exist, then 404 is returned.
+- [ ] AC3: Given the caller does not own the photo's event, then 403 is returned.
+- [ ] AC4: Given `bibNumbers` contains empty strings or whitespace-only strings, then a 400 error is returned.
+- [ ] AC5: Given a photographer visits `/photographer/dashboard/review`, then a grid of photos with `status=review_required` or `status=error` is shown, fetched via `GET /events/{id}/photos?status=review_required,error` (RS-008 Lambda extended to accept a comma-separated status list; results sorted by `uploadedAt` DESC with a single cursor for future pagination).
+- [ ] AC6: Given a `review_required` photo is shown, then: the watermarked thumbnail is displayed; current `bibNumbers` are shown as chips; a tag input field allows entering one or more bib numbers (comma-separated or Enter-to-add); a "Save" button calls `PUT /photos/{id}/bibs`.
+- [ ] AC7: Given a photographer saves bib numbers successfully, then the photo card updates to show `status=indexed` and moves out of the queue on next refresh.
+- [ ] AC8: Given an `error` photo is shown, then it displays an "Error" badge and the message "Processing failed — assign bibs manually or leave for review."
+- [ ] AC9: Given the review queue is empty, then a success state is shown: "All photos have been processed. Nothing to review."
 
 ## Out of scope
 
@@ -58,8 +59,13 @@ When Rekognition fails to detect a bib number (photo has `status=review_required
   RACEPHOTOS_BIB_INDEX_TABLE  required
   RACEPHOTOS_EVENTS_TABLE     required
   ```
-- CDK: add to existing construct; `ObservabilityConstruct` wired; IAM: photos table (GetItem + UpdateItem), bib-index table (Query + BatchWriteItem), events table (GetItem)
-- Angular: `/photographer/dashboard/review` tab within photographer dashboard; review queue fetches photos using RS-008 Lambda filtered by `status=review_required,error`; `store/photos/` NgRx updates on save
+- CDK: add Lambda + route to `PhotoProcessingConstruct` (already holds `photosTable`, `eventsTable`, `bibIndexTable` props); `ObservabilityConstruct` wired; IAM: photos table (GetItem + UpdateItem), bib-index table (Query + BatchWriteItem), events table (GetItem)
+- Angular:
+  - Component: `src/app/features/photographer/dashboard/review/review-queue.component.ts`
+  - Route: `/photographer/dashboard/review` tab within photographer dashboard
+  - Review queue fetches via `GET /events/{id}/photos?status=review_required,error`; RS-008 Lambda (`lambdas/list-event-photos/`) must be extended to split the `status` query param on commas and apply an OR filter in DynamoDB; `store/photos/` NgRx updates on save
+  - Storybook stories required: `ReviewQueueComponent` (states: loading, loaded-with-items, empty), `BibTagInputComponent` (states: empty, with-chips, saving, error)
+- `.env.example`: add `RACEPHOTOS_BIB_INDEX_TABLE` (new var not present in any prior Lambda)
 
 ## Definition of Done
 

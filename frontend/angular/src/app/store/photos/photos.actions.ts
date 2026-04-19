@@ -37,5 +37,8 @@ export const PhotosActions = createActionGroup({
 
     /** Reset the slice on navigation away. */
     'Clear Photos': emptyProps(),
+
+    /** Patch a single photo in the list without a full reload (e.g. after bib re-tag). */
+    'Upsert Photo': props<{ photo: Photo }>(),
   },
 });

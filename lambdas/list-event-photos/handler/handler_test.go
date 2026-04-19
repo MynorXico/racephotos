@@ -337,6 +337,39 @@ func TestHandler_Handle(t *testing.T) {
 			},
 			wantCode: 400,
 		},
+		// ── RS-013 multi-status filter (review queue) ─────────────────────────
+		{
+			name:    "comma-separated multi-status — passes joined filter to store",
+			sub:     "photographer-1",
+			eventID: testEventID,
+			status:  "review_required,error",
+			mockEvents: func(m *mocks.MockEventStore) {
+				m.EXPECT().GetEventPhotographerID(gomock.Any(), testEventID).Return("photographer-1", nil)
+			},
+			mockPhotos: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().ListPhotosByEvent(gomock.Any(), testEventID, "review_required,error", "", 50).
+					Return([]models.Photo{errorPhoto}, "", nil)
+			},
+			wantCode: 200,
+		},
+		{
+			name:       "in_progress combined with real status — returns 400",
+			sub:        "photographer-1",
+			eventID:    testEventID,
+			status:     "in_progress,error",
+			mockEvents: func(m *mocks.MockEventStore) {},
+			mockPhotos: func(m *mocks.MockPhotoStore) {},
+			wantCode:   400,
+		},
+		{
+			name:       "multi-status with unknown token — returns 400",
+			sub:        "photographer-1",
+			eventID:    testEventID,
+			status:     "review_required,bogus",
+			mockEvents: func(m *mocks.MockEventStore) {},
+			mockPhotos: func(m *mocks.MockPhotoStore) {},
+			wantCode:   400,
+		},
 	}
 
 	for _, tt := range tests {

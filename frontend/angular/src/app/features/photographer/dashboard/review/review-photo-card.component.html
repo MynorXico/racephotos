@@ -1,0 +1,73 @@
+<mat-card
+  role="article"
+  [attr.aria-label]="'Photo uploaded ' + (photo.uploadedAt | date:'dd MMM yyyy, HH:mm') + ', status ' + photo.status">
+
+  <!-- Thumbnail -->
+  <div class="thumbnail-wrapper">
+    @if (photo.thumbnailUrl && !imageError()) {
+      <img
+        class="thumbnail"
+        [src]="photo.thumbnailUrl"
+        alt="Race photo thumbnail"
+        (error)="onImageError()" />
+    } @else {
+      <div class="thumbnail-placeholder">
+        <mat-icon class="placeholder-icon">image_not_supported</mat-icon>
+      </div>
+    }
+
+    @if (photo.status === 'error') {
+      <mat-chip class="error-badge" color="warn" aria-label="Processing error" highlighted>
+        <mat-icon>warning</mat-icon> Error
+      </mat-chip>
+    }
+  </div>
+
+  <mat-card-content>
+    @if (photo.status === 'error') {
+      <p class="error-note">Processing failed — assign bibs manually or leave for review.</p>
+    }
+
+    <!-- Saved bibs chips -->
+    <div class="saved-bibs" aria-live="polite">
+      @if (photo.bibNumbers.length > 0) {
+        <mat-chip-set>
+          @for (bib of photo.bibNumbers; track bib) {
+            <mat-chip>{{ bib }}</mat-chip>
+          }
+        </mat-chip-set>
+      } @else {
+        <span class="no-bibs">No bibs tagged yet</span>
+      }
+    </div>
+
+    <app-bib-tag-input
+      [initialBibs]="photo.bibNumbers"
+      [disabled]="saving"
+      (bibsChanged)="onBibsChanged($event)" />
+
+    <p class="uploaded-at">Uploaded {{ photo.uploadedAt | date:'dd MMM yyyy, HH:mm' }}</p>
+
+    @if (saveError) {
+      <p class="save-error" role="alert">Failed to save. Please try again.</p>
+    }
+  </mat-card-content>
+
+  <mat-card-actions>
+    <button
+      mat-raised-button
+      color="primary"
+      class="save-btn"
+      [disabled]="isSaveDisabled || saving"
+      [attr.aria-label]="'Save bib numbers for photo ' + photo.id"
+      [attr.aria-busy]="saving"
+      (click)="onSave()">
+      @if (saving) {
+        <mat-spinner diameter="18" class="btn-spinner" />
+        Saving…
+      } @else {
+        Save bibs
+      }
+    </button>
+  </mat-card-actions>
+</mat-card>

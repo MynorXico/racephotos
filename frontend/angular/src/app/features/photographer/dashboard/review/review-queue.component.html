@@ -1,0 +1,52 @@
+<div class="review-queue">
+  @if (loading()) {
+    <div class="queue-header">
+      <div class="skeleton skeleton-count"></div>
+      <button mat-icon-button aria-label="Refresh review queue" disabled>
+        <mat-icon>refresh</mat-icon>
+      </button>
+    </div>
+    <div
+      class="photo-grid"
+      aria-busy="true"
+      aria-label="Loading review queue">
+      <mat-spinner diameter="32" class="loading-spinner" />
+      @for (s of skeletons; track $index) {
+        <div class="skeleton-card">
+          <div class="skeleton skeleton-thumb"></div>
+          <div class="skeleton skeleton-chip"></div>
+          <div class="skeleton skeleton-input"></div>
+        </div>
+      }
+    </div>
+  } @else if (error()) {
+    <div class="state-block" role="status">
+      <mat-icon class="state-icon error-icon">error_outline</mat-icon>
+      <h2 class="state-heading">Could not load the review queue.</h2>
+      <p class="state-sub">{{ error() ?? 'An unexpected error occurred.' }}</p>
+      <button mat-stroked-button color="warn" (click)="onRefresh()">Try again</button>
+    </div>
+  } @else if (photos().length === 0) {
+    <div class="state-block" role="status">
+      <mat-icon class="state-icon success-icon">check_circle</mat-icon>
+      <h2 class="state-heading">All photos have been processed.</h2>
+      <p class="state-sub">Nothing to review.</p>
+    </div>
+  } @else {
+    <div class="queue-header">
+      <h2 class="photo-count">{{ photoCount() }} photo{{ photoCount() === 1 ? '' : 's' }} to review</h2>
+      <button
+        mat-icon-button
+        aria-label="Refresh review queue"
+        (click)="onRefresh()">
+        <mat-icon>refresh</mat-icon>
+      </button>
+    </div>
+
+    <div class="photo-grid" [class.mobile]="isMobile()">
+      @for (photo of photos(); track photo.id) {
+        <app-review-photo-card [photo]="photo" />
+      }
+    </div>
+  }
+</div>

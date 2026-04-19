@@ -24,6 +24,8 @@ import { eventsReducer } from './store/events/events.reducer';
 import { EventsEffects } from './store/events/events.effects';
 import { purchasesFeature } from './store/purchases/purchases.reducer';
 import { PurchasesEffects } from './store/purchases/purchases.effects';
+import { reviewQueueFeature } from './store/review-queue/review-queue.reducer';
+import { ReviewQueueEffects } from './store/review-queue/review-queue.effects';
 
 /**
  * Loads /assets/config.json and configures AWS Amplify before the app renders.
@@ -68,8 +70,9 @@ export const appConfig: ApplicationConfig = {
       photographer: photographerReducer,
       events: eventsReducer,
       [purchasesFeature.name]: purchasesFeature.reducer,
+      [reviewQueueFeature.name]: reviewQueueFeature.reducer,
     }),
-    provideEffects(AuthEffects, PhotographerEffects, EventsEffects, PurchasesEffects),
+    provideEffects(AuthEffects, PhotographerEffects, EventsEffects, PurchasesEffects, ReviewQueueEffects),
     provideRouterStore(),
     provideStoreDevtools({ maxAge: 25, logOnly: !isDevMode() }),
   ],

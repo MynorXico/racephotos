@@ -3,11 +3,12 @@ import { MatTabsModule } from '@angular/material/tabs';
 
 import { NavigationTitleService } from '../../../core/services/navigation-title.service';
 import { ApprovalsTabComponent } from './approvals-tab/approvals-tab.component';
+import { ReviewQueueComponent } from './review/review-queue.component';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [MatTabsModule, ApprovalsTabComponent],
+  imports: [MatTabsModule, ApprovalsTabComponent, ReviewQueueComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,

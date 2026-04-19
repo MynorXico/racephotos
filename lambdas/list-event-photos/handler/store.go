@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
@@ -81,6 +82,18 @@ func (s *DynamoPhotoLister) ListPhotosByEvent(ctx context.Context, eventID, filt
 			input.FilterExpression = aws.String("#st = :sp OR #st = :sw")
 			input.ExpressionAttributeValues[":sp"] = &types.AttributeValueMemberS{Value: models.PhotoStatusProcessing}
 			input.ExpressionAttributeValues[":sw"] = &types.AttributeValueMemberS{Value: models.PhotoStatusWatermarking}
+		} else if tokens := strings.Split(filter, ","); len(tokens) > 1 {
+			// Comma-separated multi-value filter (e.g. "review_required,error") — build
+			// OR FilterExpression with one placeholder per token. This supports the review
+			// queue (RS-013) fetching both statuses in a single paginated request, keeping
+			// a single cursor for correct pagination ordering by uploadedAt DESC.
+			var clauses []string
+			for i, tok := range tokens {
+				placeholder := fmt.Sprintf(":s%d", i)
+				clauses = append(clauses, fmt.Sprintf("#st = %s", placeholder))
+				input.ExpressionAttributeValues[placeholder] = &types.AttributeValueMemberS{Value: strings.TrimSpace(tok)}
+			}
+			input.FilterExpression = aws.String(strings.Join(clauses, " OR "))
 		} else {
 			input.FilterExpression = aws.String("#st = :status")
 			input.ExpressionAttributeValues[":status"] = &types.AttributeValueMemberS{Value: filter}
