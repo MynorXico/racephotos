@@ -54,11 +54,14 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(400, "invalid request body"), nil
 	}
 
-	// Validate: reject any empty or whitespace-only bib string (AC4).
-	for _, bib := range req.BibNumbers {
-		if strings.TrimSpace(bib) == "" {
+	// Validate and trim: reject whitespace-only bibs (AC4); trim others so that
+	// " 101 " and "101" produce the same BibKey and are both searchable.
+	for i, bib := range req.BibNumbers {
+		trimmed := strings.TrimSpace(bib)
+		if trimmed == "" {
 			return errResponse(400, "bibNumbers must not contain empty or whitespace-only values"), nil
 		}
+		req.BibNumbers[i] = trimmed
 	}
 
 	// Deduplicate bibs to prevent a DynamoDB BatchWriteItem ValidationException
