@@ -61,19 +61,32 @@ type DynamoPurchaseStore struct {
 	TableName string
 }
 
+// maxApprovedPurchasesPerEmail caps the number of purchases returned to avoid
+// unbounded reads. A runner is extremely unlikely to have more than a handful
+// of approved purchases; this guard prevents runaway pagination.
+const maxApprovedPurchasesPerEmail = 100
+
 func (s *DynamoPurchaseStore) GetApprovedPurchasesByEmail(ctx context.Context, email string) ([]models.Purchase, error) {
 	var purchases []models.Purchase
 	var lastKey map[string]types.AttributeValue
 
+	// Note: this query uses a FilterExpression on `status` applied after DynamoDB
+	// reads all items in the runnerEmail partition. Items with pending or rejected
+	// status are read and billed before being discarded. For v1 the volume is low
+	// (a few purchases per runner); a future story can add a sparse GSI keyed on
+	// approvedAt to push the predicate into the key condition and eliminate the filter.
 	for {
 		out, err := s.Client.Query(ctx, &dynamodb.QueryInput{
 			TableName:              aws.String(s.TableName),
 			IndexName:              aws.String("runnerEmail-claimedAt-index"),
 			KeyConditionExpression: aws.String("#email = :email"),
 			FilterExpression:       aws.String("#status = :approved"),
+			// Only downloadToken is needed to build the resend email links.
+			ProjectionExpression: aws.String("#dt"),
 			ExpressionAttributeNames: map[string]string{
 				"#email":  "runnerEmail",
 				"#status": "status",
+				"#dt":     "downloadToken",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":email":    &types.AttributeValueMemberS{Value: email},
@@ -90,6 +103,9 @@ func (s *DynamoPurchaseStore) GetApprovedPurchasesByEmail(ctx context.Context, e
 				return nil, fmt.Errorf("GetApprovedPurchasesByEmail: unmarshal[%d]: %w", i, err)
 			}
 			purchases = append(purchases, p)
+			if len(purchases) >= maxApprovedPurchasesPerEmail {
+				return purchases, nil
+			}
 		}
 		if len(out.LastEvaluatedKey) == 0 {
 			break
@@ -111,14 +127,16 @@ type DynamoRateLimitStore struct {
 // IncrementAndCheck atomically increments the request counter for `key`.
 // If the resulting count is within `limit`, it returns (true, nil).
 // If the count exceeds `limit`, it returns (false, nil).
-// The TTL is set to now+windowSeconds on every call, keeping the window sliding.
+// The TTL is anchored to the first request in the window (if_not_exists) so that
+// the window is a fixed 1-hour tumbling window, not a sliding window that extends
+// on each request.
 func (s *DynamoRateLimitStore) IncrementAndCheck(ctx context.Context, key string, windowSeconds int, limit int) (bool, error) {
 	out, err := s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName: aws.String(s.TableName),
 		Key: map[string]types.AttributeValue{
 			"rateLimitKey": &types.AttributeValueMemberS{Value: key},
 		},
-		UpdateExpression: aws.String("SET #count = if_not_exists(#count, :zero) + :one, #ttl = :ttl"),
+		UpdateExpression: aws.String("SET #count = if_not_exists(#count, :zero) + :one, #ttl = if_not_exists(#ttl, :ttl)"),
 		ExpressionAttributeNames: map[string]string{
 			"#count": "count",
 			"#ttl":   "expiresAt",

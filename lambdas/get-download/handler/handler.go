@@ -36,6 +36,11 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	if token == "" {
 		return errResponse(400, "token is required"), nil
 	}
+	// UUID v4 tokens are always 36 chars. Reject overlong inputs before hitting DynamoDB
+	// to avoid a ValidationException (DynamoDB key size limit: 2048 bytes).
+	if len(token) > 36 {
+		return errResponse(404, "not found"), nil
+	}
 
 	purchase, err := h.Purchases.GetPurchaseByDownloadToken(ctx, token)
 	if err != nil {

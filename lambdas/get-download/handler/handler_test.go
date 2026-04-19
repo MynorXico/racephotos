@@ -114,6 +114,13 @@ func TestHandle(t *testing.T) {
 			wantStatus: 400,
 		},
 		{
+			name:  "overlong token returns 404 without hitting DynamoDB",
+			token: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", // 37 chars
+			setup: func(p *mocks.MockPurchaseStore, ph *mocks.MockPhotoStore, pr *mocks.MockPhotoPresigner) {
+			},
+			wantStatus: 404,
+		},
+		{
 			name:  "purchase store error returns 500",
 			token: testToken,
 			setup: func(p *mocks.MockPurchaseStore, ph *mocks.MockPhotoStore, pr *mocks.MockPhotoPresigner) {

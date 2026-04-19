@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"net/mail"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
 
@@ -35,6 +37,9 @@ type resendRequest struct {
 func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPRequest) (events.APIGatewayV2HTTPResponse, error) {
 	var req resendRequest
 	if err := json.Unmarshal([]byte(event.Body), &req); err != nil || req.Email == "" {
+		return errResponse(400, "email is required"), nil
+	}
+	if _, err := mail.ParseAddress(req.Email); err != nil {
 		return errResponse(400, "email is required"), nil
 	}
 
@@ -76,16 +81,17 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 // Failures are logged but not surfaced — the 200 is already committed.
 func (h *Handler) sendResendEmail(ctx context.Context, email string, purchases []models.Purchase) {
 	// Build a newline-separated list of download links for the template.
-	links := ""
-	for i, p := range purchases {
+	var sb strings.Builder
+	for _, p := range purchases {
 		if p.DownloadToken == nil {
 			continue
 		}
-		if i > 0 {
-			links += "\n"
+		if sb.Len() > 0 {
+			sb.WriteString("\n")
 		}
-		links += fmt.Sprintf("%s/download/%s", h.AppBaseURL, *p.DownloadToken)
+		sb.WriteString(fmt.Sprintf("%s/download/%s", h.AppBaseURL, *p.DownloadToken))
 	}
+	links := sb.String()
 	if links == "" {
 		return
 	}

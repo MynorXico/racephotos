@@ -102,9 +102,15 @@ export class DownloadConstruct extends Construct {
       },
     });
 
-    // s3:GetObject on the raw bucket — presigning requires the execution role to
-    // hold the permission even though the presigned URL is not fetched server-side.
-    rawBucket.grantRead(this.getDownloadFn);
+    // s3:GetObject on the raw bucket — presigning requires the execution role to hold
+    // GetObject even though the URL is not fetched server-side. grantRead() would
+    // also add s3:ListBucket (bucket enumeration), so we grant only GetObject.
+    this.getDownloadFn.addToRolePolicy(
+      new iam.PolicyStatement({
+        actions: ['s3:GetObject'],
+        resources: [`${rawBucket.bucketArn}/*`],
+      }),
+    );
 
     // dynamodb:Query on downloadToken-index GSI (purchases table).
     this.getDownloadFn.addToRolePolicy(

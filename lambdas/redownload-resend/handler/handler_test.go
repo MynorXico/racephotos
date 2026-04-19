@@ -94,6 +94,12 @@ func TestHandle(t *testing.T) {
 			wantStatus: 400,
 		},
 		{
+			name:       "invalid email format returns 400 without hitting rate-limit store",
+			event:      makeEvent("notanemail"),
+			setup:      func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {},
+			wantStatus: 400,
+		},
+		{
 			name:  "rate limit store error returns 500",
 			event: makeEvent(testEmail),
 			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
