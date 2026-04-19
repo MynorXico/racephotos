@@ -38,7 +38,8 @@ interface SesConstructProps {
  *   photographer-claim:        runnerEmailMasked, eventName, photoReference, paymentReference, dashboardUrl
  *   runner-claim-confirmation: eventName, photoReference, paymentReference
  *   runner-purchase-approved:  eventName, downloadUrl
- *   runner-redownload-resend:  downloads (array) — each item: { url, eventName, photoReference }
+ *   runner-redownload-resend:  downloads (array) — each item: { url, photoReference }
+ *                             url = {appBaseUrl}/download/{token}; photoReference = photoId.
  *                             Passed as JSON array to SendTemplatedEmail TemplateData.
  *                             Use Handlebars {{#each downloads}} iteration; never pass raw HTML.
  *

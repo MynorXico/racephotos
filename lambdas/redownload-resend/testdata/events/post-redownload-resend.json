@@ -1,0 +1,25 @@
+{
+  "version": "2.0",
+  "routeKey": "POST /purchases/redownload-resend",
+  "rawPath": "/purchases/redownload-resend",
+  "rawQueryString": "",
+  "headers": {
+    "content-type": "application/json"
+  },
+  "body": "{\"email\":\"runner@example.com\"}",
+  "requestContext": {
+    "accountId": "123456789012",
+    "apiId": "test-api-id",
+    "http": {
+      "method": "POST",
+      "path": "/purchases/redownload-resend",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "test"
+    },
+    "requestId": "test-request-id",
+    "routeKey": "POST /purchases/redownload-resend",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}

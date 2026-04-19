@@ -1,0 +1,27 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /download/{token}",
+  "rawPath": "/download/test-token-uuid-v4",
+  "rawQueryString": "",
+  "headers": {
+    "accept": "application/json"
+  },
+  "pathParameters": {
+    "token": "test-token-uuid-v4"
+  },
+  "requestContext": {
+    "accountId": "123456789012",
+    "apiId": "test-api-id",
+    "http": {
+      "method": "GET",
+      "path": "/download/test-token-uuid-v4",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "test"
+    },
+    "requestId": "test-request-id",
+    "routeKey": "GET /download/{token}",
+    "stage": "$default"
+  },
+  "isBase64Encoded": false
+}

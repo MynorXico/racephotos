@@ -1,0 +1,66 @@
+<div class="page-wrapper">
+  <mat-card appearance="outlined" class="redownload-card">
+    <mat-card-header>
+      <mat-card-title><h1 class="card-title">Resend download links</h1></mat-card-title>
+      <mat-card-subtitle>Enter the email address you used when purchasing your photos.</mat-card-subtitle>
+    </mat-card-header>
+
+    <mat-card-content>
+      <mat-form-field appearance="outline" class="email-field">
+        <mat-label>Email address</mat-label>
+        <input
+          matInput
+          type="email"
+          placeholder="you@example.com"
+          [formControl]="emailControl"
+          autocomplete="email"
+        />
+        <mat-hint>We'll send links to all approved purchases for this address.</mat-hint>
+        @if (emailControl.hasError('required') && emailControl.touched) {
+          <mat-error>Email is required.</mat-error>
+        } @else if (emailControl.hasError('email') && emailControl.touched) {
+          <mat-error>Enter a valid email address.</mat-error>
+        }
+      </mat-form-field>
+    </mat-card-content>
+
+    <mat-card-actions align="end">
+      <button
+        mat-raised-button
+        color="primary"
+        class="submit-btn"
+        [disabled]="isLoading"
+        [attr.aria-busy]="isLoading"
+        (click)="onSubmit()"
+      >
+        @if (isLoading) {
+          <mat-spinner diameter="20" mode="indeterminate" />
+          <span class="btn-label-hidden" aria-hidden="true">Send links</span>
+        } @else {
+          Send links
+        }
+      </button>
+    </mat-card-actions>
+
+    @if (submitState === 'success') {
+      <div class="outcome-message" role="status">
+        <mat-icon aria-hidden="true" class="outcome-icon success-icon">check_circle</mat-icon>
+        <span>If we have purchases for that email, you'll receive a link shortly.</span>
+      </div>
+    }
+
+    @if (submitState === 'rate-limited') {
+      <div class="outcome-message" role="alert">
+        <mat-icon aria-hidden="true" class="outcome-icon rate-limit-icon">timer</mat-icon>
+        <span>Too many attempts. Please wait an hour and try again.</span>
+      </div>
+    }
+
+    @if (submitState === 'error') {
+      <div class="outcome-message" role="alert">
+        <mat-icon aria-hidden="true" class="outcome-icon error-icon">error_outline</mat-icon>
+        <span>Something went wrong. Please try again.</span>
+      </div>
+    }
+  </mat-card>
+</div>

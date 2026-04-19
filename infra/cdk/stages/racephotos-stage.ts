@@ -12,6 +12,7 @@ import { PhotoUploadStack } from '../stacks/photo-upload-stack';
 import { PhotoProcessingStack } from '../stacks/photo-processing-stack';
 import { SearchStack } from '../stacks/search-stack';
 import { PaymentStack } from '../stacks/payment-stack';
+import { DownloadStack } from '../stacks/download-stack';
 
 interface RacePhotosStageProps extends cdk.StageProps {
   config: EnvConfig;
@@ -159,5 +160,21 @@ export class RacePhotosStage extends cdk.Stage {
     // Deploy step, so PaymentStack must be in a later pipeline wave than
     // FrontendStack. addDependency() enforces that ordering.
     paymentStack.addDependency(frontendStack);
+
+    // DownloadStack — RS-012
+    // GET /download/{token} and POST /purchases/redownload-resend (both public, no auth).
+    // Depends on StorageStack (purchases, photos, rate-limits tables + raw bucket),
+    // AuthStack (API), SesStack, and FrontendStack (writes app-base-url SSM param).
+    const downloadStack = new DownloadStack(this, 'Download', {
+      env: props.env,
+      config,
+      db: storage.db,
+      photoStorage: storage.photoStorage,
+      ses: ses.ses,
+    });
+    downloadStack.addDependency(storage);
+    downloadStack.addDependency(auth);
+    downloadStack.addDependency(ses);
+    downloadStack.addDependency(frontendStack);
   }
 }
