@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, ElementRef, effect, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, effect, inject, viewChildren } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
@@ -35,7 +35,8 @@ import { ReviewPhotoCardComponent } from './review-photo-card.component';
 export class ReviewQueueComponent {
   private readonly store = inject(Store);
   private readonly breakpointObserver = inject(BreakpointObserver);
-  private readonly el = inject(ElementRef);
+
+  readonly photoCards = viewChildren(ReviewPhotoCardComponent, { read: ElementRef });
 
   readonly loading = toSignal(this.store.select(selectReviewQueueLoading), { initialValue: false });
   readonly loadingMore = toSignal(this.store.select(selectReviewQueueLoadingMore), { initialValue: false });
@@ -70,14 +71,9 @@ export class ReviewQueueComponent {
 
     effect(() => {
       const count = this.photos().length;
-      if (count > this._prevPhotoCount && this._prevPhotoCount > 0) {
-        const prevCount = this._prevPhotoCount;
-        setTimeout(() => {
-          const cards = this.el.nativeElement.querySelectorAll('app-review-photo-card');
-          if (cards[prevCount]) {
-            (cards[prevCount] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
-          }
-        }, 0);
+      const cards = this.photoCards();
+      if (count > this._prevPhotoCount && this._prevPhotoCount > 0 && cards[this._prevPhotoCount]) {
+        cards[this._prevPhotoCount].nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
       this._prevPhotoCount = count;
     });
