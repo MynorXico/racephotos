@@ -78,16 +78,28 @@ export const reviewQueueFeature = createFeature({
       saveError: { ...state.saveError, [photoId]: null },
     })),
 
-    on(ReviewQueueActions.savePhotoBibsSuccess, (state, { photoId, updatedPhoto }) => ({
-      ...state,
-      saveLoading: { ...state.saveLoading, [photoId]: false },
-      saveError: { ...state.saveError, [photoId]: null },
-      // Remove indexed photos from the queue immediately — they no longer need
-      // review and lingering cards confuse photographers with 409 errors on retry.
-      photos: updatedPhoto.status === 'indexed'
-        ? state.photos.filter((p) => p.id !== photoId)
-        : state.photos.map((p) => (p.id === photoId ? { ...p, ...updatedPhoto } : p)),
-    })),
+    on(ReviewQueueActions.savePhotoBibsSuccess, (state, { photoId, updatedPhoto }) => {
+      const indexed = updatedPhoto.status === 'indexed';
+      const newSaveLoading = { ...state.saveLoading };
+      const newSaveError = { ...state.saveError };
+      if (indexed) {
+        delete newSaveLoading[photoId];
+        delete newSaveError[photoId];
+      } else {
+        newSaveLoading[photoId] = false;
+        newSaveError[photoId] = null;
+      }
+      return {
+        ...state,
+        saveLoading: newSaveLoading,
+        saveError: newSaveError,
+        // Remove indexed photos from the queue immediately — they no longer need
+        // review and lingering cards confuse photographers with 409 errors on retry.
+        photos: indexed
+          ? state.photos.filter((p) => p.id !== photoId)
+          : state.photos.map((p) => (p.id === photoId ? { ...p, ...updatedPhoto } : p)),
+      };
+    }),
 
     on(ReviewQueueActions.savePhotoBibsFailure, (state, { photoId, error }) => ({
       ...state,
