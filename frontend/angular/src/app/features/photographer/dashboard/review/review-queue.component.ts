@@ -72,12 +72,15 @@ export class ReviewQueueComponent {
     });
 
     effect(() => {
-      const count = this.photos().length;
       const cards = this.photoCards();
-      if (count > this._prevPhotoCount && this._prevPhotoCount > 0 && cards[this._prevPhotoCount]) {
-        cards[this._prevPhotoCount].nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      const currentCount = cards.length;
+      if (currentCount > this._prevPhotoCount && this._prevPhotoCount > 0) {
+        const firstNewCard = cards[this._prevPhotoCount];
+        if (firstNewCard) {
+          firstNewCard.nativeElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
       }
-      this._prevPhotoCount = count;
+      this._prevPhotoCount = currentCount;
     });
   }
 
