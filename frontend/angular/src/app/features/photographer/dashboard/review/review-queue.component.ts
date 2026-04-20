@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, inject, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
@@ -30,7 +30,7 @@ import { ReviewPhotoCardComponent } from './review-photo-card.component';
   styleUrl: './review-queue.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
-export class ReviewQueueComponent implements OnInit {
+export class ReviewQueueComponent {
   private readonly store = inject(Store);
   private readonly breakpointObserver = inject(BreakpointObserver);
 
@@ -51,11 +51,13 @@ export class ReviewQueueComponent implements OnInit {
 
   readonly skeletons = Array.from({ length: 8 });
 
-  ngOnInit(): void {
-    const event = this.selectedEvent();
-    if (event) {
-      this.store.dispatch(ReviewQueueActions.loadReviewQueue({ eventId: event.id }));
-    }
+  constructor() {
+    effect(() => {
+      const event = this.selectedEvent();
+      if (event) {
+        this.store.dispatch(ReviewQueueActions.loadReviewQueue({ eventId: event.id }));
+      }
+    });
   }
 
   onRefresh(): void {

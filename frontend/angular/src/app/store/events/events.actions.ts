@@ -35,5 +35,8 @@ export const EventsActions = createActionGroup({
 
     /** Navigate to the previous page using the cursor history stack (UX-D1). */
     'Load Events Previous Page': props<Record<string, never>>(),
+
+    /** Set the active event context without triggering an API call. */
+    'Select Event': props<{ event: Event }>(),
   },
 });

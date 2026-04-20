@@ -122,6 +122,12 @@ export const eventsReducer = createReducer<EventsState>(
     error,
   })),
 
+  // ── Select Event ───────────────────────────────────────────────────────────
+  on(EventsActions.selectEvent, (state, { event }) => ({
+    ...state,
+    selectedEvent: event,
+  })),
+
   // ── Archive Event ──────────────────────────────────────────────────────────
   on(EventsActions.archiveEvent, (state) => ({
     ...state,
