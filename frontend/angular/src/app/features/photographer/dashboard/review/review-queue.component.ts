@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject } from '@angular/core';
+import { ChangeDetectionStrategy, Component, ElementRef, effect, inject } from '@angular/core';
 import { Store } from '@ngrx/store';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
@@ -13,6 +13,8 @@ import {
   selectReviewPhotos,
   selectReviewQueueError,
   selectReviewQueueLoading,
+  selectReviewQueueLoadingMore,
+  selectReviewQueueNextCursor,
 } from '../../../../store/review-queue/review-queue.selectors';
 import { selectSelectedEvent } from '../../../../store/events/events.selectors';
 import { ReviewPhotoCardComponent } from './review-photo-card.component';
@@ -33,12 +35,17 @@ import { ReviewPhotoCardComponent } from './review-photo-card.component';
 export class ReviewQueueComponent {
   private readonly store = inject(Store);
   private readonly breakpointObserver = inject(BreakpointObserver);
+  private readonly el = inject(ElementRef);
 
   readonly loading = toSignal(this.store.select(selectReviewQueueLoading), { initialValue: false });
+  readonly loadingMore = toSignal(this.store.select(selectReviewQueueLoadingMore), { initialValue: false });
   readonly error = toSignal(this.store.select(selectReviewQueueError), { initialValue: null });
   readonly photos = toSignal(this.store.select(selectReviewPhotos), { initialValue: [] });
   readonly photoCount = toSignal(this.store.select(selectReviewPhotoCount), { initialValue: 0 });
   readonly selectedEvent = toSignal(this.store.select(selectSelectedEvent), {
+    initialValue: null,
+  });
+  readonly nextCursor = toSignal(this.store.select(selectReviewQueueNextCursor), {
     initialValue: null,
   });
 
@@ -51,6 +58,8 @@ export class ReviewQueueComponent {
 
   readonly skeletons = Array.from({ length: 8 });
 
+  private _prevPhotoCount = 0;
+
   constructor() {
     effect(() => {
       const event = this.selectedEvent();
@@ -58,12 +67,33 @@ export class ReviewQueueComponent {
         this.store.dispatch(ReviewQueueActions.loadReviewQueue({ eventId: event.id }));
       }
     });
+
+    effect(() => {
+      const count = this.photos().length;
+      if (count > this._prevPhotoCount && this._prevPhotoCount > 0) {
+        const prevCount = this._prevPhotoCount;
+        setTimeout(() => {
+          const cards = this.el.nativeElement.querySelectorAll('app-review-photo-card');
+          if (cards[prevCount]) {
+            (cards[prevCount] as HTMLElement).scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }, 0);
+      }
+      this._prevPhotoCount = count;
+    });
   }
 
   onRefresh(): void {
     const event = this.selectedEvent();
     if (event) {
       this.store.dispatch(ReviewQueueActions.loadReviewQueue({ eventId: event.id }));
+    }
+  }
+
+  onLoadMore(): void {
+    const event = this.selectedEvent();
+    if (event) {
+      this.store.dispatch(ReviewQueueActions.loadNextPage({ eventId: event.id }));
     }
   }
 }

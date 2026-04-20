@@ -4,7 +4,9 @@ import { ReviewPhoto, ReviewQueueActions } from './review-queue.actions';
 export interface ReviewQueueState {
   photos: ReviewPhoto[];
   loading: boolean;
+  loadingMore: boolean;
   error: string | null;
+  nextCursor: string | null;
   saveLoading: Record<string, boolean>;
   saveError: Record<string, string | null>;
 }
@@ -12,7 +14,9 @@ export interface ReviewQueueState {
 export const initialReviewQueueState: ReviewQueueState = {
   photos: [],
   loading: false,
+  loadingMore: false,
   error: null,
+  nextCursor: null,
   saveLoading: {},
   saveError: {},
 };
@@ -28,17 +32,39 @@ export const reviewQueueFeature = createFeature({
       loading: true,
       error: null,
       photos: [],
+      nextCursor: null,
     })),
 
-    on(ReviewQueueActions.loadReviewQueueSuccess, (state, { photos }) => ({
+    on(ReviewQueueActions.loadReviewQueueSuccess, (state, { photos, nextCursor }) => ({
       ...state,
       loading: false,
       photos,
+      nextCursor,
     })),
 
     on(ReviewQueueActions.loadReviewQueueFailure, (state, { error }) => ({
       ...state,
       loading: false,
+      error,
+    })),
+
+    // ── Load Next Page (append) ───────────────────────────────────────────────
+    on(ReviewQueueActions.loadNextPage, (state) => ({
+      ...state,
+      loadingMore: true,
+      error: null,
+    })),
+
+    on(ReviewQueueActions.loadNextPageSuccess, (state, { photos, nextCursor }) => ({
+      ...state,
+      loadingMore: false,
+      photos: [...state.photos, ...photos],
+      nextCursor,
+    })),
+
+    on(ReviewQueueActions.loadNextPageFailure, (state, { error }) => ({
+      ...state,
+      loadingMore: false,
       error,
     })),
 

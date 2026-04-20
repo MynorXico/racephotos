@@ -1,12 +1,14 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
+import { Store } from '@ngrx/store';
 import { of } from 'rxjs';
-import { catchError, map, mergeMap, switchMap } from 'rxjs/operators';
+import { catchError, map, mergeMap, switchMap, withLatestFrom } from 'rxjs/operators';
 
 import { AppConfigService } from '../../core/config/app-config.service';
 import { Photo, PhotosActions } from '../photos/photos.actions';
 import { ReviewPhoto, ReviewQueueActions } from './review-queue.actions';
+import { selectReviewQueueNextCursor } from './review-queue.selectors';
 
 interface ListPhotosResponse {
   photos: ReviewPhoto[];
@@ -26,6 +28,7 @@ interface SaveBibsResponse {
 export class ReviewQueueEffects {
   private readonly actions$ = inject(Actions);
   private readonly http = inject(HttpClient);
+  private readonly store = inject(Store);
   private readonly configService = inject(AppConfigService);
 
   private get apiBase(): string {
@@ -38,11 +41,14 @@ export class ReviewQueueEffects {
       switchMap(({ eventId }) =>
         this.http
           .get<ListPhotosResponse>(
-            `${this.apiBase}/events/${eventId}/photos?status=review_required,error`,
+            `${this.apiBase}/events/${eventId}/photos?status=review_required,error&limit=12`,
           )
           .pipe(
             map((res) =>
-              ReviewQueueActions.loadReviewQueueSuccess({ photos: res.photos }),
+              ReviewQueueActions.loadReviewQueueSuccess({
+                photos: res.photos,
+                nextCursor: res.nextCursor,
+              }),
             ),
             catchError((err: HttpErrorResponse) =>
               of(
@@ -50,6 +56,36 @@ export class ReviewQueueEffects {
                   error:
                     (err.error as { error?: string })?.error ??
                     'Failed to load review queue',
+                }),
+              ),
+            ),
+          ),
+      ),
+    ),
+  );
+
+  loadNextPage$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(ReviewQueueActions.loadNextPage),
+      withLatestFrom(this.store.select(selectReviewQueueNextCursor)),
+      switchMap(([{ eventId }, cursor]) =>
+        this.http
+          .get<ListPhotosResponse>(
+            `${this.apiBase}/events/${eventId}/photos?status=review_required,error&limit=12${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+          )
+          .pipe(
+            map((res) =>
+              ReviewQueueActions.loadNextPageSuccess({
+                photos: res.photos,
+                nextCursor: res.nextCursor,
+              }),
+            ),
+            catchError((err: HttpErrorResponse) =>
+              of(
+                ReviewQueueActions.loadNextPageFailure({
+                  error:
+                    (err.error as { error?: string })?.error ??
+                    'Failed to load more photos',
                 }),
               ),
             ),

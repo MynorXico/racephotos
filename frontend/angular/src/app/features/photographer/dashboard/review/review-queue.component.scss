@@ -118,3 +118,9 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.4; }
 }
+
+.pagination-footer {
+  display: flex;
+  justify-content: center;
+  padding: 24px 0 8px;
+}
