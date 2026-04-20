@@ -11,6 +11,7 @@ import { ReviewPhoto, ReviewQueueActions } from './review-queue.actions';
 import { selectReviewQueueNextCursor } from './review-queue.selectors';
 
 const REVIEW_QUEUE_PAGE_SIZE = 12;
+const REVIEW_QUEUE_STATUS_FILTER = 'review_required,error';
 
 interface ListPhotosResponse {
   photos: ReviewPhoto[];
@@ -43,7 +44,7 @@ export class ReviewQueueEffects {
       switchMap(({ eventId }) =>
         this.http
           .get<ListPhotosResponse>(
-            `${this.apiBase}/events/${eventId}/photos?status=review_required,error&limit=${REVIEW_QUEUE_PAGE_SIZE}`,
+            `${this.apiBase}/events/${eventId}/photos?status=${REVIEW_QUEUE_STATUS_FILTER}&limit=${REVIEW_QUEUE_PAGE_SIZE}`,
           )
           .pipe(
             map((res) =>
@@ -73,7 +74,7 @@ export class ReviewQueueEffects {
       switchMap(([{ eventId }, cursor]) =>
         this.http
           .get<ListPhotosResponse>(
-            `${this.apiBase}/events/${eventId}/photos?status=review_required,error&limit=${REVIEW_QUEUE_PAGE_SIZE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
+            `${this.apiBase}/events/${eventId}/photos?status=${REVIEW_QUEUE_STATUS_FILTER}&limit=${REVIEW_QUEUE_PAGE_SIZE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
           )
           .pipe(
             map((res) =>

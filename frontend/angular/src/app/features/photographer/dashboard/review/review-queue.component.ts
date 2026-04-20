@@ -62,11 +62,13 @@ export class ReviewQueueComponent {
   readonly skeletons = Array.from({ length: 8 });
 
   private _prevPhotoCount = 0;
+  private _loadedEventId: string | null = null;
 
   constructor() {
     effect(() => {
       const event = this.selectedEvent();
-      if (event) {
+      if (event && event.id !== this._loadedEventId) {
+        this._loadedEventId = event.id;
         this.store.dispatch(ReviewQueueActions.loadReviewQueue({ eventId: event.id }));
       }
     });
