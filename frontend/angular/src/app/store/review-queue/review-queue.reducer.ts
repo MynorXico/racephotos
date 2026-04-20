@@ -53,7 +53,11 @@ export const reviewQueueFeature = createFeature({
       ...state,
       saveLoading: { ...state.saveLoading, [photoId]: false },
       saveError: { ...state.saveError, [photoId]: null },
-      photos: state.photos.map((p) => (p.id === photoId ? { ...p, ...updatedPhoto } : p)),
+      // Remove indexed photos from the queue immediately — they no longer need
+      // review and lingering cards confuse photographers with 409 errors on retry.
+      photos: updatedPhoto.status === 'indexed'
+        ? state.photos.filter((p) => p.id !== photoId)
+        : state.photos.map((p) => (p.id === photoId ? { ...p, ...updatedPhoto } : p)),
     })),
 
     on(ReviewQueueActions.savePhotoBibsFailure, (state, { photoId, error }) => ({
