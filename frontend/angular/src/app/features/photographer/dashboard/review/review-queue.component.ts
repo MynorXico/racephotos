@@ -70,6 +70,8 @@ export class ReviewQueueComponent {
       if (event && event.id !== this._loadedEventId) {
         this._loadedEventId = event.id;
         this.store.dispatch(ReviewQueueActions.loadReviewQueue({ eventId: event.id }));
+      } else if (!event) {
+        this._loadedEventId = null;
       }
     });
 

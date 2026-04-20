@@ -3,7 +3,7 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { of } from 'rxjs';
-import { catchError, map, mergeMap, switchMap, withLatestFrom } from 'rxjs/operators';
+import { catchError, map, mergeMap, switchMap, takeUntil, withLatestFrom } from 'rxjs/operators';
 
 import { AppConfigService } from '../../core/config/app-config.service';
 import { Photo, PhotosActions } from '../photos/photos.actions';
@@ -77,6 +77,7 @@ export class ReviewQueueEffects {
             `${this.apiBase}/events/${eventId}/photos?status=${REVIEW_QUEUE_STATUS_FILTER}&limit=${REVIEW_QUEUE_PAGE_SIZE}${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`,
           )
           .pipe(
+            takeUntil(this.actions$.pipe(ofType(ReviewQueueActions.loadReviewQueue))),
             map((res) =>
               ReviewQueueActions.loadNextPageSuccess({
                 photos: res.photos,
