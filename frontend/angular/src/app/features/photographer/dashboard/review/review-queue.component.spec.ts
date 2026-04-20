@@ -24,6 +24,7 @@ const baseQueueState = {
   loading: false,
   loadingMore: false,
   error: null,
+  paginationError: null,
   nextCursor: null,
   saveLoading: {},
   saveError: {},

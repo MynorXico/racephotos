@@ -15,6 +15,7 @@ import {
   selectReviewQueueLoading,
   selectReviewQueueLoadingMore,
   selectReviewQueueNextCursor,
+  selectReviewQueuePaginationError,
 } from '../../../../store/review-queue/review-queue.selectors';
 import { selectSelectedEvent } from '../../../../store/events/events.selectors';
 import { ReviewPhotoCardComponent } from './review-photo-card.component';
@@ -40,6 +41,7 @@ export class ReviewQueueComponent {
 
   readonly loading = toSignal(this.store.select(selectReviewQueueLoading), { initialValue: false });
   readonly loadingMore = toSignal(this.store.select(selectReviewQueueLoadingMore), { initialValue: false });
+  readonly paginationError = toSignal(this.store.select(selectReviewQueuePaginationError), { initialValue: null });
   readonly error = toSignal(this.store.select(selectReviewQueueError), { initialValue: null });
   readonly photos = toSignal(this.store.select(selectReviewPhotos), { initialValue: [] });
   readonly photoCount = toSignal(this.store.select(selectReviewPhotoCount), { initialValue: 0 });

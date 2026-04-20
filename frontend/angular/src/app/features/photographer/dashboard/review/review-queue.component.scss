@@ -123,4 +123,15 @@
   display: flex;
   justify-content: center;
   padding: 24px 0 8px;
+
+  &.pagination-error {
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+  }
+}
+
+.pagination-error-text {
+  font-size: 0.875rem;
+  color: var(--mat-sys-error, #b00020);
 }

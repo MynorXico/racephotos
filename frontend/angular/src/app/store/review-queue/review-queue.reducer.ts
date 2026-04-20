@@ -6,6 +6,7 @@ export interface ReviewQueueState {
   loading: boolean;
   loadingMore: boolean;
   error: string | null;
+  paginationError: string | null;
   nextCursor: string | null;
   saveLoading: Record<string, boolean>;
   saveError: Record<string, string | null>;
@@ -16,6 +17,7 @@ export const initialReviewQueueState: ReviewQueueState = {
   loading: false,
   loadingMore: false,
   error: null,
+  paginationError: null,
   nextCursor: null,
   saveLoading: {},
   saveError: {},
@@ -31,6 +33,7 @@ export const reviewQueueFeature = createFeature({
       ...state,
       loading: true,
       error: null,
+      paginationError: null,
       photos: [],
       nextCursor: null,
     })),
@@ -52,7 +55,7 @@ export const reviewQueueFeature = createFeature({
     on(ReviewQueueActions.loadNextPage, (state) => ({
       ...state,
       loadingMore: true,
-      error: null,
+      paginationError: null,
     })),
 
     on(ReviewQueueActions.loadNextPageSuccess, (state, { photos, nextCursor }) => ({
@@ -65,7 +68,7 @@ export const reviewQueueFeature = createFeature({
     on(ReviewQueueActions.loadNextPageFailure, (state, { error }) => ({
       ...state,
       loadingMore: false,
-      error,
+      paginationError: error,
     })),
 
     // ── Save Photo Bibs ──────────────────────────────────────────────────────

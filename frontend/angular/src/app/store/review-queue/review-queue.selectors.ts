@@ -7,6 +7,7 @@ export const {
   selectLoading: selectReviewQueueLoading,
   selectLoadingMore: selectReviewQueueLoadingMore,
   selectError: selectReviewQueueError,
+  selectPaginationError: selectReviewQueuePaginationError,
   selectNextCursor: selectReviewQueueNextCursor,
   selectSaveLoading: selectSaveLoadingMap,
   selectSaveError: selectSaveErrorMap,
