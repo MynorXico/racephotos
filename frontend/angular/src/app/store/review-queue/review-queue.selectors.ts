@@ -5,7 +5,10 @@ export const {
   selectReviewQueueState,
   selectPhotos: selectReviewPhotos,
   selectLoading: selectReviewQueueLoading,
+  selectLoadingMore: selectReviewQueueLoadingMore,
   selectError: selectReviewQueueError,
+  selectPaginationError: selectReviewQueuePaginationError,
+  selectNextCursor: selectReviewQueueNextCursor,
   selectSaveLoading: selectSaveLoadingMap,
   selectSaveError: selectSaveErrorMap,
 } = reviewQueueFeature;

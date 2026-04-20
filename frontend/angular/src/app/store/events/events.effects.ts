@@ -5,12 +5,12 @@ import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { Store } from '@ngrx/store';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { of } from 'rxjs';
-import { catchError, map, switchMap, tap, withLatestFrom } from 'rxjs/operators';
+import { catchError, filter, map, switchMap, tap, withLatestFrom } from 'rxjs/operators';
 
 import { AppConfigService } from '../../core/config/app-config.service';
 import { EventsActions } from './events.actions';
 import { Event } from '../../features/photographer/events/event.model';
-import { selectCursorHistory } from './events.selectors';
+import { selectCursorHistory, selectSelectedEvent } from './events.selectors';
 
 interface ListEventsResponse {
   events: Event[];
@@ -162,6 +162,19 @@ export class EventsEffects {
         }),
       ),
     { dispatch: false },
+  );
+
+  /** When events load and no event is selected, auto-select the first active event. */
+  autoSelectEvent$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(EventsActions.loadEventsSuccess),
+      withLatestFrom(this.store.select(selectSelectedEvent)),
+      filter(([{ events }, selected]) => selected === null && events.length > 0),
+      map(([{ events }]) => {
+        const active = events.find((e) => e.status === 'active') ?? events[0];
+        return EventsActions.selectEvent({ event: active });
+      }),
+    ),
   );
 
   /** PUT /events/{id}/archive — archives an event. */

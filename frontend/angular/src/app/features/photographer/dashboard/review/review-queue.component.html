@@ -48,5 +48,26 @@
         <app-review-photo-card [photo]="photo" />
       }
     </div>
+
+    @if (loadingMore()) {
+      <div class="pagination-footer">
+        <mat-spinner diameter="32" />
+      </div>
+    } @else if (paginationError()) {
+      <div class="pagination-footer pagination-error" role="alert">
+        <span class="pagination-error-text">{{ paginationError() }}</span>
+        <button mat-stroked-button color="warn" (click)="onLoadMore()">
+          <mat-icon>refresh</mat-icon>
+          Retry
+        </button>
+      </div>
+    } @else if (nextCursor()) {
+      <div class="pagination-footer">
+        <button mat-stroked-button (click)="onLoadMore()">
+          <mat-icon>expand_more</mat-icon>
+          Load more
+        </button>
+      </div>
+    }
   }
 </div>

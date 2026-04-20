@@ -19,62 +19,80 @@ const mockPhotos = [
   },
 ];
 
+const baseQueueState = {
+  photos: [],
+  loading: false,
+  loadingMore: false,
+  error: null,
+  paginationError: null,
+  nextCursor: null,
+  saveLoading: {},
+  saveError: {},
+};
+
 describe('ReviewQueueComponent', () => {
   let fixture: ComponentFixture<ReviewQueueComponent>;
   let store: MockStore;
 
-  function createComponent(storeState: object) {
+  function setupModule(storeState: object): void {
     TestBed.resetTestingModule();
     TestBed.configureTestingModule({
       imports: [ReviewQueueComponent, NoopAnimationsModule],
       providers: [provideMockStore({ initialState: storeState })],
     });
     store = TestBed.inject(MockStore);
-    fixture = TestBed.createComponent(ReviewQueueComponent);
-    fixture.detectChanges();
   }
 
-  it('dispatches loadReviewQueue on init when event selected', () => {
-    createComponent({
-      [reviewQueueFeature.name]: { photos: [], loading: false, error: null, saveLoading: {}, saveError: {} },
+  it('dispatches loadReviewQueue on construction when event selected', () => {
+    setupModule({
+      [reviewQueueFeature.name]: { ...baseQueueState },
       events: { selectedEvent: mockEvent },
     });
     const dispatchSpy = spyOn(store, 'dispatch');
-    fixture.componentInstance.ngOnInit();
+    fixture = TestBed.createComponent(ReviewQueueComponent);
+    fixture.detectChanges();
     expect(dispatchSpy).toHaveBeenCalledWith(
       ReviewQueueActions.loadReviewQueue({ eventId: 'event-1' }),
     );
   });
 
   it('shows loading skeleton when loading', () => {
-    createComponent({
-      [reviewQueueFeature.name]: { photos: [], loading: true, error: null, saveLoading: {}, saveError: {} },
+    setupModule({
+      [reviewQueueFeature.name]: { ...baseQueueState, loading: true },
       events: { selectedEvent: null },
     });
+    fixture = TestBed.createComponent(ReviewQueueComponent);
+    fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('[aria-busy="true"]')).toBeTruthy();
   });
 
   it('shows error state', () => {
-    createComponent({
-      [reviewQueueFeature.name]: { photos: [], loading: false, error: 'Network error', saveLoading: {}, saveError: {} },
+    setupModule({
+      [reviewQueueFeature.name]: { ...baseQueueState, error: 'Network error' },
       events: { selectedEvent: null },
     });
+    fixture = TestBed.createComponent(ReviewQueueComponent);
+    fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.error-icon')).toBeTruthy();
   });
 
   it('shows empty state when no photos', () => {
-    createComponent({
-      [reviewQueueFeature.name]: { photos: [], loading: false, error: null, saveLoading: {}, saveError: {} },
+    setupModule({
+      [reviewQueueFeature.name]: { ...baseQueueState },
       events: { selectedEvent: null },
     });
+    fixture = TestBed.createComponent(ReviewQueueComponent);
+    fixture.detectChanges();
     expect(fixture.nativeElement.querySelector('.success-icon')).toBeTruthy();
   });
 
   it('renders photo cards when photos loaded', () => {
-    createComponent({
-      [reviewQueueFeature.name]: { photos: mockPhotos, loading: false, error: null, saveLoading: {}, saveError: {} },
+    setupModule({
+      [reviewQueueFeature.name]: { ...baseQueueState, photos: mockPhotos },
       events: { selectedEvent: mockEvent },
     });
+    fixture = TestBed.createComponent(ReviewQueueComponent);
+    fixture.detectChanges();
     const cards = fixture.nativeElement.querySelectorAll('app-review-photo-card');
     expect(cards.length).toBe(1);
   });
