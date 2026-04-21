@@ -41,7 +41,9 @@ func (s *DynamoEventStore) ListActiveEvents(ctx context.Context, cursor string, 
 		TableName:              aws.String(s.TableName),
 		IndexName:              aws.String(gsiName),
 		KeyConditionExpression: aws.String("#s = :status"),
-		FilterExpression:       aws.String("visibility = :pub"),
+		// attribute_not_exists handles legacy events created before the visibility
+		// field was introduced; they are treated as public per ADR-0004 v1 rules.
+		FilterExpression: aws.String("attribute_not_exists(visibility) OR visibility = :pub"),
 		ExpressionAttributeNames: map[string]string{
 			"#s": "status",
 		},

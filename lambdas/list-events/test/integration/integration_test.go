@@ -189,6 +189,36 @@ func TestIntegration_ListActiveEvents(t *testing.T) {
 		}
 	})
 
+	t.Run("legacy events without visibility field are included (attribute_not_exists)", func(t *testing.T) {
+		// Simulate an event created before the visibility field was introduced by
+		// writing a raw item without the visibility attribute.
+		legacyID := prefix + "-legacy"
+		item := map[string]types.AttributeValue{
+			"id":        &types.AttributeValueMemberS{Value: legacyID},
+			"name":      &types.AttributeValueMemberS{Value: "Legacy Event"},
+			"date":      &types.AttributeValueMemberS{Value: "2026-06-20"},
+			"location":  &types.AttributeValueMemberS{Value: "Legacy City"},
+			"status":    &types.AttributeValueMemberS{Value: "active"},
+			"createdAt": &types.AttributeValueMemberS{Value: time.Now().UTC().Add(200 * time.Second).Format(time.RFC3339)},
+			"updatedAt": &types.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339)},
+			// intentionally omitting visibility
+		}
+		_, err := client.PutItem(ctx, &dynamodb.PutItemInput{
+			TableName: aws.String(tableName),
+			Item:      item,
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() { deleteEvent(ctx, client, tableName, legacyID) })
+
+		evts, _, err := store.ListActiveEvents(ctx, "", 100)
+		require.NoError(t, err)
+		ids := make([]string, 0, len(evts))
+		for _, e := range evts {
+			ids = append(ids, e.ID)
+		}
+		assert.Contains(t, ids, legacyID, "legacy event without visibility attribute must appear in public listing")
+	})
+
 	t.Run("unlisted events are excluded from public listing", func(t *testing.T) {
 		unlistedID := prefix + "-unlisted"
 		seedEvent(t, ctx, client, tableName, models.Event{
