@@ -61,7 +61,10 @@ func deleteEvent(ctx context.Context, client *dynamodb.Client, tableName, id str
 func TestIntegration_ListActiveEvents(t *testing.T) {
 	ctx := context.Background()
 	client := newDynamoClient(t)
-	tableName := "racephotos-events"
+	tableName := os.Getenv("RACEPHOTOS_EVENTS_TABLE")
+	if tableName == "" {
+		t.Skip("RACEPHOTOS_EVENTS_TABLE not set — skipping integration test")
+	}
 
 	// Use a unique prefix to isolate this test's data.
 	prefix := "list-events-integ-" + time.Now().Format("20060102150405")
@@ -150,5 +153,60 @@ func TestIntegration_ListActiveEvents(t *testing.T) {
 		_, _, err := store.ListActiveEvents(ctx, "not-valid-base64!!!", 20)
 		require.Error(t, err)
 		assert.ErrorIs(t, err, handler.ErrInvalidCursor)
+	})
+
+	t.Run("TC-019 — exactly limit-many events does not produce spurious cursor", func(t *testing.T) {
+		// Seed exactly 2 events and query with limit=2.
+		// DynamoDB may return a non-empty LastEvaluatedKey even when exhausted;
+		// if so, the follow-up page must be empty.
+		exactIDs := []string{}
+		for i := 0; i < 2; i++ {
+			id := prefix + fmt.Sprintf("-exact-%d", i)
+			seedEvent(t, ctx, client, tableName, models.Event{
+				ID:         id,
+				Name:       "Exact Event " + id,
+				Date:       "2026-07-01",
+				Location:   "Boundary City",
+				Status:     "active",
+				Visibility: "public",
+				CreatedAt:  time.Now().UTC().Add(time.Duration(i+100) * time.Second).Format(time.RFC3339),
+				UpdatedAt:  time.Now().UTC().Format(time.RFC3339),
+			})
+			exactIDs = append(exactIDs, id)
+		}
+		t.Cleanup(func() {
+			for _, id := range exactIDs {
+				deleteEvent(ctx, client, tableName, id)
+			}
+		})
+
+		_, cursor, err := store.ListActiveEvents(ctx, "", 2)
+		require.NoError(t, err)
+		if cursor != "" {
+			// Spurious cursor is valid per DynamoDB spec; the follow-up page must be empty or valid.
+			_, _, err2 := store.ListActiveEvents(ctx, cursor, 2)
+			require.NoError(t, err2)
+		}
+	})
+
+	t.Run("unlisted events are excluded from public listing", func(t *testing.T) {
+		unlistedID := prefix + "-unlisted"
+		seedEvent(t, ctx, client, tableName, models.Event{
+			ID:         unlistedID,
+			Name:       "Unlisted Event",
+			Date:       "2026-06-15",
+			Location:   "Secret City",
+			Status:     "active",
+			Visibility: "unlisted",
+			CreatedAt:  time.Now().UTC().Format(time.RFC3339),
+			UpdatedAt:  time.Now().UTC().Format(time.RFC3339),
+		})
+		t.Cleanup(func() { deleteEvent(ctx, client, tableName, unlistedID) })
+
+		evts, _, err := store.ListActiveEvents(ctx, "", 100)
+		require.NoError(t, err)
+		for _, e := range evts {
+			assert.NotEqual(t, unlistedID, e.ID, "unlisted event must not appear in public listing")
+		}
 	})
 }

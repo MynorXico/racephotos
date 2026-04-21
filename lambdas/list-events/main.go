@@ -27,7 +27,7 @@ func main() {
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 
-	cfg, err := config.LoadDefaultConfig(context.Background())
+	cfg, err := config.LoadDefaultConfig(context.TODO()) // cold-start init — no request context available
 	if err != nil {
 		slog.Error("failed to load AWS config", slog.String("error", err.Error()))
 		os.Exit(1)
@@ -42,10 +42,7 @@ func main() {
 
 	h := &handler.Handler{Store: store}
 
-	slog.Info("list-events Lambda starting",
-		slog.String("env", env),
-		slog.String("eventsTable", eventsTable),
-	)
+	slog.Info("list-events Lambda starting", slog.String("env", env))
 
 	lambda.Start(h.Handle)
 }

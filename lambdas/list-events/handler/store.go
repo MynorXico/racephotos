@@ -31,19 +31,23 @@ type DynamoEventStore struct {
 	TableName string
 }
 
-// ListActiveEvents queries all active events sorted by createdAt DESC.
-// cursor is a base64-encoded JSON map representing the LastEvaluatedKey from a previous page.
+// ListActiveEvents queries all active, publicly visible events sorted by createdAt DESC.
+// cursor is a base64-encoded, RawURL-safe JSON blob representing the DynamoDB LastEvaluatedKey
+// from a previous page. Callers must not re-encode the cursor value (e.g. with encodeURIComponent)
+// before appending it to the query string — API Gateway decodes query params before the Lambda sees them.
 // Returns the events, the next cursor (empty string if no more pages), and any error.
 func (s *DynamoEventStore) ListActiveEvents(ctx context.Context, cursor string, limit int) ([]models.Event, string, error) {
 	input := &dynamodb.QueryInput{
 		TableName:              aws.String(s.TableName),
 		IndexName:              aws.String(gsiName),
 		KeyConditionExpression: aws.String("#s = :status"),
+		FilterExpression:       aws.String("visibility = :pub"),
 		ExpressionAttributeNames: map[string]string{
 			"#s": "status",
 		},
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":status": &types.AttributeValueMemberS{Value: "active"},
+			":pub":    &types.AttributeValueMemberS{Value: "public"},
 		},
 		ScanIndexForward: aws.Bool(false),
 		Limit:            aws.Int32(int32(limit)),
@@ -110,6 +114,10 @@ func decodeCursor(cursor string) (map[string]types.AttributeValue, error) {
 	var m map[string]map[string]string
 	if err := json.Unmarshal(b, &m); err != nil {
 		return nil, fmt.Errorf("decodeCursor: unmarshal: %w", err)
+	}
+	// status-createdAt-index keys: status (PK), createdAt (SK), id (table PK pointer) = 3 max.
+	if len(m) > 3 {
+		return nil, fmt.Errorf("decodeCursor: too many key attributes (%d)", len(m))
 	}
 	key := make(map[string]types.AttributeValue)
 	for k, v := range m {

@@ -122,7 +122,7 @@ func jsonResponse(statusCode int, body any) (events.APIGatewayV2HTTPResponse, er
 		StatusCode: statusCode,
 		Headers: map[string]string{
 			"Content-Type":                "application/json",
-			"Cache-Control":               "public, max-age=30",
+			"Cache-Control":               "private, max-age=30",
 			"Access-Control-Allow-Origin": "*",
 		},
 		Body: string(b),
