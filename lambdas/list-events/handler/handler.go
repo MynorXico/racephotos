@@ -107,9 +107,8 @@ func errResponse(statusCode int, message string) events.APIGatewayV2HTTPResponse
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: statusCode,
 		Headers: map[string]string{
-			"Content-Type":                "application/json",
-			"Cache-Control":               "no-store",
-			"Access-Control-Allow-Origin": "*",
+			"Content-Type":  "application/json",
+			"Cache-Control": "no-store",
 		},
 		Body: string(b),
 	}
@@ -125,9 +124,8 @@ func jsonResponse(statusCode int, body any) (events.APIGatewayV2HTTPResponse, er
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: statusCode,
 		Headers: map[string]string{
-			"Content-Type":                "application/json",
-			"Cache-Control":               "private, max-age=30",
-			"Access-Control-Allow-Origin": "*",
+			"Content-Type":  "application/json",
+			"Cache-Control": "private, max-age=30",
 		},
 		Body: string(b),
 	}, nil
