@@ -199,13 +199,23 @@ export class EventsEffects {
               append,
             }),
           ),
-          catchError((err: HttpErrorResponse) =>
-            of(
+          catchError((err: HttpErrorResponse) => {
+            if (append) {
+              const ref = this.snackBar.open('Could not load more events.', 'Retry', {
+                duration: 8000,
+              });
+              // snackBarRef.onAction() completes when the snackbar is dismissed,
+              // so this subscription is self-cleaning.
+              ref.onAction().subscribe(() =>
+                this.store.dispatch(PublicEventsActions.listPublicEvents({ cursor })),
+              );
+            }
+            return of(
               PublicEventsActions.listPublicEventsFailure({
                 error: (err.error as { error?: string })?.error ?? 'Failed to load events',
               }),
-            ),
-          ),
+            );
+          }),
         );
       }),
     ),
