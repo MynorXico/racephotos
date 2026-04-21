@@ -1,0 +1,98 @@
+<div class="page-wrapper">
+  <!-- Header -->
+  <header class="page-header">
+    <span class="wordmark" aria-label="RaceShots">RaceShots</span>
+    <a mat-button routerLink="/login" class="login-link">Photographer login</a>
+  </header>
+
+  <!-- Content constrained to max-width -->
+  <div class="content">
+    <!-- Hero -->
+    <div class="hero" aria-labelledby="hero-headline">
+      <h1 id="hero-headline" class="hero-headline">Find your race photos</h1>
+      <p class="hero-sub">Search any event below to find photos by your bib number.</p>
+    </div>
+
+    <!-- Card grid -->
+    @if (loading() && events().length === 0) {
+      <!-- Skeleton state -->
+      <div
+        class="card-grid"
+        role="status"
+        aria-label="Loading events, please wait"
+      >
+        @for (s of skeletons; track $index) {
+          <div class="skeleton-card" aria-hidden="true">
+            <div class="skeleton-img"></div>
+            <div class="skeleton-line skeleton-name"></div>
+            <div class="skeleton-line skeleton-meta"></div>
+          </div>
+        }
+      </div>
+    } @else if (error() && events().length === 0) {
+      <!-- Initial-load error state -->
+      <div class="state-block" role="alert">
+        <mat-icon class="state-icon error-icon">cloud_off</mat-icon>
+        <p class="state-primary error-text">Unable to load events.</p>
+        <p class="state-secondary">Something went wrong. Please try again.</p>
+        <button mat-stroked-button (click)="onRetry()">Try again</button>
+      </div>
+    } @else if (events().length === 0) {
+      <!-- Empty state (AC7) -->
+      <div class="state-block" role="status">
+        <mat-icon class="state-icon">event_busy</mat-icon>
+        <p class="state-primary">No events listed yet.</p>
+        <p class="state-secondary">Check back soon.</p>
+      </div>
+    } @else {
+      <!-- Loaded cards (AC5) -->
+      <div
+        class="card-grid"
+        role="list"
+        aria-label="Upcoming race events"
+      >
+        @for (event of events(); track event.id) {
+          <app-event-card
+            [event]="event"
+            (cardClick)="onCardClick($event)"
+          />
+        }
+      </div>
+
+      <!-- Load-more error (load-more failed but cards are visible) -->
+      @if (error() && events().length > 0) {
+        <div class="load-more-error" role="alert">
+          <mat-icon>cloud_off</mat-icon>
+          <span class="error-text">Could not load more events.</span>
+          <button mat-stroked-button (click)="onLoadMore()">Try again</button>
+        </div>
+      }
+
+      <!-- Load more button (AC6) -->
+      @if (hasMore() && !error()) {
+        <div class="load-more-row">
+          <button
+            mat-stroked-button
+            class="load-more-btn"
+            [disabled]="loading()"
+            [attr.aria-busy]="loading()"
+            aria-label="Load more events"
+            (click)="onLoadMore()"
+          >
+            @if (loading()) {
+              <mat-spinner diameter="20" aria-hidden="true" />
+              <span class="visually-hidden">Loading more events</span>
+            } @else {
+              Load more events
+            }
+          </button>
+        </div>
+      }
+    }
+  </div>
+
+  <!-- Footer -->
+  <footer class="page-footer">
+    <span class="mat-caption">RaceShots — open-source race photo platform</span>
+  </footer>
+</div>

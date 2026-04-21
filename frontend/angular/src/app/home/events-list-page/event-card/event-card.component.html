@@ -1,0 +1,24 @@
+<mat-card appearance="outlined" class="event-card">
+  <mat-card-content>
+    <h2 class="event-name">{{ event.name }}</h2>
+    <div class="meta-row">
+      <mat-icon aria-hidden="true" class="meta-icon">calendar_today</mat-icon>
+      <span>{{ event.date | date: 'longDate' }}</span>
+    </div>
+    <div class="meta-row">
+      <mat-icon aria-hidden="true" class="meta-icon">location_on</mat-icon>
+      <span class="location-text">{{ event.location }}</span>
+    </div>
+  </mat-card-content>
+  <mat-card-actions>
+    <button
+      mat-flat-button
+      color="primary"
+      class="search-btn"
+      [attr.aria-label]="'Search photos for ' + event.name"
+      (click)="onSearchClick($event)"
+    >
+      Search photos
+    </button>
+  </mat-card-actions>
+</mat-card>

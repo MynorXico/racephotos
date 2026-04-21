@@ -2,27 +2,29 @@
 
 **ID**: RS-014
 **Epic**: Search / Frontend
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
 
-Events are publicly listed on the homepage sorted by creation date (ADR-0004). Any visitor can browse all active events without an account, then click through to search for their photos. Archived events are excluded from the listing but remain accessible via direct link (P4 decision). This is the primary discovery channel for runners who do not have a direct link from the photographer.
+Events are publicly listed on the homepage sorted by creation date (ADR-0004). Any visitor can browse all active events without an account, then click through to search for their photos. Archived events are excluded from the listing but remain accessible via direct link (P4 — see `docs/development-plan.md`). This is the primary discovery channel for runners who do not have a direct link from the photographer.
 
 ## Acceptance criteria
 
 - [ ] AC1: Given `GET /events` is called (no auth), when active events exist, then paginated events are returned sorted by `createdAt` DESC: `{ events: [{id, name, date, location, createdAt}], nextCursor }`. Default page size: 20.
 - [ ] AC2: Given `?cursor={cursor}` is provided, then the next page of results is returned from that cursor position.
-- [ ] AC3: Given an event has `archivedAt` set (non-empty), then it is excluded from results.
+- [ ] AC3: Given an event has `status` set to `"archived"`, then it is excluded from results. (The `archive-event` Lambda sets both `status="archived"` and `archivedAt` atomically; this Lambda filters only on `status` via the GSI.)
 - [ ] AC4: Given no events exist, then `{ events: [], nextCursor: null }` is returned.
 - [ ] AC5: Given a visitor opens the Angular app at `/`, when the page loads, then a list of event cards is shown, each displaying: event name, date, and location. Cards are sorted most recent first.
 - [ ] AC6: Given more events exist beyond the current page, then a "Load more" button fetches the next page and appends cards to the existing list.
 - [ ] AC7: Given no events are available, then an empty state message is shown: "No events listed yet. Check back soon."
 - [ ] AC8: Given a visitor clicks an event card, then they are navigated to `/events/{id}` (the runner search page from RS-009).
+- [ ] AC9: Given `?cursor=` contains a malformed or non-base64 value, then `400 Bad Request` is returned with `{ error: "invalid cursor" }`.
+- [ ] AC10: Given a DynamoDB error occurs, then `500 Internal Server Error` is returned with `{ error: "internal error" }` — the raw error is never exposed.
 
 ## Out of scope
 
-- Search/filter by date or location (v2)
+- Search/filter by date or location (v2 — ADR-0004 lists this in consequences but explicitly defers to v2)
 - Event visibility toggle (v2 — ADR-0004 `visibility` field)
 - Photographer name on event cards (photographer displayName not exposed publicly in v1)
 

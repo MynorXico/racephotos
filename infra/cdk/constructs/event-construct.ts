@@ -26,24 +26,26 @@ interface EventConstructProps {
 }
 
 /**
- * EventConstruct — RS-005
+ * EventConstruct — RS-005, RS-014
  *
- * Creates five Lambda functions for event management:
- *   - create-event     → POST /events                  (Cognito JWT required)
- *   - get-event        → GET  /events/{id}             (no auth — public)
- *   - update-event     → PUT  /events/{id}             (Cognito JWT required)
- *   - archive-event    → PUT  /events/{id}/archive     (Cognito JWT required)
- *   - list-events      → GET  /photographer/me/events  (Cognito JWT required)
+ * Creates six Lambda functions for event management:
+ *   - create-event              → POST /events                  (Cognito JWT required)
+ *   - get-event                 → GET  /events/{id}             (no auth — public)
+ *   - update-event              → PUT  /events/{id}             (Cognito JWT required)
+ *   - archive-event             → PUT  /events/{id}/archive     (Cognito JWT required)
+ *   - list-photographer-events  → GET  /photographer/me/events  (Cognito JWT required)
+ *   - list-events               → GET  /events                  (no auth — public)
  *
  * IAM grants:
- *   - create-event     : dynamodb:PutItem on eventsTable
- *                        dynamodb:GetItem on photographersTable (read defaultCurrency)
- *   - get-event        : dynamodb:GetItem on eventsTable
- *   - update-event     : dynamodb:GetItem + dynamodb:UpdateItem on eventsTable
- *   - archive-event    : dynamodb:GetItem + dynamodb:UpdateItem on eventsTable
- *   - list-events      : dynamodb:Query on eventsTable
+ *   - create-event             : dynamodb:PutItem on eventsTable
+ *                                dynamodb:GetItem on photographersTable (read defaultCurrency)
+ *   - get-event                : dynamodb:GetItem on eventsTable
+ *   - update-event             : dynamodb:GetItem + dynamodb:UpdateItem on eventsTable
+ *   - archive-event            : dynamodb:GetItem + dynamodb:UpdateItem on eventsTable
+ *   - list-photographer-events : dynamodb:Query on eventsTable
+ *   - list-events              : dynamodb:Query on eventsTable (status-createdAt-index GSI)
  *
- * AC: RS-005
+ * AC: RS-005, RS-014
  */
 export class EventConstruct extends Construct {
   readonly createEventFn: lambda.Function;
@@ -51,6 +53,7 @@ export class EventConstruct extends Construct {
   readonly updateEventFn: lambda.Function;
   readonly archiveEventFn: lambda.Function;
   readonly listPhotographerEventsFn: lambda.Function;
+  readonly listEventsFn: lambda.Function;
 
   constructor(scope: Construct, id: string, props: EventConstructProps) {
     super(scope, id);
@@ -208,6 +211,35 @@ export class EventConstruct extends Construct {
       routeKey: apigatewayv2.HttpRouteKey.with('/photographer/me/events', apigatewayv2.HttpMethod.GET),
       integration: new integrations.HttpLambdaIntegration('ListPhotographerEventsIntegration', this.listPhotographerEventsFn),
       authorizer: jwtAuthorizer,
+    });
+
+    // ── list-events Lambda ────────────────────────────────────────────────────
+    this.listEventsFn = new lambda.Function(this, 'ListEventsFn', {
+      functionName: `racephotos-list-events-${config.envName}`,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
+      architecture: lambda.Architecture.X86_64,
+      handler: 'bootstrap',
+      memorySize: 256,
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/list-events')),
+      environment: {
+        RACEPHOTOS_ENV: config.envName,
+        RACEPHOTOS_EVENTS_TABLE: eventsTable.tableName,
+      },
+    });
+
+    // Query on status-createdAt-index GSI — needs dynamodb:Query on the table.
+    eventsTable.grant(this.listEventsFn, 'dynamodb:Query');
+
+    new ObservabilityConstruct(this, 'ListEventsObs', {
+      lambda: this.listEventsFn,
+      logRetentionDays: config.photoRetentionDays,
+    });
+
+    // list-events is public — no authorizer.
+    new apigatewayv2.HttpRoute(this, 'ListEventsRoute', {
+      httpApi,
+      routeKey: apigatewayv2.HttpRouteKey.with('/events', apigatewayv2.HttpMethod.GET),
+      integration: new integrations.HttpLambdaIntegration('ListEventsIntegration', this.listEventsFn),
     });
   }
 }

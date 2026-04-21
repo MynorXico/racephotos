@@ -1,6 +1,6 @@
 import { createReducer, on } from '@ngrx/store';
-import { Event } from '../../features/photographer/events/event.model';
-import { EventsActions } from './events.actions';
+import { Event, PublicEvent } from '../../features/photographer/events/event.model';
+import { EventsActions, PublicEventsActions } from './events.actions';
 
 export interface EventsState {
   events: Event[];
@@ -10,6 +10,11 @@ export interface EventsState {
   nextCursor: string | null;
   /** Cursor history stack for previous-page navigation (UX-D1). */
   cursorHistory: string[];
+  /** Public event listing state (RS-014 — unauthenticated GET /events). */
+  publicEvents: PublicEvent[];
+  publicNextCursor: string | null;
+  publicLoading: boolean;
+  publicError: string | null;
 }
 
 export const initialEventsState: EventsState = {
@@ -19,6 +24,10 @@ export const initialEventsState: EventsState = {
   error: null,
   nextCursor: null,
   cursorHistory: [],
+  publicEvents: [],
+  publicNextCursor: null,
+  publicLoading: false,
+  publicError: null,
 };
 
 export const eventsReducer = createReducer<EventsState>(
@@ -126,6 +135,26 @@ export const eventsReducer = createReducer<EventsState>(
   on(EventsActions.selectEvent, (state, { event }) => ({
     ...state,
     selectedEvent: event,
+  })),
+
+  // ── Public Events (RS-014) ─────────────────────────────────────────────────
+  on(PublicEventsActions.listPublicEvents, (state) => ({
+    ...state,
+    publicLoading: true,
+    publicError: null,
+  })),
+
+  on(PublicEventsActions.listPublicEventsSuccess, (state, { events, nextCursor, append }) => ({
+    ...state,
+    publicLoading: false,
+    publicEvents: append ? [...state.publicEvents, ...events] : events,
+    publicNextCursor: nextCursor,
+  })),
+
+  on(PublicEventsActions.listPublicEventsFailure, (state, { error }) => ({
+    ...state,
+    publicLoading: false,
+    publicError: error,
   })),
 
   // ── Archive Event ──────────────────────────────────────────────────────────
