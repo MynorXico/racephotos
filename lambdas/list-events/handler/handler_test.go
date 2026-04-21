@@ -113,11 +113,11 @@ func TestHandler_Handle(t *testing.T) {
 			wantCode: 200,
 		},
 		{
-			name:   "limit > max clamped to default",
+			name:   "limit > max clamped to maxPageSize (50)",
 			cursor: "",
 			limit:  "200",
 			mockFn: func(m *mocks.MockEventStore) {
-				m.EXPECT().ListActiveEvents(gomock.Any(), "", 20).Return([]models.Event{}, "", nil)
+				m.EXPECT().ListActiveEvents(gomock.Any(), "", 50).Return([]models.Event{}, "", nil)
 			},
 			wantCode: 200,
 		},

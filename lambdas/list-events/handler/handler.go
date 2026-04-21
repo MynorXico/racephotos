@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strconv"
 
@@ -87,8 +86,11 @@ func parseLimit(raw string) int {
 		return defaultPageSize
 	}
 	n, err := strconv.Atoi(raw)
-	if err != nil || n <= 0 || n > maxPageSize {
+	if err != nil || n <= 0 {
 		return defaultPageSize
+	}
+	if n > maxPageSize {
+		return maxPageSize
 	}
 	return n
 }
@@ -116,7 +118,9 @@ func errResponse(statusCode int, message string) events.APIGatewayV2HTTPResponse
 func jsonResponse(statusCode int, body any) (events.APIGatewayV2HTTPResponse, error) {
 	b, err := json.Marshal(body)
 	if err != nil {
-		return errResponse(500, "internal error"), fmt.Errorf("jsonResponse: marshal: %w", err)
+		// Return nil error so the Lambda runtime uses our response body rather than
+		// overriding it with a generic error message.
+		return errResponse(500, "internal error"), nil
 	}
 	return events.APIGatewayV2HTTPResponse{
 		StatusCode: statusCode,
