@@ -37,8 +37,8 @@
         <p class="state-secondary">Something went wrong. Please try again.</p>
         <button mat-stroked-button (click)="onRetry()">Try again</button>
       </div>
-    } @else if (events().length === 0) {
-      <!-- Empty state (AC7) -->
+    } @else if (events().length === 0 && !hasMore()) {
+      <!-- Empty state (AC7) — only when there are truly no events and no further pages -->
       <div class="state-block" role="status">
         <mat-icon class="state-icon">event_busy</mat-icon>
         <p class="state-primary">No events listed yet.</p>

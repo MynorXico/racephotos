@@ -32,9 +32,10 @@ type DynamoEventStore struct {
 }
 
 // ListActiveEvents queries all active, publicly visible events sorted by createdAt DESC.
-// cursor is a base64-encoded, RawURL-safe JSON blob representing the DynamoDB LastEvaluatedKey
-// from a previous page. Callers must not re-encode the cursor value (e.g. with encodeURIComponent)
-// before appending it to the query string — API Gateway decodes query params before the Lambda sees them.
+// cursor is a base64-encoded RawURL-safe JSON blob representing the DynamoDB LastEvaluatedKey
+// from a previous page. Clients should URL-encode the cursor when appending it to a query string
+// (e.g. encodeURIComponent in JS, HttpParams in Angular) — API Gateway decodes it before the Lambda
+// receives it, so there is no risk of double-encoding at the application level.
 // Returns the events, the next cursor (empty string if no more pages), and any error.
 func (s *DynamoEventStore) ListActiveEvents(ctx context.Context, cursor string, limit int) ([]models.Event, string, error) {
 	input := &dynamodb.QueryInput{

@@ -84,15 +84,30 @@ describe('EventsListPageComponent', () => {
     expect(cards.length).toBe(2);
   });
 
-  it('AC7 — shows empty state when no events', () => {
+  it('AC7 — shows empty state when no events and no further pages', () => {
     store.overrideSelector(selectPublicEvents, []);
     store.overrideSelector(selectPublicEventsLoading, false);
+    store.overrideSelector(selectHasMorePublicEvents, false);
     store.refreshState();
     fixture.detectChanges();
 
     const text = (fixture.nativeElement as HTMLElement).textContent;
     expect(text).toContain('No events listed yet.');
     expect(text).toContain('Check back soon.');
+  });
+
+  it('AC7 — hides empty state when no events shown but more pages exist (filtered page)', () => {
+    store.overrideSelector(selectPublicEvents, []);
+    store.overrideSelector(selectPublicEventsLoading, false);
+    store.overrideSelector(selectHasMorePublicEvents, true);
+    store.overrideSelector(selectPublicNextCursor, 'cursor-xyz');
+    store.refreshState();
+    fixture.detectChanges();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent;
+    expect(text).not.toContain('No events listed yet.');
+    const btn = fixture.nativeElement.querySelector('.load-more-btn');
+    expect(btn).toBeTruthy();
   });
 
   it('shows error state on initial load failure', () => {
