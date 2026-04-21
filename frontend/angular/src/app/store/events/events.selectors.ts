@@ -20,3 +20,26 @@ export const selectCursorHistory = createSelector(
   selectEventsState,
   (state) => state.cursorHistory,
 );
+
+// ── Public event listing selectors (RS-014) ────────────────────────────────
+export const selectPublicEvents = createSelector(selectEventsState, (state) => state.publicEvents);
+
+export const selectPublicNextCursor = createSelector(
+  selectEventsState,
+  (state) => state.publicNextCursor,
+);
+
+export const selectPublicEventsLoading = createSelector(
+  selectEventsState,
+  (state) => state.publicLoading,
+);
+
+export const selectPublicEventsError = createSelector(
+  selectEventsState,
+  (state) => state.publicError,
+);
+
+export const selectHasMorePublicEvents = createSelector(
+  selectEventsState,
+  (state) => state.publicNextCursor !== null,
+);

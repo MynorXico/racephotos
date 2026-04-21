@@ -1,0 +1,212 @@
+.page-wrapper {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+// ── Header ──────────────────────────────────────────────────────────────────
+.page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  height: 56px;
+  border-bottom: 1px solid var(--mat-sys-outline-variant, rgba(0, 0, 0, 0.12));
+}
+
+.wordmark {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: var(--mat-sys-primary);
+}
+
+.login-link {
+  font-size: 14px;
+}
+
+// ── Content ─────────────────────────────────────────────────────────────────
+.content {
+  flex: 1;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 16px 48px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+// ── Hero ────────────────────────────────────────────────────────────────────
+.hero {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  height: 88px;
+  text-align: center;
+}
+
+.hero-headline {
+  font: var(--mat-headline-5-font, 400 24px/32px Roboto, sans-serif);
+  margin: 0 0 4px;
+}
+
+.hero-sub {
+  font: var(--mat-body-1-font, 400 16px/24px Roboto, sans-serif);
+  color: var(--mat-sys-on-surface-variant, rgba(0, 0, 0, 0.6));
+  margin: 0;
+}
+
+// ── Card grid ───────────────────────────────────────────────────────────────
+.card-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+// ── Skeleton ────────────────────────────────────────────────────────────────
+.skeleton-card {
+  border: 1px solid var(--mat-sys-outline-variant, rgba(0, 0, 0, 0.12));
+  border-radius: 4px;
+  padding: 0 16px 16px;
+  overflow: hidden;
+}
+
+.skeleton-img {
+  height: 72px;
+  background: linear-gradient(90deg, #e0e0e0 25%, #f5f5f5 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+  margin: 0 -16px 12px;
+}
+
+.skeleton-line {
+  height: 16px;
+  background: linear-gradient(90deg, #e0e0e0 25%, #f5f5f5 50%, #e0e0e0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 4px;
+  margin-bottom: 8px;
+}
+
+.skeleton-name { width: 70%; }
+.skeleton-meta { width: 50%; height: 14px; }
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+// ── State blocks ─────────────────────────────────────────────────────────────
+.state-block {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 64px 0;
+  gap: 8px;
+}
+
+.state-icon {
+  font-size: 64px;
+  width: 64px;
+  height: 64px;
+  color: var(--mat-sys-on-surface-variant, rgba(0, 0, 0, 0.38));
+
+  &.error-icon {
+    color: var(--mat-sys-error, #b00020);
+  }
+}
+
+.state-primary {
+  font: var(--mat-body-1-font, 400 16px/24px Roboto, sans-serif);
+  font-weight: 700;
+  margin: 0;
+}
+
+.state-secondary {
+  font: var(--mat-body-2-font, 400 14px/20px Roboto, sans-serif);
+  color: var(--mat-sys-on-surface-variant, rgba(0, 0, 0, 0.6));
+  margin: 0;
+}
+
+.error-text {
+  color: var(--mat-sys-error, #b00020);
+}
+
+// ── Load more ────────────────────────────────────────────────────────────────
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.load-more-btn {
+  width: 100%;
+  min-height: 48px;
+}
+
+.load-more-error {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 16px;
+  color: var(--mat-sys-error, #b00020);
+  flex-wrap: wrap;
+}
+
+// ── Footer ───────────────────────────────────────────────────────────────────
+.page-footer {
+  text-align: center;
+  padding: 48px 16px 24px;
+  color: var(--mat-sys-on-surface-variant, rgba(0, 0, 0, 0.6));
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  border: 0;
+}
+
+// ── Responsive ───────────────────────────────────────────────────────────────
+@media (min-width: 768px) {
+  .card-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+  }
+}
+
+@media (min-width: 1280px) {
+  .content {
+    padding: 0 24px 48px;
+  }
+
+  .page-header {
+    padding: 0 24px;
+  }
+
+  .hero {
+    height: 120px;
+  }
+
+  .hero-headline {
+    font: var(--mat-headline-4-font, 400 34px/40px Roboto, sans-serif);
+  }
+
+  .card-grid {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+  }
+
+  .load-more-btn {
+    width: 320px;
+    min-height: auto;
+  }
+}

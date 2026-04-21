@@ -58,12 +58,13 @@ export class DatabaseConstruct extends Construct {
     // GSI photographerId-createdAt-index: list events by photographer in date order
     // GSI status-createdAt-index: list events by processing status (future: moderation)
     //
-    // NOTE — status-createdAt-index hot-partition concern (raised in security review):
-    // `status` is a low-cardinality field (e.g. "active", "draft", "closed"). At large
-    // scale all active events share one GSI partition. This GSI is reserved for a future
-    // platform-level moderation feature; it is NOT used by any v1 Lambda. Before any
-    // Lambda queries this GSI, evaluate whether a sharded PK (e.g. "active#0"…"active#7")
-    // or a sparse GSI approach is more appropriate for the query volume at that time.
+    // NOTE — status-createdAt-index hot-partition concern:
+    // `status` is a low-cardinality field; all active events share one GSI partition.
+    // Used by: list-events Lambda (RS-014, GET /events public homepage).
+    // Accepted for v1: at launch-day event volume the 3,000 RCU/s partition limit is not
+    // a concern. Cache-Control: private, max-age=30 on the Lambda response limits DynamoDB
+    // read frequency per browser session. Remediation for v2 scale: write-sharded PK
+    // ("active#0"…"active#7") with scatter-gather in the Lambda — tracked as a follow-up story.
     this.eventsTable = new dynamodb.Table(this, 'EventsTable', {
       tableName: 'racephotos-events',
       partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },

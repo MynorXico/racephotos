@@ -1,0 +1,28 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /events",
+  "rawPath": "/events",
+  "rawQueryString": "",
+  "headers": {
+    "accept": "application/json"
+  },
+  "queryStringParameters": {},
+  "requestContext": {
+    "accountId": "123456789012",
+    "apiId": "abc123",
+    "domainName": "localhost",
+    "http": {
+      "method": "GET",
+      "path": "/events",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "curl/7.68.0"
+    },
+    "requestId": "test-request-id",
+    "routeKey": "GET /events",
+    "stage": "$default",
+    "time": "01/Apr/2026:00:00:00 +0000",
+    "timeEpoch": 1743465600000
+  },
+  "isBase64Encoded": false
+}

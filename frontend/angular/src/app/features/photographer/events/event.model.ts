@@ -14,6 +14,15 @@ export interface Event {
   updatedAt: string;
 }
 
+/** PublicEvent is the subset of Event returned by the public GET /events listing. */
+export interface PublicEvent {
+  id: string;
+  name: string;
+  date: string; // ISO 8601 YYYY-MM-DD
+  location: string;
+  createdAt: string;
+}
+
 export interface CreateEventRequest {
   name: string;
   date: string;

@@ -181,3 +181,13 @@ Resources:
           RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
           RACEPHOTOS_BIB_INDEX_TABLE: racephotos-bib-index
           RACEPHOTOS_EVENTS_TABLE: racephotos-events
+
+  ListEventsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-list-events-local
+      Handler: bootstrap
+      CodeUri: lambdas/list-events/
+      Environment:
+        Variables:
+          RACEPHOTOS_EVENTS_TABLE: racephotos-events

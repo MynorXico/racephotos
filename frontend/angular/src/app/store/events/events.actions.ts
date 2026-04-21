@@ -2,6 +2,7 @@ import { createActionGroup, props } from '@ngrx/store';
 import {
   CreateEventRequest,
   Event,
+  PublicEvent,
   UpdateEventRequest,
 } from '../../features/photographer/events/event.model';
 
@@ -38,5 +39,16 @@ export const EventsActions = createActionGroup({
 
     /** Set the active event context without triggering an API call. */
     'Select Event': props<{ event: Event }>(),
+  },
+});
+
+/** PublicEventsActions — unauthenticated public listing (GET /events, RS-014). */
+export const PublicEventsActions = createActionGroup({
+  source: 'Public Events',
+  events: {
+    /** Load the public event listing, optionally resuming from a cursor. */
+    'List Public Events': props<{ cursor?: string }>(),
+    'List Public Events Success': props<{ events: PublicEvent[]; nextCursor: string | null; append: boolean }>(),
+    'List Public Events Failure': props<{ error: string }>(),
   },
 });

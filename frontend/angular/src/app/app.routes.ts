@@ -116,9 +116,12 @@ export const routes: Routes = [
       ),
     providers: [provideState(runnerPhotosFeature), provideEffects(RunnerPhotosEffects), provideState(cartFeature)],
   },
+  // Public homepage — runner event listing (RS-014, no auth guard)
   {
     path: '',
-    redirectTo: '/login',
-    pathMatch: 'full',
+    loadComponent: () =>
+      import('./home/events-list-page/events-list-page.component').then(
+        (m) => m.EventsListPageComponent,
+      ),
   },
 ];

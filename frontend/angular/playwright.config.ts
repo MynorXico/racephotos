@@ -15,6 +15,11 @@ export default defineConfig({
   workers: process.env['CI'] ? 1 : undefined,
   reporter: process.env['CI'] ? 'github' : 'html',
 
+  expect: {
+    // Allow up to 2% pixel difference to account for font rendering across OS/CI environments.
+    toHaveScreenshot: { maxDiffPixelRatio: 0.02 },
+  },
+
   use: {
     baseURL: 'http://localhost:4200',
     trace: 'on-first-retry',

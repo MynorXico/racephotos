@@ -8,12 +8,17 @@ import { of } from 'rxjs';
 import { catchError, filter, map, switchMap, tap, withLatestFrom } from 'rxjs/operators';
 
 import { AppConfigService } from '../../core/config/app-config.service';
-import { EventsActions } from './events.actions';
-import { Event } from '../../features/photographer/events/event.model';
+import { EventsActions, PublicEventsActions } from './events.actions';
+import { Event, PublicEvent } from '../../features/photographer/events/event.model';
 import { selectCursorHistory, selectSelectedEvent } from './events.selectors';
 
 interface ListEventsResponse {
   events: Event[];
+  nextCursor: string | null;
+}
+
+interface ListPublicEventsResponse {
+  events: PublicEvent[];
   nextCursor: string | null;
 }
 
@@ -173,6 +178,45 @@ export class EventsEffects {
       map(([{ events }]) => {
         const active = events.find((e) => e.status === 'active') ?? events[0];
         return EventsActions.selectEvent({ event: active });
+      }),
+    ),
+  );
+
+  /** GET /events — loads the public event listing (no auth). */
+  listPublicEvents$ = createEffect(() =>
+    this.actions$.pipe(
+      ofType(PublicEventsActions.listPublicEvents),
+      switchMap(({ cursor }) => {
+        const append = cursor !== undefined;
+        const url = cursor
+          ? `${this.apiBase}/events?cursor=${encodeURIComponent(cursor)}`
+          : `${this.apiBase}/events`;
+        return this.http.get<ListPublicEventsResponse>(url).pipe(
+          map((res) =>
+            PublicEventsActions.listPublicEventsSuccess({
+              events: res.events,
+              nextCursor: res.nextCursor ?? null,
+              append,
+            }),
+          ),
+          catchError((err: HttpErrorResponse) => {
+            if (append) {
+              const ref = this.snackBar.open('Could not load more events.', 'Retry', {
+                duration: 8000,
+              });
+              // snackBarRef.onAction() completes when the snackbar is dismissed,
+              // so this subscription is self-cleaning.
+              ref.onAction().subscribe(() =>
+                this.store.dispatch(PublicEventsActions.listPublicEvents({ cursor })),
+              );
+            }
+            return of(
+              PublicEventsActions.listPublicEventsFailure({
+                error: (err.error as { error?: string })?.error ?? 'Failed to load events',
+              }),
+            );
+          }),
+        );
       }),
     ),
   );

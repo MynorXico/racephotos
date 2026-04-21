@@ -1,6 +1,6 @@
-.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark test-watermark invoke-list-event-photos invoke-search invoke-create-order invoke-list-purchases-for-approval invoke-approve-purchase invoke-reject-purchase invoke-get-download invoke-redownload-resend invoke-tag-photo-bibs
+.PHONY: test test-unit test-integration lint lint-check build seed-local synth cdk-check ng-build ng-lint ng-test storybook-build e2e validate format invoke-get-photographer invoke-update-photographer invoke-photo-processor invoke-watermark test-watermark invoke-list-event-photos invoke-search invoke-create-order invoke-list-purchases-for-approval invoke-approve-purchase invoke-reject-purchase invoke-get-download invoke-redownload-resend invoke-tag-photo-bibs invoke-list-events
 
-LAMBDAS := presign-photos photo-processor watermark search payment create-order get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events list-event-photos list-purchases-for-approval approve-purchase reject-purchase get-download redownload-resend tag-photo-bibs
+LAMBDAS := presign-photos photo-processor watermark search payment create-order get-photographer update-photographer create-event get-event update-event archive-event list-photographer-events list-event-photos list-purchases-for-approval approve-purchase reject-purchase get-download redownload-resend tag-photo-bibs list-events
 
 # Run all tests
 test: test-unit test-integration
@@ -177,6 +177,9 @@ invoke-redownload-resend:
 
 invoke-tag-photo-bibs:
 	$(call invoke_lambda,tag-photo-bibs,TagPhotoBibsFunction)
+
+invoke-list-events:
+	$(call invoke_lambda,list-events,ListEventsFunction)
 
 ## test-watermark: apply watermark locally and open the result — no AWS needed.
 ## Usage:
