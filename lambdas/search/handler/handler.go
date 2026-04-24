@@ -119,7 +119,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 		photos, err := h.Photos.BatchGetPhotos(ctx, thisPage)
 		if err != nil {
-			<-evCh
+			// evCh is buffered (cap 1) — the goroutine writes and exits regardless; no drain needed.
 			slog.ErrorContext(ctx, "BatchGetPhotos (cursor fast-path) failed",
 				slog.String("eventID", eventID),
 				slog.String("error", err.Error()),

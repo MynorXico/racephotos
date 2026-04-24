@@ -128,7 +128,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 
 	evRes := <-evCh
 	if evRes.err != nil {
-		<-phCh // drain
+		// phCh is buffered (cap 1) — the goroutine writes and exits regardless; no drain needed.
 		if errors.Is(evRes.err, ErrEventNotFound) {
 			return errResponse(404, "event not found"), nil
 		}
