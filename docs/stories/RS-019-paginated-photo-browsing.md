@@ -1,7 +1,7 @@
 # Story: Paginated photo browsing for runners — load more with photo counter
 **ID**: RS-019
 **Epic**: Search
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
