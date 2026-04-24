@@ -5,9 +5,14 @@ export const {
   selectRunnerPhotosState,
   selectPhotos: selectRunnerPhotos,
   selectLoading: selectRunnerPhotosLoading,
+  selectLoadingMore: selectRunnerPhotosLoadingMore,
   selectError: selectRunnerPhotosError,
+  selectLoadMoreError: selectRunnerPhotosLoadMoreError,
   selectSearchedBib,
   selectSelectedPhotoId,
+  selectNextCursor,
+  selectTotalCount,
+  selectMode,
 } = runnerPhotosFeature;
 
 export const selectHasSearched = createSelector(
@@ -24,4 +29,9 @@ export const selectSelectedPhoto = createSelector(
   selectRunnerPhotos,
   selectSelectedPhotoId,
   (photos, id) => (id ? (photos.find((p) => p.photoId === id) ?? null) : null),
+);
+
+export const selectHasMorePhotos = createSelector(
+  selectNextCursor,
+  (cursor) => cursor !== null,
 );

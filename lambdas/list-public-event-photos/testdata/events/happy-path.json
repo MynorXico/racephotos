@@ -1,0 +1,27 @@
+{
+  "version": "2.0",
+  "routeKey": "GET /events/{id}/public-photos",
+  "rawPath": "/events/11111111-2222-3333-4444-555555555555/public-photos",
+  "pathParameters": {
+    "id": "11111111-2222-3333-4444-555555555555"
+  },
+  "queryStringParameters": {},
+  "requestContext": {
+    "accountId": "123456789012",
+    "apiId": "local",
+    "domainName": "localhost",
+    "http": {
+      "method": "GET",
+      "path": "/events/11111111-2222-3333-4444-555555555555/public-photos",
+      "protocol": "HTTP/1.1",
+      "sourceIp": "127.0.0.1",
+      "userAgent": "integration-test"
+    },
+    "requestId": "local-req-1",
+    "routeKey": "GET /events/{id}/public-photos",
+    "stage": "$default",
+    "time": "01/Jan/2026:00:00:00 +0000",
+    "timeEpoch": 1735689600000
+  },
+  "isBase64Encoded": false
+}

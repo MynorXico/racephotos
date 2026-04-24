@@ -102,6 +102,20 @@ Resources:
           RACEPHOTOS_EVENTS_TABLE: racephotos-events
           RACEPHOTOS_PHOTO_CDN_DOMAIN: localhost:4566
 
+  ListPublicEventPhotosFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: racephotos-list-public-event-photos-local
+      Handler: bootstrap
+      CodeUri: lambdas/list-public-event-photos/
+      Architectures:
+        - arm64
+      Environment:
+        Variables:
+          RACEPHOTOS_PHOTOS_TABLE: racephotos-photos
+          RACEPHOTOS_EVENTS_TABLE: racephotos-events
+          RACEPHOTOS_PHOTO_CDN_DOMAIN: localhost:4566
+
   SearchFunction:
     Type: AWS::Serverless::Function
     Properties:

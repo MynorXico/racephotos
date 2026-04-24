@@ -18,4 +18,8 @@ type Event struct {
 	ArchivedAt     string  `dynamodbav:"archivedAt"     json:"archivedAt"` // empty if not archived
 	CreatedAt      string  `dynamodbav:"createdAt"      json:"createdAt"`
 	UpdatedAt      string  `dynamodbav:"updatedAt"      json:"updatedAt"`
+	// PhotoCount is a denormalised counter incremented by the watermark Lambda each
+	// time a photo transitions to "indexed". Used by the public browsing endpoint
+	// to serve "Showing X of Y" without scanning the photos table (ADR-0012).
+	PhotoCount int `dynamodbav:"photoCount,omitempty" json:"photoCount,omitempty"`
 }

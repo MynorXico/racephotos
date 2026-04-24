@@ -26,11 +26,17 @@ import { RunnerPhotosActions } from '../../store/runner-photos/runner-photos.act
 import {
   selectRunnerPhotos,
   selectRunnerPhotosLoading,
+  selectRunnerPhotosLoadingMore,
   selectRunnerPhotosError,
+  selectRunnerPhotosLoadMoreError,
   selectSearchedBib,
   selectHasSearched,
   selectHasResults,
   selectSelectedPhoto,
+  selectNextCursor,
+  selectTotalCount,
+  selectMode,
+  selectHasMorePhotos,
 } from '../../store/runner-photos/runner-photos.selectors';
 import { EventsActions } from '../../store/events/events.actions';
 import { selectSelectedEvent, selectEventsLoading } from '../../store/events/events.selectors';
@@ -82,13 +88,21 @@ export class EventSearchComponent implements OnInit, OnDestroy {
   readonly loading = toSignal(this.store.select(selectRunnerPhotosLoading), {
     initialValue: false,
   });
+  readonly loadingMore = toSignal(this.store.select(selectRunnerPhotosLoadingMore), {
+    initialValue: false,
+  });
   readonly error = toSignal(this.store.select(selectRunnerPhotosError), { initialValue: null });
+  readonly loadMoreError = toSignal(this.store.select(selectRunnerPhotosLoadMoreError), { initialValue: null });
   readonly searchedBib = toSignal(this.store.select(selectSearchedBib), { initialValue: null });
   readonly hasSearched = toSignal(this.store.select(selectHasSearched), { initialValue: false });
   readonly hasResults = toSignal(this.store.select(selectHasResults), { initialValue: false });
   readonly selectedPhoto = toSignal(this.store.select(selectSelectedPhoto), { initialValue: null });
   readonly selectedEvent = toSignal(this.store.select(selectSelectedEvent), { initialValue: null });
   readonly eventLoading = toSignal(this.store.select(selectEventsLoading), { initialValue: false });
+  readonly nextCursor = toSignal(this.store.select(selectNextCursor), { initialValue: null });
+  readonly totalCount = toSignal(this.store.select(selectTotalCount), { initialValue: 0 });
+  readonly mode = toSignal(this.store.select(selectMode), { initialValue: 'all' as const });
+  readonly hasMorePhotos = toSignal(this.store.select(selectHasMorePhotos), { initialValue: false });
 
   readonly skeletonCards = Array.from({ length: 6 });
 
@@ -99,12 +113,12 @@ export class EventSearchComponent implements OnInit, OnDestroy {
   private purchaseDialogRef: MatDialogRef<PurchaseStepperComponent> | null = null;
 
   constructor() {
-    // Load event metadata when route param changes.
+    // Load event metadata and first page of public photos when route param changes.
     effect(() => {
       const id = this.eventId();
       if (id) {
         this.store.dispatch(EventsActions.loadEvent({ id }));
-        this.store.dispatch(RunnerPhotosActions.clearResults());
+        this.store.dispatch(RunnerPhotosActions.loadEventPhotos({ eventId: id }));
       }
     });
 
@@ -153,20 +167,13 @@ export class EventSearchComponent implements OnInit, OnDestroy {
     this.actions$
       .pipe(ofType(PurchasesActions.initiatePurchase), takeUntilDestroyed(this._destroyRef))
       .subscribe(({ photoIds }) => {
-        // Guard: avoid opening a second stepper when initiatePurchase is dispatched
-        // while one is already open (e.g. "Try again" from the error step retries
-        // the same action inside the existing dialog).
         if (this.purchaseDialogRef) {
           return;
         }
-
-        // Close the photo-detail dialog without dispatching deselectPhoto twice
-        // (afterClosed() subscription handles deselectPhoto).
         if (this.dialogRef) {
           this.dialogRef.close();
           this.dialogRef = null;
         }
-
         const data: PurchaseStepperDialogData = { photoIds };
         this.purchaseDialogRef = this.dialog.open(PurchaseStepperComponent, {
           data,
@@ -177,14 +184,10 @@ export class EventSearchComponent implements OnInit, OnDestroy {
           panelClass: 'purchase-stepper-dialog',
           disableClose: true,
         });
-
         this.purchaseDialogRef
           .afterClosed()
           .pipe(takeUntilDestroyed(this._destroyRef))
           .subscribe(() => {
-            // Guard: only dispatch resetPurchase if the store still has active photo IDs,
-            // meaning the dialog was closed by backdrop/external means rather than the
-            // "Done" button which already dispatched resetPurchase.
             this.store
               .select(selectActivePhotoIds)
               .pipe(take(1))
@@ -216,15 +219,43 @@ export class EventSearchComponent implements OnInit, OnDestroy {
     this.store.dispatch(RunnerPhotosActions.searchByBib({ eventId: id, bibNumber: bib }));
   }
 
+  onClearBib(): void {
+    this.bibControl.reset('');
+    const id = this.eventId();
+    if (id) {
+      this.store.dispatch(RunnerPhotosActions.loadEventPhotos({ eventId: id }));
+    }
+  }
+
+  onLoadMore(): void {
+    const cursor = this.nextCursor();
+    const id = this.eventId();
+    if (!cursor || !id) return;
+
+    if (this.mode() === 'bib') {
+      const bib = this.searchedBib();
+      if (bib) {
+        this.store.dispatch(RunnerPhotosActions.loadMoreBibPhotos({ eventId: id, bibNumber: bib, cursor }));
+      }
+    } else {
+      this.store.dispatch(RunnerPhotosActions.loadMoreEventPhotos({ eventId: id, cursor }));
+    }
+  }
+
   onPhotoSelected(photoId: string): void {
     this.store.dispatch(RunnerPhotosActions.selectPhoto({ photoId }));
   }
 
   onRetry(): void {
     const id = this.eventId();
-    const bib = this.searchedBib();
-    if (id && bib) {
-      this.store.dispatch(RunnerPhotosActions.searchByBib({ eventId: id, bibNumber: bib }));
+    if (!id) return;
+    if (this.mode() === 'bib') {
+      const bib = this.searchedBib();
+      if (bib) {
+        this.store.dispatch(RunnerPhotosActions.searchByBib({ eventId: id, bibNumber: bib }));
+      }
+    } else {
+      this.store.dispatch(RunnerPhotosActions.loadEventPhotos({ eventId: id }));
     }
   }
 }

@@ -59,6 +59,10 @@ func main() {
 			Client:    ddbClient,
 			TableName: photosTable,
 		},
+		EventCounter: &handler.DynamoEventCountUpdater{
+			Client:    ddbClient,
+			TableName: eventsTable,
+		},
 		ProcessedBucket: processedBucket,
 	}
 

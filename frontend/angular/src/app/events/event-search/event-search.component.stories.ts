@@ -34,21 +34,43 @@ const photos = Array.from({ length: 6 }, (_, i) => ({
   capturedAt: null,
 }));
 
-function baseProviders(
-  runnerPhotosOverride: object,
+function baseState(
+  runnerOverride: object,
   eventsOverride: object,
 ) {
   return [
     importProvidersFrom(NoopAnimationsModule),
     provideRouter([]),
     provideStore({
-      runnerPhotos: (s = runnerPhotosOverride) => s,
+      runnerPhotos: (s = runnerOverride) => s,
       events: (s = eventsOverride) => s,
     }),
     provideEffects([]),
     { provide: ActivatedRoute, useValue: mockRoute },
   ];
 }
+
+const defaultRunnerState = {
+  photos: [],
+  searchedBib: null,
+  loading: false,
+  loadingMore: false,
+  error: null,
+  loadMoreError: null,
+  selectedPhotoId: null,
+  nextCursor: null,
+  totalCount: 0,
+  mode: 'all',
+};
+
+const defaultEventsState = {
+  events: [],
+  selectedEvent: mockEvent,
+  loading: false,
+  error: null,
+  nextCursor: null,
+  cursorHistory: [],
+};
 
 const meta: Meta<EventSearchComponent> = {
   title: 'Runner/Photo Search/EventSearchComponent',
@@ -60,49 +82,85 @@ const meta: Meta<EventSearchComponent> = {
 export default meta;
 type Story = StoryObj<EventSearchComponent>;
 
-export const InitialState: Story = {
-  name: 'Initial — no search yet',
+export const AllEventBrowse: Story = {
+  name: 'All-event browse — loaded with counter',
   decorators: [
     applicationConfig({
-      providers: baseProviders(
-        { photos: [], searchedBib: null, loading: false, error: null, selectedPhotoId: null },
-        { events: [], selectedEvent: mockEvent, loading: false, error: null, nextCursor: null, cursorHistory: [] },
+      providers: baseState(
+        { ...defaultRunnerState, photos, totalCount: 150, nextCursor: 'abc123', mode: 'all' },
+        defaultEventsState,
       ),
     }),
   ],
 };
 
-export const Loading: Story = {
-  name: 'Loading (skeleton cards)',
+export const AllEventBrowseLoadMore: Story = {
+  name: 'All-event browse — load more visible',
   decorators: [
     applicationConfig({
-      providers: baseProviders(
-        { photos: [], searchedBib: '101', loading: true, error: null, selectedPhotoId: null },
-        { events: [], selectedEvent: mockEvent, loading: false, error: null, nextCursor: null, cursorHistory: [] },
+      providers: baseState(
+        { ...defaultRunnerState, photos, totalCount: 150, nextCursor: 'cursor-next', mode: 'all' },
+        defaultEventsState,
       ),
     }),
   ],
 };
 
-export const WithResults: Story = {
-  name: 'Results — 6 photos',
+export const EmptyEventNoPhotos: Story = {
+  name: 'Empty state — no indexed photos yet (AC7)',
   decorators: [
     applicationConfig({
-      providers: baseProviders(
-        { photos, searchedBib: '101', loading: false, error: null, selectedPhotoId: null },
-        { events: [], selectedEvent: mockEvent, loading: false, error: null, nextCursor: null, cursorHistory: [] },
+      providers: baseState(
+        { ...defaultRunnerState, photos: [], totalCount: 0, nextCursor: null, mode: 'all' },
+        defaultEventsState,
       ),
     }),
   ],
 };
 
-export const NoResults: Story = {
-  name: 'No results for bib',
+export const LoadingSkeleton: Story = {
+  name: 'Loading skeleton cards',
   decorators: [
     applicationConfig({
-      providers: baseProviders(
-        { photos: [], searchedBib: '999', loading: false, error: null, selectedPhotoId: null },
-        { events: [], selectedEvent: mockEvent, loading: false, error: null, nextCursor: null, cursorHistory: [] },
+      providers: baseState(
+        { ...defaultRunnerState, loading: true, mode: 'all' },
+        defaultEventsState,
+      ),
+    }),
+  ],
+};
+
+export const BibResultsWithCounter: Story = {
+  name: 'Bib results — showing X of Y counter',
+  decorators: [
+    applicationConfig({
+      providers: baseState(
+        { ...defaultRunnerState, photos: photos.slice(0, 3), searchedBib: '101', totalCount: 7, nextCursor: null, mode: 'bib' },
+        defaultEventsState,
+      ),
+    }),
+  ],
+};
+
+export const BibResultsLoadMore: Story = {
+  name: 'Bib results — load more visible',
+  decorators: [
+    applicationConfig({
+      providers: baseState(
+        { ...defaultRunnerState, photos, searchedBib: '42', totalCount: 30, nextCursor: 'cursor-bib', mode: 'bib' },
+        defaultEventsState,
+      ),
+    }),
+  ],
+};
+
+export const NoResultsBib: Story = {
+  name: 'No results for bib search',
+  decorators: [
+    applicationConfig({
+      providers: baseState(
+        { ...defaultRunnerState, photos: [], searchedBib: '999', totalCount: 0, nextCursor: null, mode: 'bib' },
+        defaultEventsState,
       ),
     }),
   ],
@@ -112,9 +170,9 @@ export const ErrorState: Story = {
   name: 'Error — retry button',
   decorators: [
     applicationConfig({
-      providers: baseProviders(
-        { photos: [], searchedBib: '101', loading: false, error: 'network_error', selectedPhotoId: null },
-        { events: [], selectedEvent: mockEvent, loading: false, error: null, nextCursor: null, cursorHistory: [] },
+      providers: baseState(
+        { ...defaultRunnerState, error: 'network_error', mode: 'all' },
+        defaultEventsState,
       ),
     }),
   ],
@@ -124,10 +182,20 @@ export const EventLoading: Story = {
   name: 'Event header loading',
   decorators: [
     applicationConfig({
-      providers: baseProviders(
-        { photos: [], searchedBib: null, loading: false, error: null, selectedPhotoId: null },
-        { events: [], selectedEvent: null, loading: true, error: null, nextCursor: null, cursorHistory: [] },
+      providers: baseState(
+        defaultRunnerState,
+        { ...defaultEventsState, selectedEvent: null, loading: true },
       ),
+    }),
+  ],
+};
+
+// Legacy stories kept for backwards compatibility
+export const InitialState: Story = {
+  name: 'Initial — no search yet',
+  decorators: [
+    applicationConfig({
+      providers: baseState(defaultRunnerState, defaultEventsState),
     }),
   ],
 };

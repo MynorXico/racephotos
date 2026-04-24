@@ -33,11 +33,17 @@ import { EventsActions } from '../../store/events/events.actions';
 import {
   selectRunnerPhotos,
   selectRunnerPhotosLoading,
+  selectRunnerPhotosLoadingMore,
   selectRunnerPhotosError,
+  selectRunnerPhotosLoadMoreError,
   selectSearchedBib,
   selectHasSearched,
   selectHasResults,
   selectSelectedPhoto,
+  selectNextCursor,
+  selectTotalCount,
+  selectMode,
+  selectHasMorePhotos,
 } from '../../store/runner-photos/runner-photos.selectors';
 import {
   selectSelectedEvent,
@@ -113,7 +119,9 @@ describe('EventSearchComponent', () => {
     // Default selector overrides
     store.overrideSelector(selectRunnerPhotos, []);
     store.overrideSelector(selectRunnerPhotosLoading, false);
+    store.overrideSelector(selectRunnerPhotosLoadingMore, false);
     store.overrideSelector(selectRunnerPhotosError, null);
+    store.overrideSelector(selectRunnerPhotosLoadMoreError, null);
     store.overrideSelector(selectSearchedBib, null);
     store.overrideSelector(selectHasSearched, false);
     store.overrideSelector(selectHasResults, false);
@@ -121,6 +129,10 @@ describe('EventSearchComponent', () => {
     store.overrideSelector(selectSelectedEvent, null);
     store.overrideSelector(selectEventsLoading, false);
     store.overrideSelector(selectActivePhotoIds, null);
+    store.overrideSelector(selectNextCursor, null);
+    store.overrideSelector(selectTotalCount, 0);
+    store.overrideSelector(selectMode, 'all');
+    store.overrideSelector(selectHasMorePhotos, false);
 
     spyOn(store, 'dispatch');
 
@@ -139,8 +151,10 @@ describe('EventSearchComponent', () => {
     expect(store.dispatch).toHaveBeenCalledWith(EventsActions.loadEvent({ id: 'event-123' }));
   });
 
-  it('dispatches clearResults on init', () => {
-    expect(store.dispatch).toHaveBeenCalledWith(RunnerPhotosActions.clearResults());
+  it('dispatches loadEventPhotos on init', () => {
+    expect(store.dispatch).toHaveBeenCalledWith(
+      RunnerPhotosActions.loadEventPhotos({ eventId: 'event-123' }),
+    );
   });
 
   it('dispatches clearResults on destroy', () => {
@@ -206,8 +220,9 @@ describe('EventSearchComponent', () => {
     expect(btn.textContent?.trim().toLowerCase()).toBe('try again');
   });
 
-  it('onRetry dispatches searchByBib when searchedBib is set', () => {
+  it('onRetry dispatches searchByBib when mode is bib and searchedBib is set', () => {
     store.overrideSelector(selectSearchedBib, '99');
+    store.overrideSelector(selectMode, 'bib');
     store.refreshState();
     fixture.detectChanges();
     component.onRetry();
@@ -218,9 +233,10 @@ describe('EventSearchComponent', () => {
 
   // --- Results ---
 
-  it('shows no-results state after search with no photos', () => {
+  it('shows no-results state after bib search with no photos', () => {
     store.overrideSelector(selectHasSearched, true);
     store.overrideSelector(selectHasResults, false);
+    store.overrideSelector(selectMode, 'bib');
     store.refreshState();
     fixture.detectChanges();
     const status: HTMLElement = fixture.nativeElement.querySelector('[role="status"]');

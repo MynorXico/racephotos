@@ -3,6 +3,7 @@ package handler
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -19,6 +20,12 @@ import (
 type DynamoAPI interface {
 	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+}
+
+// isDynamoConditionFailed returns true when err is a DynamoDB ConditionalCheckFailedException.
+func isDynamoConditionFailed(err error) bool {
+	var ccfe *types.ConditionalCheckFailedException
+	return errors.As(err, &ccfe)
 }
 
 // S3API is the minimal S3 surface used by the photo reader/writer.
@@ -143,6 +150,11 @@ type DynamoPhotoStore struct {
 // between two separate writes.
 //
 // finalStatus must be "indexed" or "review_required".
+//
+// ConditionExpression: attribute_exists(id) AND #st = :watermarking ensures
+// the update only applies when the photo is in the expected "watermarking" state.
+// If the condition fails (prior attempt already completed), ErrAlreadyCompleted is
+// returned so the caller can skip the photoCount increment (RS-019 idempotency).
 func (s *DynamoPhotoStore) CompleteWatermark(ctx context.Context, photoId, watermarkedS3Key, finalStatus string) error {
 	key, err := attributevalue.MarshalMap(map[string]string{"id": photoId})
 	if err != nil {
@@ -156,13 +168,21 @@ func (s *DynamoPhotoStore) CompleteWatermark(ctx context.Context, photoId, water
 	if err != nil {
 		return fmt.Errorf("CompleteWatermark: marshal finalStatus: %w", err)
 	}
+	wmStatusVal, err := attributevalue.Marshal("watermarking")
+	if err != nil {
+		return fmt.Errorf("CompleteWatermark: marshal watermarking status: %w", err)
+	}
 	_, err = s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
 		TableName:        aws.String(s.TableName),
 		Key:              key,
 		UpdateExpression: aws.String("SET #wk = :wk, #st = :st"),
-		// ConditionExpression prevents silent ghost-record creation if photoId does not exist.
-		// DynamoDB UpdateItem upserts by default; attribute_exists(id) makes it fail-fast instead.
-		ConditionExpression: aws.String("attribute_exists(id)"),
+		// Dual condition:
+		//   attribute_exists(id)   — guard against ghost-record upserts (original RS-017 guard)
+		//   #st = :wm              — idempotency: only apply when status is still "watermarking";
+		//                            a retry after a prior successful run will find "indexed" or
+		//                            "review_required" and fail here, returning ErrAlreadyCompleted
+		//                            so the caller knows to skip IncrementPhotoCount (RS-019).
+		ConditionExpression: aws.String("attribute_exists(id) AND #st = :wm"),
 		ExpressionAttributeNames: map[string]string{
 			"#wk": "watermarkedS3Key",
 			"#st": "status",
@@ -170,10 +190,48 @@ func (s *DynamoPhotoStore) CompleteWatermark(ctx context.Context, photoId, water
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":wk": keyVal,
 			":st": statusVal,
+			":wm": wmStatusVal,
 		},
 	})
 	if err != nil {
+		if isDynamoConditionFailed(err) {
+			return ErrAlreadyCompleted
+		}
 		return fmt.Errorf("CompleteWatermark: dynamodb.UpdateItem photoId=%s: %w", photoId, err)
+	}
+	return nil
+}
+
+// DynamoEventCountUpdater implements EventCountUpdater against racephotos-events.
+type DynamoEventCountUpdater struct {
+	Client    DynamoAPI
+	TableName string
+}
+
+// IncrementPhotoCount atomically increments the photoCount field on the event
+// record using a DynamoDB ADD expression (RS-019 / ADR-0012).
+// ADD is safe for concurrent Lambda executions — no condition needed because
+// the CompleteWatermark idempotency guard in DynamoPhotoStore ensures this is
+// called at most once per photo.
+func (s *DynamoEventCountUpdater) IncrementPhotoCount(ctx context.Context, eventID string) error {
+	key, err := attributevalue.MarshalMap(map[string]string{"id": eventID})
+	if err != nil {
+		return fmt.Errorf("IncrementPhotoCount: marshal key: %w", err)
+	}
+	one, err := attributevalue.Marshal(1)
+	if err != nil {
+		return fmt.Errorf("IncrementPhotoCount: marshal one: %w", err)
+	}
+	_, err = s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName:        aws.String(s.TableName),
+		Key:              key,
+		UpdateExpression: aws.String("ADD photoCount :one"),
+		ExpressionAttributeValues: map[string]types.AttributeValue{
+			":one": one,
+		},
+	})
+	if err != nil {
+		return fmt.Errorf("IncrementPhotoCount: dynamodb.UpdateItem eventId=%s: %w", eventID, err)
 	}
 	return nil
 }

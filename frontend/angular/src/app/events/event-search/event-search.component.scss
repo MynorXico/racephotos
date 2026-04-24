@@ -271,6 +271,36 @@
   line-height: 1.6;
 }
 
+// ── Clear bib button ─────────────────────────────────────────────────────────
+
+.clear-btn {
+  min-height: 56px;
+  flex-shrink: 0;
+  border-radius: 12px;
+}
+
+// ── Load more row ─────────────────────────────────────────────────────────────
+
+.load-more-row {
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+}
+
+.load-more-btn {
+  min-width: 160px;
+  border-radius: 12px;
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.load-more-label {
+  display: inline-flex;
+  align-items: center;
+}
+
 // ── Animation ─────────────────────────────────────────────────────────────────
 
 @keyframes pulse {

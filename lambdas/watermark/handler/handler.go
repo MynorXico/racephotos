@@ -34,6 +34,7 @@ type Handler struct {
 	Watermarker     ImageWatermarker
 	Events          EventStore
 	Photos          PhotoStore
+	EventCounter    EventCountUpdater
 	ProcessedBucket string // racephotos-processed-{envName}
 }
 
@@ -134,8 +135,34 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 	// Atomically set watermarkedS3Key and the final status in a single DynamoDB
 	// UpdateItem. Using one expression prevents a partial state (key written but
 	// status still "watermarking") if the Lambda crashes mid-update (RS-017).
+	// The condition checks status = "watermarking" for idempotency (RS-019):
+	// if a prior attempt already completed, ErrAlreadyCompleted is returned and
+	// we skip the photoCount increment to avoid double-counting.
 	if err := h.Photos.CompleteWatermark(ctx, wm.PhotoID, destKey, wm.FinalStatus); err != nil {
+		if errors.Is(err, ErrAlreadyCompleted) {
+			slog.WarnContext(ctx, "watermark already completed by prior attempt — skipping counter increment",
+				slog.String("photoId", wm.PhotoID),
+				slog.String("eventId", wm.EventID),
+			)
+			return nil
+		}
 		return fmt.Errorf("processMessage: CompleteWatermark: %w", err)
+	}
+
+	// Increment the event's denormalised photo counter when a photo becomes
+	// publicly indexed (RS-019 / ADR-0012). Only "indexed" photos appear in
+	// the public gallery; "review_required" photos are not publicly visible.
+	if wm.FinalStatus == models.PhotoStatusIndexed && h.EventCounter != nil {
+		if err := h.EventCounter.IncrementPhotoCount(ctx, wm.EventID); err != nil {
+			// Counter increment failure is non-fatal: the photo is already watermarked
+			// and publicly visible. Log and continue rather than returning an error
+			// (which would cause an SQS retry and risk double-incrementing).
+			slog.ErrorContext(ctx, "IncrementPhotoCount failed — photo indexed but counter may be off",
+				slog.String("photoId", wm.PhotoID),
+				slog.String("eventId", wm.EventID),
+				slog.String("error", err.Error()),
+			)
+		}
 	}
 
 	slog.InfoContext(ctx, "watermark applied",

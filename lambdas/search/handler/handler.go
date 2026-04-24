@@ -3,10 +3,12 @@ package handler
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"log/slog"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -14,6 +16,9 @@ import (
 	"github.com/racephotos/shared/apperrors"
 	"github.com/racephotos/shared/models"
 )
+
+// bibPageSize is the number of photos returned per page in bib search results.
+const bibPageSize = 24
 
 // uuidRE validates that an event ID is a standard UUID (case-insensitive).
 // This prevents pathological strings from reaching DynamoDB key lookups.
@@ -47,6 +52,8 @@ type photoItem struct {
 
 type searchResponse struct {
 	Photos        []photoItem `json:"photos"`
+	NextCursor    *string     `json:"nextCursor"`
+	TotalCount    int         `json:"totalCount"`
 	EventName     string      `json:"eventName"`
 	PricePerPhoto float64     `json:"pricePerPhoto"`
 	Currency      string      `json:"currency"`
@@ -74,6 +81,20 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	bib := event.QueryStringParameters["bib"]
 	if bib == "" || !bibRE.MatchString(bib) {
 		return errResponse(400, "missing or invalid bib number"), nil
+	}
+
+	cursor := event.QueryStringParameters["cursor"]
+	offset := 0
+	if cursor != "" {
+		decoded, err := base64.RawURLEncoding.DecodeString(cursor)
+		if err != nil {
+			return errResponse(400, "invalid cursor"), nil
+		}
+		n, err := strconv.Atoi(string(decoded))
+		if err != nil || n < 0 {
+			return errResponse(400, "invalid cursor"), nil
+		}
+		offset = n
 	}
 
 	// Run GetEvent and GetPhotoIDsByBib concurrently — both are independent reads.
@@ -118,6 +139,8 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	if len(bibRes.photoIDs) == 0 {
 		return jsonResponse(200, searchResponse{
 			Photos:        []photoItem{},
+			NextCursor:    nil,
+			TotalCount:    0,
 			EventName:     evRes.event.Name,
 			PricePerPhoto: evRes.event.PricePerPhoto,
 			Currency:      evRes.event.Currency,
@@ -136,7 +159,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	// Filter: only indexed photos with a valid watermark key (AC4).
 	// WatermarkedS3Key is validated against safeS3KeyRE before URL construction
 	// to prevent a tampered DynamoDB record from injecting an arbitrary URL.
-	items := make([]photoItem, 0, len(photos))
+	allIndexed := make([]photoItem, 0, len(photos))
 	for _, p := range photos {
 		if p.Status != models.PhotoStatusIndexed || p.WatermarkedS3Key == "" {
 			continue
@@ -156,11 +179,33 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		if p.CapturedAt != "" {
 			item.CapturedAt = &p.CapturedAt
 		}
-		items = append(items, item)
+		allIndexed = append(allIndexed, item)
+	}
+
+	// Slice the indexed results by offset for pagination.
+	totalCount := len(allIndexed)
+	var page []photoItem
+	if offset >= totalCount {
+		page = []photoItem{}
+	} else {
+		end := offset + bibPageSize
+		if end > totalCount {
+			end = totalCount
+		}
+		page = allIndexed[offset:end]
+	}
+
+	var nextCursorPtr *string
+	nextOffset := offset + bibPageSize
+	if nextOffset < totalCount {
+		enc := base64.RawURLEncoding.EncodeToString([]byte(strconv.Itoa(nextOffset)))
+		nextCursorPtr = &enc
 	}
 
 	return jsonResponse(200, searchResponse{
-		Photos:        items,
+		Photos:        page,
+		NextCursor:    nextCursorPtr,
+		TotalCount:    totalCount,
 		EventName:     evRes.event.Name,
 		PricePerPhoto: evRes.event.PricePerPhoto,
 		Currency:      evRes.event.Currency,
