@@ -1,7 +1,7 @@
 # Story: Paginated photo browsing for runners — load more with photo counter
 **ID**: RS-019
 **Epic**: Search
-**Status**: draft
+**Status**: done
 **Has UI**: yes
 
 ## Context
@@ -55,6 +55,20 @@ so runners always know how many photos remain.
   endpoint is called, then the Lambda must respond within 500ms p99, consistent with the
   existing bib search latency target in PRODUCT_CONTEXT.md.
 
+- [ ] **AC9 — Invalid cursor returns 400**: Given `GET /events/{id}/public-photos` is called
+  with a `cursor` value that cannot be base64-decoded or has an unrecognised structure, when
+  the Lambda handles the request, then it returns HTTP 400 with `{"error": "invalid cursor"}`
+  and does not call DynamoDB.
+
+- [ ] **AC10 — Event not found returns 404**: Given `GET /events/{id}/public-photos` is called
+  with an event ID that does not exist in DynamoDB, when the Lambda handles the request, then
+  it returns HTTP 404 with `{"error": "event not found"}`.
+
+- [ ] **AC11 — DynamoDB error returns 500, raw error not exposed**: Given the DynamoDB
+  `Query` fails with an internal error, when the Lambda handles the request, then it returns
+  HTTP 500 with `{"error": "internal error"}` — the raw AWS error message is logged but never
+  included in the response body.
+
 ## Out of scope
 - Infinite scroll (scroll-triggered load) — "Load more" button only in this story
 - Filtering or sorting photos (by time, bib, etc.)
@@ -68,8 +82,8 @@ so runners always know how many photos remain.
 ## Tech notes
 
 ### New API route
-- **Route**: `GET /events/{id}/photos?cursor=<token>&limit=24`
-- **Auth**: none — public, same as existing search route
+- **Route**: `GET /events/{id}/public-photos?cursor=<token>&limit=24`
+- **Auth**: none — public, unauthenticated (distinct from the authenticated `GET /events/{id}/photos` photographer endpoint)
 - **Response**:
   ```json
   {
@@ -95,10 +109,11 @@ so runners always know how many photos remain.
   is a base64-encoded integer offset into the sorted photo ID list.
 - If total bib photos ≤ 24, `nextCursor` is null and no frontend "Load more" is shown.
 
-### Lambda: `lambdas/search/`
-Add a second handler `ListEventPhotos` alongside the existing `Handle`:
+### Lambda: `lambdas/list-public-event-photos/` (new module)
+New self-contained Lambda module following the one-module-per-route convention. Handles
+`GET /events/{id}/public-photos` only. Do not add this handler to `lambdas/search/`.
 
-**New interface** (add to `handler/store.go`):
+**New interface** (`handler/store.go`):
 ```go
 type EventPhotoLister interface {
     ListEventPhotos(ctx context.Context, eventID, cursor string, limit int) ([]models.Photo, string, error)
@@ -118,13 +133,14 @@ type EventPhotoLister interface {
 - `ExclusiveStartKey`: decoded from cursor param when present
 - Returns next `LastEvaluatedKey` base64-encoded as `nextCursor`
 
-**New env var for search Lambda** — none; `RACEPHOTOS_PHOTOS_TABLE` is already injected.
+**New env vars** (`RACEPHOTOS_` prefix, declared in `main.go`):
+- `RACEPHOTOS_PHOTOS_TABLE` — required, DynamoDB photos table name
+- `RACEPHOTOS_EVENTS_TABLE` — required, DynamoDB events table name (for `photoCount` read)
+- `RACEPHOTOS_PHOTO_CDN_DOMAIN` — required, CloudFront domain for constructing `watermarkedUrl`
 
-**CDK grant addition** (`infra/cdk/constructs/search-construct.ts`):
-```typescript
-// Currently only BatchGetItem is granted — add Query for the new list handler
-photosTable.grant(this.searchFn, 'dynamodb:Query');
-```
+**CDK construct**: new `ListPublicEventPhotosConstruct` (or add to `photo-upload-construct.ts`
+alongside `list-event-photos`) — register route `GET /events/{id}/public-photos` with no authorizer.
+Grant `dynamodb:Query` on `racephotos-photos` and `dynamodb:GetItem` on `racephotos-events`.
 
 ### `photoCount` counter on Event record
 
@@ -157,6 +173,14 @@ type EventCountUpdater interface {
 ```typescript
 eventsTable.grant(this.watermarkFn, 'dynamodb:UpdateItem');
 ```
+
+**Idempotency guard**: The watermark Lambda is SQS-triggered with `maxReceiveCount: 3`.
+A retry after `CompleteWatermark` succeeds but before `IncrementPhotoCount` completes would
+double-increment the counter. Guard against this by reading the photo's current `status`
+before calling `IncrementPhotoCount`: if `status != "watermarking"` (i.e. a prior attempt
+already transitioned it to `indexed`/`review_required`), skip the increment and return
+success. This check uses the `photo` value already fetched earlier in the handler — no extra
+DynamoDB read required.
 
 ### Frontend: `frontend/angular/src/app/`
 
@@ -192,9 +216,19 @@ mode: 'all' | 'bib';  // drives which empty state / counter label to show
 </p>
 ```
 
+**Storybook stories to add/update**:
+- `event-search.component.stories.ts` — add stories for: all-event browse (loaded state
+  with photos + counter), empty state (no indexed photos yet, AC7 message), load-more
+  visible state, bib results with counter, loading skeleton
+- No new components are introduced — all changes are to the existing `event-search`
+  component and NgRx state
+
 ### ADR dependency
 - ADR-0003 (bib fan-out table) — resolved, already built in RS-009; referenced for
   the bib-pagination cursor design
+- ADR-0012 (public photo browsing — `photoCount` counter and fill-to-limit pagination
+  loop) — documents the denormalized counter design and why the fill-to-limit loop is
+  appropriate here but was declined for RS-014
 - No open decisions from PRODUCT_CONTEXT.md block this story
 
 ## Definition of Done

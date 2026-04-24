@@ -3,9 +3,15 @@ package handler
 
 import (
 	"context"
+	"errors"
 	"image"
 	"io"
 )
+
+// ErrAlreadyCompleted is returned by CompleteWatermark when the DynamoDB
+// condition check fails because the photo was already watermarked in a prior
+// attempt. The caller should treat this as a successful idempotent no-op.
+var ErrAlreadyCompleted = errors.New("watermark already completed")
 
 // RawPhotoReader downloads a photo from the private raw S3 bucket.
 type RawPhotoReader interface {
@@ -37,7 +43,18 @@ type EventStore interface {
 type PhotoStore interface {
 	// CompleteWatermark atomically sets watermarkedS3Key and status in a single
 	// DynamoDB UpdateItem. finalStatus must be "indexed" or "review_required".
-	// Using a single expression prevents a partial state where the key is written
-	// but the status is still "watermarking" if the Lambda crashes mid-update.
+	// Uses ConditionExpression: attribute_exists(id) AND #st = :watermarking so
+	// that SQS retries that arrive after a successful write return ErrAlreadyCompleted
+	// rather than double-incrementing the photo counter (RS-019 idempotency guard).
 	CompleteWatermark(ctx context.Context, photoId, watermarkedS3Key, finalStatus string) error
+}
+
+// EventCountUpdater increments the denormalised photoCount on an Event record.
+// Called after CompleteWatermark succeeds when finalStatus is "indexed" (RS-019).
+type EventCountUpdater interface {
+	// IncrementPhotoCount atomically increments photoCount by 1 using a DynamoDB
+	// ADD expression. ADD is safe for concurrent Lambda invocations — no condition
+	// is needed since over-count on failure is guarded by the PhotoStore.CompleteWatermark
+	// idempotency condition.
+	IncrementPhotoCount(ctx context.Context, eventID string) error
 }

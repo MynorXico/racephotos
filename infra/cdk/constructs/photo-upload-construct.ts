@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -34,23 +35,26 @@ interface PhotoUploadConstructProps {
 }
 
 /**
- * PhotoUploadConstruct — RS-006, RS-008
+ * PhotoUploadConstruct — RS-006, RS-008, RS-019
  *
  * Creates:
  *   - presign-photos Lambda  POST /events/{eventId}/photos/presign  (Cognito JWT required)
  *   - list-event-photos Lambda  GET /events/{id}/photos  (Cognito JWT required)
+ *   - list-public-event-photos Lambda  GET /events/{id}/public-photos  (no auth — public)
  *
  * IAM grants:
  *   - s3:PutObject on the raw bucket (photographer uploads go direct to S3)
  *   - dynamodb:BatchWriteItem on the photos table (creates Photo records)
  *   - dynamodb:GetItem on the events table (ownership check — both Lambdas)
- *   - dynamodb:Query on the photos table GSI (list-event-photos)
+ *   - dynamodb:Query on the photos table GSI (list-event-photos, list-public-event-photos)
+ *   - dynamodb:GetItem on the events table (photoCount read — list-public-event-photos)
  *
- * AC: RS-006 AC1, AC2, AC3, AC9, AC10 / RS-008 AC1, AC2
+ * AC: RS-006 AC1, AC2, AC3, AC9, AC10 / RS-008 AC1, AC2 / RS-019 AC1–AC11
  */
 export class PhotoUploadConstruct extends Construct {
   readonly presignPhotosFn: lambda.Function;
   readonly listEventPhotosFn: lambda.Function;
+  readonly listPublicEventPhotosFn: lambda.Function;
 
   constructor(scope: Construct, id: string, props: PhotoUploadConstructProps) {
     super(scope, id);
@@ -156,6 +160,56 @@ export class PhotoUploadConstruct extends Construct {
         this.listEventPhotosFn,
       ),
       authorizer: jwtAuthorizer,
+    });
+
+    // ── list-public-event-photos Lambda ──────────────────────────────────────
+    // RS-019: public unauthenticated endpoint — no authorizer attached.
+    this.listPublicEventPhotosFn = new lambda.Function(this, 'ListPublicEventPhotosFn', {
+      functionName: `racephotos-list-public-event-photos-${config.envName}`,
+      runtime: lambda.Runtime.PROVIDED_AL2023,
+      architecture: lambda.Architecture.ARM_64,
+      handler: 'bootstrap',
+      memorySize: 256,
+      // 10 s: up to 10 fill-to-limit DynamoDB Query rounds + concurrent GetItem + cold-start.
+      // Matches the search Lambda timeout; without this the CDK default (3 s) would cause
+      // hard 502s whenever more than 2–3 loop iterations are needed.
+      timeout: cdk.Duration.seconds(10),
+      code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/list-public-event-photos')),
+      environment: {
+        RACEPHOTOS_ENV: config.envName,
+        RACEPHOTOS_PHOTOS_TABLE: photosTable.tableName,
+        RACEPHOTOS_EVENTS_TABLE: eventsTable.tableName,
+        RACEPHOTOS_PHOTO_CDN_DOMAIN: cdnDomainName,
+      },
+    });
+
+    // Grant Query scoped to the specific GSI only.
+    this.listPublicEventPhotosFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ['dynamodb:Query'],
+      resources: [
+        photosTable.tableArn,
+        `${photosTable.tableArn}/index/eventId-uploadedAt-index`,
+      ],
+    }));
+    // GetItem on events table to read name, photoCount, pricePerPhoto, currency.
+    eventsTable.grant(this.listPublicEventPhotosFn, 'dynamodb:GetItem');
+
+    new ObservabilityConstruct(this, 'ListPublicEventPhotosObs', {
+      lambda: this.listPublicEventPhotosFn,
+      logRetentionDays: config.photoRetentionDays,
+    });
+
+    // No authorizer — public endpoint.
+    new apigatewayv2.HttpRoute(this, 'ListPublicEventPhotosRoute', {
+      httpApi,
+      routeKey: apigatewayv2.HttpRouteKey.with(
+        '/events/{id}/public-photos',
+        apigatewayv2.HttpMethod.GET,
+      ),
+      integration: new integrations.HttpLambdaIntegration(
+        'ListPublicEventPhotosIntegration',
+        this.listPublicEventPhotosFn,
+      ),
     });
   }
 }

@@ -12,12 +12,14 @@ import {
 import { ActivatedRoute } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { Actions, ofType } from '@ngrx/effects';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarRef, TextOnlySnackBar } from '@angular/material/snack-bar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
@@ -26,11 +28,17 @@ import { RunnerPhotosActions } from '../../store/runner-photos/runner-photos.act
 import {
   selectRunnerPhotos,
   selectRunnerPhotosLoading,
+  selectRunnerPhotosLoadingMore,
   selectRunnerPhotosError,
+  selectRunnerPhotosLoadMoreError,
   selectSearchedBib,
   selectHasSearched,
   selectHasResults,
   selectSelectedPhoto,
+  selectNextCursor,
+  selectTotalCount,
+  selectMode,
+  selectHasMorePhotos,
 } from '../../store/runner-photos/runner-photos.selectors';
 import { EventsActions } from '../../store/events/events.actions';
 import { selectSelectedEvent, selectEventsLoading } from '../../store/events/events.selectors';
@@ -45,7 +53,6 @@ import {
   PurchaseStepperComponent,
   PurchaseStepperDialogData,
 } from './purchase-stepper/purchase-stepper.component';
-import { MatDialogRef } from '@angular/material/dialog';
 import { take } from 'rxjs';
 
 @Component({
@@ -59,6 +66,7 @@ import { take } from 'rxjs';
     MatInputModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    MatSnackBarModule,
     RunnerPhotoGridComponent,
   ],
   templateUrl: './event-search.component.html',
@@ -82,29 +90,63 @@ export class EventSearchComponent implements OnInit, OnDestroy {
   readonly loading = toSignal(this.store.select(selectRunnerPhotosLoading), {
     initialValue: false,
   });
+  readonly loadingMore = toSignal(this.store.select(selectRunnerPhotosLoadingMore), {
+    initialValue: false,
+  });
   readonly error = toSignal(this.store.select(selectRunnerPhotosError), { initialValue: null });
+  readonly loadMoreError = toSignal(this.store.select(selectRunnerPhotosLoadMoreError), { initialValue: null });
   readonly searchedBib = toSignal(this.store.select(selectSearchedBib), { initialValue: null });
   readonly hasSearched = toSignal(this.store.select(selectHasSearched), { initialValue: false });
   readonly hasResults = toSignal(this.store.select(selectHasResults), { initialValue: false });
   readonly selectedPhoto = toSignal(this.store.select(selectSelectedPhoto), { initialValue: null });
   readonly selectedEvent = toSignal(this.store.select(selectSelectedEvent), { initialValue: null });
   readonly eventLoading = toSignal(this.store.select(selectEventsLoading), { initialValue: false });
+  readonly nextCursor = toSignal(this.store.select(selectNextCursor), { initialValue: null });
+  readonly totalCount = toSignal(this.store.select(selectTotalCount), { initialValue: 0 });
+  readonly mode = toSignal(this.store.select(selectMode), { initialValue: 'all' as const });
+  readonly hasMorePhotos = toSignal(this.store.select(selectHasMorePhotos), { initialValue: false });
 
   readonly skeletonCards = Array.from({ length: 6 });
 
   private readonly paramMap = toSignal(this.route.paramMap);
   readonly eventId = computed(() => this.paramMap()?.get('id') ?? '');
 
+  private readonly snackBar = inject(MatSnackBar);
+
   private dialogRef: MatDialogRef<PhotoDetailComponent> | null = null;
   private purchaseDialogRef: MatDialogRef<PurchaseStepperComponent> | null = null;
+  private loadMoreSnackBarRef: MatSnackBarRef<TextOnlySnackBar> | null = null;
 
   constructor() {
-    // Load event metadata when route param changes.
+    // Show a persistent snackbar with Retry action when load-more fails; dismiss on recovery.
+    effect(() => {
+      const err = this.loadMoreError();
+      if (err && !this.loadMoreSnackBarRef) {
+        this.loadMoreSnackBarRef = this.snackBar.open(
+          'Could not load more photos — tap to retry.',
+          'Retry',
+          { duration: 0 },
+        );
+        this.loadMoreSnackBarRef
+          .onAction()
+          .pipe(takeUntilDestroyed(this._destroyRef))
+          .subscribe(() => this.onLoadMore());
+        this.loadMoreSnackBarRef
+          .afterDismissed()
+          .pipe(takeUntilDestroyed(this._destroyRef))
+          .subscribe(() => { this.loadMoreSnackBarRef = null; });
+      } else if (!err && this.loadMoreSnackBarRef) {
+        this.loadMoreSnackBarRef.dismiss();
+        this.loadMoreSnackBarRef = null;
+      }
+    });
+
+    // Load event metadata and first page of public photos when route param changes.
     effect(() => {
       const id = this.eventId();
       if (id) {
         this.store.dispatch(EventsActions.loadEvent({ id }));
-        this.store.dispatch(RunnerPhotosActions.clearResults());
+        this.store.dispatch(RunnerPhotosActions.loadEventPhotos({ eventId: id }));
       }
     });
 
@@ -153,20 +195,13 @@ export class EventSearchComponent implements OnInit, OnDestroy {
     this.actions$
       .pipe(ofType(PurchasesActions.initiatePurchase), takeUntilDestroyed(this._destroyRef))
       .subscribe(({ photoIds }) => {
-        // Guard: avoid opening a second stepper when initiatePurchase is dispatched
-        // while one is already open (e.g. "Try again" from the error step retries
-        // the same action inside the existing dialog).
         if (this.purchaseDialogRef) {
           return;
         }
-
-        // Close the photo-detail dialog without dispatching deselectPhoto twice
-        // (afterClosed() subscription handles deselectPhoto).
         if (this.dialogRef) {
           this.dialogRef.close();
           this.dialogRef = null;
         }
-
         const data: PurchaseStepperDialogData = { photoIds };
         this.purchaseDialogRef = this.dialog.open(PurchaseStepperComponent, {
           data,
@@ -177,14 +212,10 @@ export class EventSearchComponent implements OnInit, OnDestroy {
           panelClass: 'purchase-stepper-dialog',
           disableClose: true,
         });
-
         this.purchaseDialogRef
           .afterClosed()
           .pipe(takeUntilDestroyed(this._destroyRef))
           .subscribe(() => {
-            // Guard: only dispatch resetPurchase if the store still has active photo IDs,
-            // meaning the dialog was closed by backdrop/external means rather than the
-            // "Done" button which already dispatched resetPurchase.
             this.store
               .select(selectActivePhotoIds)
               .pipe(take(1))
@@ -216,15 +247,43 @@ export class EventSearchComponent implements OnInit, OnDestroy {
     this.store.dispatch(RunnerPhotosActions.searchByBib({ eventId: id, bibNumber: bib }));
   }
 
+  onClearBib(): void {
+    this.bibControl.reset('');
+    const id = this.eventId();
+    if (id) {
+      this.store.dispatch(RunnerPhotosActions.loadEventPhotos({ eventId: id }));
+    }
+  }
+
+  onLoadMore(): void {
+    const cursor = this.nextCursor();
+    const id = this.eventId();
+    if (!cursor || !id) return;
+
+    if (this.mode() === 'bib') {
+      const bib = this.searchedBib();
+      if (bib) {
+        this.store.dispatch(RunnerPhotosActions.loadMoreBibPhotos({ eventId: id, bibNumber: bib, cursor }));
+      }
+    } else {
+      this.store.dispatch(RunnerPhotosActions.loadMoreEventPhotos({ eventId: id, cursor }));
+    }
+  }
+
   onPhotoSelected(photoId: string): void {
     this.store.dispatch(RunnerPhotosActions.selectPhoto({ photoId }));
   }
 
   onRetry(): void {
     const id = this.eventId();
-    const bib = this.searchedBib();
-    if (id && bib) {
-      this.store.dispatch(RunnerPhotosActions.searchByBib({ eventId: id, bibNumber: bib }));
+    if (!id) return;
+    if (this.mode() === 'bib') {
+      const bib = this.searchedBib();
+      if (bib) {
+        this.store.dispatch(RunnerPhotosActions.searchByBib({ eventId: id, bibNumber: bib }));
+      }
+    } else {
+      this.store.dispatch(RunnerPhotosActions.loadEventPhotos({ eventId: id }));
     }
   }
 }

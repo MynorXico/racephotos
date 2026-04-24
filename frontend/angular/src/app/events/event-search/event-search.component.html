@@ -39,6 +39,17 @@
             autocomplete="off"
             (keydown.enter)="onSubmit()"
           />
+          @if (bibControl.value) {
+            <button
+              matSuffix
+              mat-icon-button
+              type="button"
+              (click)="onClearBib()"
+              aria-label="Clear bib number"
+            >
+              <mat-icon>close</mat-icon>
+            </button>
+          }
           @if (bibControl.hasError('required') && bibControl.touched) {
             <mat-error>Bib number is required</mat-error>
           } @else if (bibControl.hasError('pattern') && bibControl.touched) {
@@ -54,14 +65,15 @@
           [disabled]="loading()"
           aria-label="Search photos"
         >
-          @if (loading()) {
+          @if (loading() && mode() === 'bib') {
             <mat-spinner diameter="20" />
           }
-          <span class="search-btn-label" [class.search-btn-label--hidden]="loading()">
+          <span class="search-btn-label" [class.search-btn-label--hidden]="loading() && mode() === 'bib'">
             <mat-icon>search</mat-icon>
             Search
           </span>
         </button>
+
       </div>
 
     </div>
@@ -70,7 +82,7 @@
   <!-- Results area -->
   <section class="results-section" aria-live="polite" aria-atomic="false">
 
-    <!-- Skeleton loader -->
+    <!-- Skeleton loader (initial load) -->
     @if (loading()) {
       <div class="skeleton-grid" aria-label="Loading photos" aria-busy="true">
         @for (card of skeletonCards; track $index) {
@@ -95,8 +107,8 @@
       </div>
     }
 
-    <!-- No results -->
-    @else if (hasSearched() && !hasResults()) {
+    <!-- Empty state: bib search, no results -->
+    @else if (mode() === 'bib' && hasSearched() && !hasResults()) {
       <div class="state-container" role="status">
         <div class="state-icon-wrap">
           <mat-icon>photo_camera</mat-icon>
@@ -109,11 +121,25 @@
       </div>
     }
 
+    <!-- Empty state: all-event browse, no indexed photos yet (AC7) -->
+    @else if (mode() === 'all' && !hasResults() && totalCount() === 0) {
+      <div class="state-container" role="status">
+        <div class="state-icon-wrap">
+          <mat-icon>hourglass_empty</mat-icon>
+        </div>
+        <h2 class="state-title">Photos are still processing</h2>
+        <p class="state-hint">Check back soon — your race photos will appear here once they're ready.</p>
+      </div>
+    }
+
     <!-- Results grid -->
     @else if (hasResults()) {
       <div class="results-header">
-        <p class="results-count">
-          {{ photos().length }} photo{{ photos().length === 1 ? '' : 's' }} found for bib <strong>{{ searchedBib() }}</strong>
+        <p class="results-count" role="status">
+          Showing {{ photos().length }} of {{ totalCount() }} photo{{ totalCount() === 1 ? '' : 's' }}
+          @if (mode() === 'bib') {
+            for bib <strong>{{ searchedBib() }}</strong>
+          }
         </p>
       </div>
       <app-runner-photo-grid
@@ -125,6 +151,27 @@
         [searchedBib]="searchedBib() ?? ''"
         (photoSelected)="onPhotoSelected($event)"
       />
+
+      <!-- Load more row -->
+      @if (hasMorePhotos()) {
+        <div class="load-more-row">
+          <button
+            mat-stroked-button
+            class="load-more-btn"
+            type="button"
+            (click)="onLoadMore()"
+            [disabled]="loadingMore()"
+            [attr.aria-label]="loadingMore() ? 'Loading more photos' : 'Load more photos'"
+          >
+            @if (loadingMore()) {
+              <mat-spinner diameter="20" />
+              <span class="visually-hidden">Loading more photos</span>
+            } @else {
+              Load more photos
+            }
+          </button>
+        </div>
+      }
     }
 
   </section>

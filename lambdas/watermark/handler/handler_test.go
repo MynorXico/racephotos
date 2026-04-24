@@ -54,19 +54,21 @@ func TestHandler_ProcessBatch(t *testing.T) {
 	expectedKey := "evt-ccc/photo-ddd/watermarked.jpg"
 
 	tests := []struct {
-		name            string
-		sqsBody         string
-		setupReader     func(*mocks.MockRawPhotoReader)
-		setupWriter     func(*mocks.MockProcessedPhotoWriter)
-		setupWatermark  func(*mocks.MockImageWatermarker)
-		setupEventStore func(*mocks.MockEventStore)
-		setupPhotoStore func(*mocks.MockPhotoStore)
-		wantFailures    int
+		name             string
+		sqsBody          string
+		setupReader      func(*mocks.MockRawPhotoReader)
+		setupWriter      func(*mocks.MockProcessedPhotoWriter)
+		setupWatermark   func(*mocks.MockImageWatermarker)
+		setupEventStore  func(*mocks.MockEventStore)
+		setupPhotoStore  func(*mocks.MockPhotoStore)
+		setupEventCount  func(*mocks.MockEventCountUpdater)
+		wantFailures     int
 	}{
 		{
-			// Handler order: GetWatermarkText → GetObject → ApplyTextWatermark → PutObject → CompleteWatermark
+			// Handler order: GetWatermarkText → GetObject → ApplyTextWatermark → PutObject → CompleteWatermark → IncrementPhotoCount
 			// RS-017: CompleteWatermark atomically sets watermarkedS3Key + finalStatus in one UpdateItem.
-			name:    "AC5: happy path — watermark applied, photo completed with finalStatus=indexed",
+			// RS-019: IncrementPhotoCount called for indexed photos.
+			name:    "AC5: happy path — watermark applied, photo completed with finalStatus=indexed, counter incremented",
 			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "indexed"),
 			setupEventStore: func(m *mocks.MockEventStore) {
 				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("Marathon 2026 · racephotos.example.com", "Marathon 2026", nil)
@@ -84,11 +86,15 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {
 				m.EXPECT().CompleteWatermark(gomock.Any(), testPhotoID, expectedKey, "indexed").Return(nil)
 			},
+			setupEventCount: func(m *mocks.MockEventCountUpdater) {
+				m.EXPECT().IncrementPhotoCount(gomock.Any(), testEventID).Return(nil)
+			},
 			wantFailures: 0,
 		},
 		{
 			// TC-019: when watermarkText is empty, default to "{eventName} · racephotos.example.com".
-			name:    "TC-019: empty watermarkText — default applied, finalStatus=review_required",
+			// review_required photos are watermarked but NOT counted in photoCount (not publicly indexed).
+			name:    "TC-019: empty watermarkText — default applied, finalStatus=review_required, counter NOT incremented",
 			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "review_required"),
 			setupEventStore: func(m *mocks.MockEventStore) {
 				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("", "City Marathon 2026", nil)
@@ -105,6 +111,60 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {
 				m.EXPECT().CompleteWatermark(gomock.Any(), testPhotoID, expectedKey, "review_required").Return(nil)
 			},
+			setupEventCount: func(m *mocks.MockEventCountUpdater) {
+				// No call expected — review_required photos are not publicly visible.
+			},
+			wantFailures: 0,
+		},
+		{
+			// RS-019 idempotency: if CompleteWatermark returns ErrAlreadyCompleted (prior
+			// attempt already transitioned status away from "watermarking"), the handler
+			// must return nil without calling IncrementPhotoCount.
+			name:    "RS-019 idempotency: ErrAlreadyCompleted — counter NOT incremented, message acknowledged",
+			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "indexed"),
+			setupEventStore: func(m *mocks.MockEventStore) {
+				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("text", "Event", nil)
+			},
+			setupReader: func(m *mocks.MockRawPhotoReader) {
+				m.EXPECT().GetObject(gomock.Any(), gomock.Any(), testRawS3Key).Return(nopReader(), nil)
+			},
+			setupWatermark: func(m *mocks.MockImageWatermarker) {
+				m.EXPECT().ApplyTextWatermark(gomock.Any(), gomock.Any()).Return(testImg(), nil)
+			},
+			setupWriter: func(m *mocks.MockProcessedPhotoWriter) {
+				m.EXPECT().PutObject(gomock.Any(), gomock.Any(), expectedKey, gomock.Any(), "image/jpeg").Return(nil)
+			},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().CompleteWatermark(gomock.Any(), testPhotoID, expectedKey, "indexed").Return(handler.ErrAlreadyCompleted)
+			},
+			setupEventCount: func(m *mocks.MockEventCountUpdater) {
+				// No call expected — skipped because CompleteWatermark was a no-op.
+			},
+			wantFailures: 0,
+		},
+		{
+			// RS-019: IncrementPhotoCount failure is non-fatal — photo is already publicly
+			// visible; logging + continue prevents an SQS retry that would double-increment.
+			name:    "RS-019: IncrementPhotoCount error — non-fatal, message acknowledged",
+			sqsBody: watermarkMsg(testPhotoID, testEventID, testRawS3Key, "indexed"),
+			setupEventStore: func(m *mocks.MockEventStore) {
+				m.EXPECT().GetWatermarkText(gomock.Any(), testEventID).Return("text", "Event", nil)
+			},
+			setupReader: func(m *mocks.MockRawPhotoReader) {
+				m.EXPECT().GetObject(gomock.Any(), gomock.Any(), testRawS3Key).Return(nopReader(), nil)
+			},
+			setupWatermark: func(m *mocks.MockImageWatermarker) {
+				m.EXPECT().ApplyTextWatermark(gomock.Any(), gomock.Any()).Return(testImg(), nil)
+			},
+			setupWriter: func(m *mocks.MockProcessedPhotoWriter) {
+				m.EXPECT().PutObject(gomock.Any(), gomock.Any(), expectedKey, gomock.Any(), "image/jpeg").Return(nil)
+			},
+			setupPhotoStore: func(m *mocks.MockPhotoStore) {
+				m.EXPECT().CompleteWatermark(gomock.Any(), testPhotoID, expectedKey, "indexed").Return(nil)
+			},
+			setupEventCount: func(m *mocks.MockEventCountUpdater) {
+				m.EXPECT().IncrementPhotoCount(gomock.Any(), testEventID).Return(errors.New("dynamodb: throttle"))
+			},
 			wantFailures: 0,
 		},
 		{
@@ -120,6 +180,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupWriter:     func(m *mocks.MockProcessedPhotoWriter) {},
 			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
+			setupEventCount: func(m *mocks.MockEventCountUpdater) {},
 			wantFailures:    1,
 		},
 		{
@@ -136,6 +197,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupWriter:     func(m *mocks.MockProcessedPhotoWriter) {},
 			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
+			setupEventCount: func(m *mocks.MockEventCountUpdater) {},
 			wantFailures:    1,
 		},
 		{
@@ -147,6 +209,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
 			setupEventStore: func(m *mocks.MockEventStore) {},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
+			setupEventCount: func(m *mocks.MockEventCountUpdater) {},
 			wantFailures:    1,
 		},
 		{
@@ -158,6 +221,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
 			setupEventStore: func(m *mocks.MockEventStore) {},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
+			setupEventCount: func(m *mocks.MockEventCountUpdater) {},
 			wantFailures:    1,
 		},
 		{
@@ -168,6 +232,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			setupWatermark:  func(m *mocks.MockImageWatermarker) {},
 			setupEventStore: func(m *mocks.MockEventStore) {},
 			setupPhotoStore: func(m *mocks.MockPhotoStore) {},
+			setupEventCount: func(m *mocks.MockEventCountUpdater) {},
 			wantFailures:    1,
 		},
 	}
@@ -182,12 +247,14 @@ func TestHandler_ProcessBatch(t *testing.T) {
 			wm := mocks.NewMockImageWatermarker(ctrl)
 			es := mocks.NewMockEventStore(ctrl)
 			ps := mocks.NewMockPhotoStore(ctrl)
+			ec := mocks.NewMockEventCountUpdater(ctrl)
 
 			tc.setupReader(reader)
 			tc.setupWriter(writer)
 			tc.setupWatermark(wm)
 			tc.setupEventStore(es)
 			tc.setupPhotoStore(ps)
+			tc.setupEventCount(ec)
 
 			h := &handler.Handler{
 				RawReader:       reader,
@@ -195,6 +262,7 @@ func TestHandler_ProcessBatch(t *testing.T) {
 				Watermarker:     wm,
 				Events:          es,
 				Photos:          ps,
+				EventCounter:    ec,
 				ProcessedBucket: "racephotos-processed-local",
 			}
 

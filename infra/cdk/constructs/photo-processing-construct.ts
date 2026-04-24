@@ -193,8 +193,8 @@ export class PhotoProcessingConstruct extends Construct {
         resources: [processedBucket.arnForObjects('*')],
       }),
     );
-    // IAM: DynamoDB reads (events) and writes (photos)
-    eventsTable.grant(this.watermarkFn, 'dynamodb:GetItem');
+    // IAM: DynamoDB reads (events watermarkText) + UpdateItem (photoCount increment — RS-019)
+    eventsTable.grant(this.watermarkFn, 'dynamodb:GetItem', 'dynamodb:UpdateItem');
     photosTable.grant(this.watermarkFn, 'dynamodb:UpdateItem');
 
     // Event source: racephotos-watermark queue
