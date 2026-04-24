@@ -30,14 +30,14 @@ test.describe('RS-009 — Public route access (AC1)', () => {
     // Should NOT be redirected to /login — the route is public.
     await expect(page).not.toHaveURL(/\/login/);
     // The bib input should be present on the page.
-    await expect(page.getByLabel('Bib number')).toBeVisible();
+    await expect(page.getByLabel('Bib number', { exact: true })).toBeVisible();
   });
 });
 
 test.describe('RS-009 — Bib input validation (AC3)', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/events/evt-test-001');
-    await expect(page.getByLabel('Bib number')).toBeVisible();
+    await expect(page.getByLabel('Bib number', { exact: true })).toBeVisible();
   });
 
   test('search button is initially enabled', async ({ page }) => {
@@ -46,7 +46,7 @@ test.describe('RS-009 — Bib input validation (AC3)', () => {
   });
 
   test('empty bib shows required error after touching the field', async ({ page }) => {
-    const input = page.getByLabel('Bib number');
+    const input = page.getByLabel('Bib number', { exact: true });
     // Fill with a space then clear — makes the field dirty+touched so required error shows.
     await input.fill(' ');
     await input.clear();
@@ -55,21 +55,21 @@ test.describe('RS-009 — Bib input validation (AC3)', () => {
   });
 
   test('non-numeric bib shows validation error', async ({ page }) => {
-    const input = page.getByLabel('Bib number');
+    const input = page.getByLabel('Bib number', { exact: true });
     await input.fill('abc');
     await input.press('Tab');
     await expect(page.getByText(/bib must be 1–6 digits/i)).toBeVisible();
   });
 
   test('bib longer than 6 digits shows validation error', async ({ page }) => {
-    const input = page.getByLabel('Bib number');
+    const input = page.getByLabel('Bib number', { exact: true });
     await input.fill('1234567');
     await input.press('Tab');
     await expect(page.getByText(/bib must be 1–6 digits/i)).toBeVisible();
   });
 
   test('valid 1–6 digit bib clears validation error', async ({ page }) => {
-    const input = page.getByLabel('Bib number');
+    const input = page.getByLabel('Bib number', { exact: true });
     await input.fill('abc');
     await input.press('Tab');
     await expect(page.getByText(/bib must be 1–6 digits/i)).toBeVisible();
@@ -85,14 +85,14 @@ test.describe('RS-009 — Responsive baselines', () => {
   test('375px — search page renders with bib input visible', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/events/evt-test-001');
-    await expect(page.getByLabel('Bib number')).toBeVisible();
+    await expect(page.getByLabel('Bib number', { exact: true })).toBeVisible();
     await page.screenshot({ path: 'e2e/snapshots/rs009-375px-search-page.png' });
   });
 
   test('1280px — search page renders with bib input visible', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.goto('/events/evt-test-001');
-    await expect(page.getByLabel('Bib number')).toBeVisible();
+    await expect(page.getByLabel('Bib number', { exact: true })).toBeVisible();
     await page.screenshot({ path: 'e2e/snapshots/rs009-1280px-search-page.png' });
   });
 });

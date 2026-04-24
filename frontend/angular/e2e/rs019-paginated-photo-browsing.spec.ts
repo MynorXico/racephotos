@@ -29,7 +29,7 @@ test.describe('RS-019 — Event search page loads (AC1)', () => {
   test('page is accessible without authentication', async ({ page }) => {
     await page.goto('/events/00000000-0000-0000-0000-000000000001');
     await expect(page).not.toHaveURL(/\/login/);
-    await expect(page.getByLabel('Bib number')).toBeVisible();
+    await expect(page.getByLabel('Bib number', { exact: true })).toBeVisible();
   });
 
   test('search button is present', async ({ page }) => {
@@ -39,16 +39,22 @@ test.describe('RS-019 — Event search page loads (AC1)', () => {
 });
 
 test.describe('RS-019 — Clear bib button (AC4)', () => {
-  test('clear button appears after bib entry', async ({ page }) => {
+  test('clear button appears when bib field is non-empty', async ({ page }) => {
     await page.goto('/events/00000000-0000-0000-0000-000000000001');
-    const input = page.getByLabel('Bib number');
-    await input.fill('101');
-    await page.getByRole('button', { name: /search/i }).click();
+    const input = page.getByLabel('Bib number', { exact: true });
+    const clearBtn = page.getByRole('button', { name: 'Clear bib number' });
 
-    // Clear button should appear when mode switches to bib (may take a moment for state update).
-    // The clear button may not appear without a real API response changing the NgRx mode,
-    // but we verify the form still holds the bib value after submit.
-    await expect(input).toHaveValue('101');
+    // Clear button is hidden when input is empty.
+    await expect(clearBtn).not.toBeVisible();
+
+    // Fills value → clear button appears immediately (no API call required).
+    await input.fill('101');
+    await expect(clearBtn).toBeVisible();
+
+    // Clicking clear empties the field and hides the button.
+    await clearBtn.click();
+    await expect(input).toHaveValue('');
+    await expect(clearBtn).not.toBeVisible();
   });
 });
 
@@ -56,14 +62,14 @@ test.describe('RS-019 — Responsive layout (AC8)', () => {
   test('renders correctly on mobile (375px)', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/events/00000000-0000-0000-0000-000000000001');
-    await expect(page.getByLabel('Bib number')).toBeVisible();
+    await expect(page.getByLabel('Bib number', { exact: true })).toBeVisible();
     await page.screenshot({ path: 'e2e/screenshots/rs019-mobile-375.png', fullPage: false });
   });
 
   test('renders correctly on desktop (1280px)', async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/events/00000000-0000-0000-0000-000000000001');
-    await expect(page.getByLabel('Bib number')).toBeVisible();
+    await expect(page.getByLabel('Bib number', { exact: true })).toBeVisible();
     await page.screenshot({ path: 'e2e/screenshots/rs019-desktop-1280.png', fullPage: false });
   });
 });
