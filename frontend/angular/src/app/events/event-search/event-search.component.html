@@ -39,6 +39,17 @@
             autocomplete="off"
             (keydown.enter)="onSubmit()"
           />
+          @if (bibControl.value) {
+            <button
+              matSuffix
+              mat-icon-button
+              type="button"
+              (click)="onClearBib()"
+              aria-label="Clear bib search and show all event photos"
+            >
+              <mat-icon>close</mat-icon>
+            </button>
+          }
           @if (bibControl.hasError('required') && bibControl.touched) {
             <mat-error>Bib number is required</mat-error>
           } @else if (bibControl.hasError('pattern') && bibControl.touched) {
@@ -63,18 +74,6 @@
           </span>
         </button>
 
-        @if (mode() === 'bib') {
-          <button
-            mat-stroked-button
-            class="clear-btn"
-            type="button"
-            (click)="onClearBib()"
-            aria-label="Clear bib search and show all event photos"
-          >
-            <mat-icon>close</mat-icon>
-            Clear
-          </button>
-        }
       </div>
 
     </div>
