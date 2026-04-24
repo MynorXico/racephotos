@@ -7,6 +7,8 @@ import { catchError, map, switchMap } from 'rxjs/operators';
 import { AppConfigService } from '../../core/config/app-config.service';
 import { RunnerPhoto, RunnerPhotosActions } from './runner-photos.actions';
 
+const PAGE_SIZE = 24;
+
 interface SearchResponse {
   photos: RunnerPhoto[];
   nextCursor: string | null;
@@ -41,7 +43,7 @@ export class RunnerPhotosEffects {
       ofType(RunnerPhotosActions.loadEventPhotos),
       switchMap(({ eventId }) =>
         this.http
-          .get<PublicPhotosResponse>(`${this.apiBase}/events/${eventId}/public-photos?limit=24`)
+          .get<PublicPhotosResponse>(`${this.apiBase}/events/${eventId}/public-photos?limit=${PAGE_SIZE}`)
           .pipe(
             map((res) =>
               RunnerPhotosActions.loadEventPhotosSuccess({
@@ -72,7 +74,7 @@ export class RunnerPhotosEffects {
       switchMap(({ eventId, cursor }) =>
         this.http
           .get<PublicPhotosResponse>(
-            `${this.apiBase}/events/${eventId}/public-photos?limit=24&cursor=${encodeURIComponent(cursor)}`,
+            `${this.apiBase}/events/${eventId}/public-photos?limit=${PAGE_SIZE}&cursor=${encodeURIComponent(cursor)}`,
           )
           .pipe(
             map((res) =>
