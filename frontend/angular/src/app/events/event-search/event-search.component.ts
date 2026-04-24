@@ -12,12 +12,14 @@ import {
 import { ActivatedRoute } from '@angular/router';
 import { Store } from '@ngrx/store';
 import { Actions, ofType } from '@ngrx/effects';
-import { MatDialog } from '@angular/material/dialog';
+import { MatDialog, MatDialogRef } from '@angular/material/dialog';
+import { MatSnackBar, MatSnackBarRef, TextOnlySnackBar } from '@angular/material/snack-bar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSnackBarModule } from '@angular/material/snack-bar';
 import { ReactiveFormsModule, FormControl, Validators } from '@angular/forms';
 import { toSignal, takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Title } from '@angular/platform-browser';
@@ -51,7 +53,6 @@ import {
   PurchaseStepperComponent,
   PurchaseStepperDialogData,
 } from './purchase-stepper/purchase-stepper.component';
-import { MatDialogRef } from '@angular/material/dialog';
 import { take } from 'rxjs';
 
 @Component({
@@ -65,6 +66,7 @@ import { take } from 'rxjs';
     MatInputModule,
     MatIconModule,
     MatProgressSpinnerModule,
+    MatSnackBarModule,
     RunnerPhotoGridComponent,
   ],
   templateUrl: './event-search.component.html',
@@ -109,10 +111,36 @@ export class EventSearchComponent implements OnInit, OnDestroy {
   private readonly paramMap = toSignal(this.route.paramMap);
   readonly eventId = computed(() => this.paramMap()?.get('id') ?? '');
 
+  private readonly snackBar = inject(MatSnackBar);
+
   private dialogRef: MatDialogRef<PhotoDetailComponent> | null = null;
   private purchaseDialogRef: MatDialogRef<PurchaseStepperComponent> | null = null;
+  private loadMoreSnackBarRef: MatSnackBarRef<TextOnlySnackBar> | null = null;
 
   constructor() {
+    // Show a persistent snackbar with Retry action when load-more fails; dismiss on recovery.
+    effect(() => {
+      const err = this.loadMoreError();
+      if (err && !this.loadMoreSnackBarRef) {
+        this.loadMoreSnackBarRef = this.snackBar.open(
+          'Could not load more photos — tap to retry.',
+          'Retry',
+          { duration: 0 },
+        );
+        this.loadMoreSnackBarRef
+          .onAction()
+          .pipe(takeUntilDestroyed(this._destroyRef))
+          .subscribe(() => this.onLoadMore());
+        this.loadMoreSnackBarRef
+          .afterDismissed()
+          .pipe(takeUntilDestroyed(this._destroyRef))
+          .subscribe(() => { this.loadMoreSnackBarRef = null; });
+      } else if (!err && this.loadMoreSnackBarRef) {
+        this.loadMoreSnackBarRef.dismiss();
+        this.loadMoreSnackBarRef = null;
+      }
+    });
+
     // Load event metadata and first page of public photos when route param changes.
     effect(() => {
       const id = this.eventId();

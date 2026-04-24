@@ -1,9 +1,8 @@
 import { inject, Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { Actions, createEffect, ofType } from '@ngrx/effects';
 import { of } from 'rxjs';
-import { catchError, map, switchMap, tap } from 'rxjs/operators';
+import { catchError, map, switchMap } from 'rxjs/operators';
 
 import { AppConfigService } from '../../core/config/app-config.service';
 import { RunnerPhoto, RunnerPhotosActions } from './runner-photos.actions';
@@ -31,7 +30,6 @@ export class RunnerPhotosEffects {
   private readonly actions$ = inject(Actions);
   private readonly http = inject(HttpClient);
   private readonly configService = inject(AppConfigService);
-  private readonly snackBar = inject(MatSnackBar);
 
   private get apiBase(): string {
     return this.configService.get().apiBaseUrl;
@@ -89,20 +87,6 @@ export class RunnerPhotosEffects {
           ),
       ),
     ),
-  );
-
-  /** Show snackbar when load-more fails — non-fatal (photos already loaded stay visible). */
-  loadMoreEventPhotosFailure$ = createEffect(
-    () =>
-      this.actions$.pipe(
-        ofType(RunnerPhotosActions.loadMoreEventPhotosFailure, RunnerPhotosActions.loadMoreBibPhotosFailure),
-        tap(() => {
-          this.snackBar.open('Failed to load more photos. Please try again.', 'Dismiss', {
-            duration: 5000,
-          });
-        }),
-      ),
-    { dispatch: false },
   );
 
   /** GET /events/{id}/photos/search?bib=... — initial bib search. */

@@ -162,7 +162,7 @@
             type="button"
             (click)="onLoadMore()"
             [disabled]="loadingMore()"
-            aria-label="Load more photos"
+            [attr.aria-label]="loadingMore() ? 'Loading more photos' : 'Load more photos'"
           >
             @if (loadingMore()) {
               <mat-spinner diameter="20" />
