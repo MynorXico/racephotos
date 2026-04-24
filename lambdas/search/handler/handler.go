@@ -127,9 +127,15 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 			return errResponse(500, "internal server error"), nil
 		}
 
+		// BatchGetItem returns items in undefined order. Sort by UploadedAt DESC
+		// (PhotoID tiebreaker) before building photoItems — matches all-event browse order.
+		sort.Slice(photos, func(i, j int) bool {
+			if photos[i].UploadedAt != photos[j].UploadedAt {
+				return photos[i].UploadedAt > photos[j].UploadedAt
+			}
+			return photos[i].ID < photos[j].ID
+		})
 		page := buildPageItems(ctx, h.CdnDomain, photos)
-		// BatchGetItem returns items in undefined order — sort for consistent paging.
-		sort.Slice(page, func(i, j int) bool { return page[i].PhotoID < page[j].PhotoID })
 
 		remaining := bibCur.IDs[len(thisPage):]
 		var nextCursorPtr *string
@@ -229,11 +235,17 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(500, "internal server error"), nil
 	}
 
+	// Sort by UploadedAt DESC (PhotoID tiebreaker) before filtering so that
+	// page slices and cursor IDs are in a consistent chronological order that
+	// matches the all-event browse (GSI uploadedAt DESC).
+	sort.Slice(allPhotos, func(i, j int) bool {
+		if allPhotos[i].UploadedAt != allPhotos[j].UploadedAt {
+			return allPhotos[i].UploadedAt > allPhotos[j].UploadedAt
+		}
+		return allPhotos[i].ID < allPhotos[j].ID
+	})
 	// Filter: only indexed photos with a valid watermark key (AC4).
-	// Sort by photoId for a stable ordering across requests (BatchGetItem
-	// result order is not guaranteed by DynamoDB).
 	allIndexed := buildPageItems(ctx, h.CdnDomain, allPhotos)
-	sort.Slice(allIndexed, func(i, j int) bool { return allIndexed[i].PhotoID < allIndexed[j].PhotoID })
 
 	// Apply offset from fallback cursor (for very large bibs where pre-fetched IDs
 	// were exhausted after bibCursorMaxIDs). For normal first requests, offset is 0.

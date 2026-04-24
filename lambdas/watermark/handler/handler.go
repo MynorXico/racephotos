@@ -161,6 +161,7 @@ func (h *Handler) processMessage(ctx context.Context, msg events.SQSMessage) err
 				slog.String("photoId", wm.PhotoID),
 				slog.String("eventId", wm.EventID),
 				slog.String("error", err.Error()),
+				slog.String("alert", "photo_count_drift"),
 			)
 		}
 	}
