@@ -222,10 +222,15 @@ func (s *DynamoEventCountUpdater) IncrementPhotoCount(ctx context.Context, event
 	if err != nil {
 		return fmt.Errorf("IncrementPhotoCount: marshal one: %w", err)
 	}
+	// ConditionExpression prevents upsert: if the event was deleted while its photos
+	// were still in the watermark queue, a bare ADD would silently create a phantom
+	// event record with only {id, photoCount}. attribute_exists(id) causes a
+	// ConditionalCheckFailedException instead, which the caller treats as non-fatal.
 	_, err = s.Client.UpdateItem(ctx, &dynamodb.UpdateItemInput{
-		TableName:        aws.String(s.TableName),
-		Key:              key,
-		UpdateExpression: aws.String("ADD photoCount :one"),
+		TableName:           aws.String(s.TableName),
+		Key:                 key,
+		UpdateExpression:    aws.String("ADD photoCount :one"),
+		ConditionExpression: aws.String("attribute_exists(id)"),
 		ExpressionAttributeValues: map[string]types.AttributeValue{
 			":one": one,
 		},

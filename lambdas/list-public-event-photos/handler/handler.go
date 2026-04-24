@@ -55,9 +55,11 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	cursor := event.QueryStringParameters["cursor"]
 	limit := defaultPageSize
 	if lStr := event.QueryStringParameters["limit"]; lStr != "" {
-		if l, err := strconv.Atoi(lStr); err == nil && l >= 1 && l <= maxPageSize {
-			limit = l
+		l, err := strconv.Atoi(lStr)
+		if err != nil || l < 1 || l > maxPageSize {
+			return errResponse(400, "limit must be between 1 and 50"), nil
 		}
+		limit = l
 	}
 
 	// Validate cursor format before hitting DynamoDB (AC9).
@@ -106,7 +108,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 		items := make([]photoItem, 0, len(photos))
 		for _, p := range photos {
-			if p.WatermarkedS3Key == "" || !safeS3KeyRE.MatchString(p.WatermarkedS3Key) {
+			if p.WatermarkedS3Key == "" || !safeS3KeyRE.MatchString(p.WatermarkedS3Key) || strings.Contains(p.WatermarkedS3Key, "..") {
 				slog.Warn("skipping indexed photo with missing or malformed watermarkedS3Key",
 					slog.String("photoId", p.ID),
 				)

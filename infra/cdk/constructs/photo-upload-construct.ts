@@ -1,6 +1,7 @@
 import * as path from 'path';
 import * as apigatewayv2 from 'aws-cdk-lib/aws-apigatewayv2';
 import * as integrations from 'aws-cdk-lib/aws-apigatewayv2-integrations';
+import * as cdk from 'aws-cdk-lib';
 import * as dynamodb from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
@@ -169,6 +170,10 @@ export class PhotoUploadConstruct extends Construct {
       architecture: lambda.Architecture.ARM_64,
       handler: 'bootstrap',
       memorySize: 256,
+      // 10 s: up to 10 fill-to-limit DynamoDB Query rounds + concurrent GetItem + cold-start.
+      // Matches the search Lambda timeout; without this the CDK default (3 s) would cause
+      // hard 502s whenever more than 2–3 loop iterations are needed.
+      timeout: cdk.Duration.seconds(10),
       code: lambda.Code.fromAsset(path.join(__dirname, '../../../lambdas/list-public-event-photos')),
       environment: {
         RACEPHOTOS_ENV: config.envName,

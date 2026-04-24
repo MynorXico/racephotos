@@ -71,10 +71,17 @@ func (s *DynamoEventPhotoLister) ListEventPhotos(ctx context.Context, eventID, c
 	}
 
 	var photos []models.Photo
+	// rawItems mirrors photos — stores the raw DynamoDB attribute map for each
+	// photo so we can build an exact cursor key from DynamoDB's own data rather
+	// than reconstructing it from struct fields (avoids same-timestamp tiebreaker
+	// ambiguity on the eventId-uploadedAt-index GSI).
+	var rawItems []map[string]types.AttributeValue
 	var lastKey map[string]types.AttributeValue
 
 	for iter := 0; iter < maxIterations; iter++ {
-		remaining := limit - len(photos)
+		// Fetch limit+1 items so we can detect whether a next page exists and
+		// use the (limit+1)-th item's DynamoDB key as the cursor.
+		remaining := limit + 1 - len(photos)
 		if remaining < 1 {
 			remaining = 1
 		}
@@ -90,37 +97,42 @@ func (s *DynamoEventPhotoLister) ListEventPhotos(ctx context.Context, eventID, c
 				return nil, "", fmt.Errorf("ListEventPhotos: unmarshal: %w", err)
 			}
 			photos = append(photos, p)
-			if len(photos) >= limit {
+			rawItems = append(rawItems, item)
+			if len(photos) > limit { // collected limit+1, stop
 				break
 			}
 		}
 		lastKey = out.LastEvaluatedKey
-		if len(photos) >= limit || len(lastKey) == 0 {
+		if len(photos) > limit || len(lastKey) == 0 {
 			break
 		}
 		input.ExclusiveStartKey = lastKey
 	}
 
-	if len(photos) > limit {
-		photos = photos[:limit]
-	}
-
 	var nextCursor string
-	if len(lastKey) > 0 {
-		var cursorKey map[string]types.AttributeValue
-		if len(photos) > 0 {
-			last := photos[len(photos)-1]
-			cursorKey = map[string]types.AttributeValue{
-				"id":         &types.AttributeValueMemberS{Value: last.ID},
-				"eventId":    &types.AttributeValueMemberS{Value: last.EventID},
-				"uploadedAt": &types.AttributeValueMemberS{Value: last.UploadedAt},
-			}
-		} else {
-			cursorKey = lastKey
+	if len(photos) > limit {
+		// Use the (limit+1)-th item's raw DynamoDB key as ExclusiveStartKey for the
+		// next page. This avoids reconstructing the key from struct fields and
+		// correctly handles photos with identical uploadedAt values (same-timestamp
+		// tiebreaker is preserved in DynamoDB's own attribute representation).
+		cursorItem := rawItems[limit]
+		cursorKey := map[string]types.AttributeValue{
+			"id":         cursorItem["id"],
+			"eventId":    cursorItem["eventId"],
+			"uploadedAt": cursorItem["uploadedAt"],
 		}
+		photos = photos[:limit]
 		nc, err := encodeCursor(cursorKey)
 		if err != nil {
 			return nil, "", fmt.Errorf("ListEventPhotos: encodeCursor: %w", err)
+		}
+		nextCursor = nc
+	} else if len(lastKey) > 0 {
+		// DynamoDB has more items but maxIterations was reached with exactly limit
+		// photos. Use DynamoDB's own LastEvaluatedKey as the cursor.
+		nc, err := encodeCursor(lastKey)
+		if err != nil {
+			return nil, "", fmt.Errorf("ListEventPhotos: encodeCursor lastKey: %w", err)
 		}
 		nextCursor = nc
 	}
@@ -201,6 +213,19 @@ func decodeCursor(cursor, eventID string) (map[string]types.AttributeValue, erro
 		} else {
 			return nil, fmt.Errorf("decodeCursor: unrecognised type for key %s", k)
 		}
+	}
+	// Whitelist: the cursor for eventId-uploadedAt-index requires exactly
+	// {id, eventId, uploadedAt}. Reject extra keys to prevent a tampered cursor
+	// from injecting unexpected attributes as ExclusiveStartKey (which would
+	// surface as a DynamoDB ValidationException → 500 instead of 400).
+	allowedKeys := map[string]bool{"id": true, "eventId": true, "uploadedAt": true}
+	for k := range key {
+		if !allowedKeys[k] {
+			return nil, fmt.Errorf("decodeCursor: unexpected key %q", k)
+		}
+	}
+	if len(key) != 3 {
+		return nil, fmt.Errorf("decodeCursor: expected 3 keys, got %d", len(key))
 	}
 	eid, ok := key["eventId"]
 	if !ok {

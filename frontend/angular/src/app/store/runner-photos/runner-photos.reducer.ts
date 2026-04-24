@@ -65,12 +65,12 @@ const runnerPhotosReducer = createReducer<RunnerPhotosState>(
     loadMoreError: null,
   })),
 
-  on(RunnerPhotosActions.loadMoreEventPhotosSuccess, (state, { photos, nextCursor }) => ({
-    ...state,
-    loadingMore: false,
-    photos: [...state.photos, ...photos],
-    nextCursor,
-  })),
+  on(RunnerPhotosActions.loadMoreEventPhotosSuccess, (state, { photos, nextCursor }) => {
+    // Guard: if mode changed to 'bib' while the HTTP request was in-flight,
+    // discard the stale response to prevent corrupting the current page state.
+    if (state.mode !== 'all') return state;
+    return { ...state, loadingMore: false, photos: [...state.photos, ...photos], nextCursor };
+  }),
 
   on(RunnerPhotosActions.loadMoreEventPhotosFailure, (state, { error }) => ({
     ...state,
@@ -111,12 +111,12 @@ const runnerPhotosReducer = createReducer<RunnerPhotosState>(
     loadMoreError: null,
   })),
 
-  on(RunnerPhotosActions.loadMoreBibPhotosSuccess, (state, { photos, nextCursor }) => ({
-    ...state,
-    loadingMore: false,
-    photos: [...state.photos, ...photos],
-    nextCursor,
-  })),
+  on(RunnerPhotosActions.loadMoreBibPhotosSuccess, (state, { photos, nextCursor }) => {
+    // Guard: if mode changed to 'all' while the HTTP request was in-flight,
+    // discard the stale response to prevent corrupting the current page state.
+    if (state.mode !== 'bib') return state;
+    return { ...state, loadingMore: false, photos: [...state.photos, ...photos], nextCursor };
+  }),
 
   on(RunnerPhotosActions.loadMoreBibPhotosFailure, (state, { error }) => ({
     ...state,

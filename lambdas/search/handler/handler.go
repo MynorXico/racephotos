@@ -6,9 +6,10 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"regexp"
-	"strconv"
+	"sort"
 	"strings"
 
 	"github.com/aws/aws-lambda-go/events"
@@ -19,6 +20,13 @@ import (
 
 // bibPageSize is the number of photos returned per page in bib search results.
 const bibPageSize = 24
+
+// bibCursorMaxIDs is the maximum number of pre-fetched indexed photo IDs stored
+// in the cursor. 150 IDs × 36 chars ≈ 5.4 KB raw JSON → ~7.6 KB base64, which
+// stays under the API Gateway 8 KB query-string limit. For bibs with > 174
+// indexed photos (24 first page + 150 cursor), subsequent pages fall back to a
+// full re-fetch.
+const bibCursorMaxIDs = 150
 
 // uuidRE validates that an event ID is a standard UUID (case-insensitive).
 // This prevents pathological strings from reaching DynamoDB key lookups.
@@ -83,27 +91,91 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(400, "missing or invalid bib number"), nil
 	}
 
-	cursor := event.QueryStringParameters["cursor"]
-	offset := 0
-	if cursor != "" {
-		decoded, err := base64.RawURLEncoding.DecodeString(cursor)
+	cursorStr := event.QueryStringParameters["cursor"]
+	var bibCur *bibSearchCursor
+	if cursorStr != "" {
+		bc, err := decodeBibCursor(cursorStr)
 		if err != nil {
 			return errResponse(400, "invalid cursor"), nil
 		}
-		n, err := strconv.Atoi(string(decoded))
-		if err != nil || n < 0 {
-			return errResponse(400, "invalid cursor"), nil
-		}
-		offset = n
+		bibCur = bc
 	}
 
+	// ── Fast path: load-more with pre-fetched IDs from cursor ────────────────
+	// On load-more when the cursor contains pre-fetched indexed photo IDs,
+	// only BatchGet those IDs (O(page_size)) rather than re-fetching all bib
+	// photos (O(total_bib_photos)). GetEvent runs concurrently so event
+	// metadata is always returned for consistency.
+	if bibCur != nil && len(bibCur.IDs) > 0 {
+		evCh := make(chan eventResult, 1)
+		go func() {
+			ev, err := h.Events.GetEvent(ctx, eventID)
+			evCh <- eventResult{event: ev, err: err}
+		}()
+
+		thisPage := bibCur.IDs
+		if len(thisPage) > bibPageSize {
+			thisPage = thisPage[:bibPageSize]
+		}
+		photos, err := h.Photos.BatchGetPhotos(ctx, thisPage)
+		if err != nil {
+			<-evCh
+			slog.ErrorContext(ctx, "BatchGetPhotos (cursor fast-path) failed",
+				slog.String("eventID", eventID),
+				slog.String("error", err.Error()),
+			)
+			return errResponse(500, "internal server error"), nil
+		}
+
+		page := buildPageItems(ctx, h.CdnDomain, photos)
+
+		remaining := bibCur.IDs[len(thisPage):]
+		var nextCursorPtr *string
+		newOffset := bibCur.Offset + len(thisPage)
+		if len(remaining) > 0 {
+			nc := &bibSearchCursor{IDs: remaining, Offset: newOffset, HasMore: bibCur.HasMore}
+			if enc, err := encodeBibCursor(nc); err == nil {
+				nextCursorPtr = &enc
+			}
+		} else if bibCur.HasMore {
+			// IDs exhausted but more exist — encode a fallback cursor so the
+			// next load-more re-fetches from scratch at the correct offset.
+			nc := &bibSearchCursor{IDs: nil, Offset: newOffset, HasMore: true}
+			if enc, err := encodeBibCursor(nc); err == nil {
+				nextCursorPtr = &enc
+			}
+		}
+
+		evRes := <-evCh
+		if evRes.err != nil {
+			if errors.Is(evRes.err, apperrors.ErrNotFound) {
+				return errResponse(404, "event not found"), nil
+			}
+			slog.ErrorContext(ctx, "GetEvent (cursor fast-path) failed",
+				slog.String("eventID", eventID),
+				slog.String("error", evRes.err.Error()),
+			)
+			return errResponse(500, "internal server error"), nil
+		}
+
+		return jsonResponse(200, searchResponse{
+			Photos:        page,
+			NextCursor:    nextCursorPtr,
+			TotalCount:    bibCur.TotalCount,
+			EventName:     evRes.event.Name,
+			PricePerPhoto: evRes.event.PricePerPhoto,
+			Currency:      evRes.event.Currency,
+		})
+	}
+
+	// ── Full fetch path: first request or fallback for very large bibs ────────
 	// Run GetEvent and GetPhotoIDsByBib concurrently — both are independent reads.
-	evCh := make(chan eventResult, 1)
+	evCh2 := make(chan eventResult, 1)
 	bibCh := make(chan bibResult, 1)
 
 	go func() {
 		ev, err := h.Events.GetEvent(ctx, eventID)
-		evCh <- eventResult{event: ev, err: err}
+		evCh2 <- eventResult{event: ev, err: err}
 	}()
 
 	go func() {
@@ -111,11 +183,10 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		bibCh <- bibResult{photoIDs: ids, err: err}
 	}()
 
-	evRes := <-evCh
+	evRes := <-evCh2
 	if evRes.err != nil {
 		// bibCh is buffered (capacity 1) so the bib goroutine can write without
-		// blocking even after we return — no explicit drain needed to prevent a
-		// goroutine leak.
+		// blocking even after we return — no explicit drain needed.
 		if errors.Is(evRes.err, apperrors.ErrNotFound) {
 			return errResponse(404, "event not found"), nil
 		}
@@ -147,7 +218,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		})
 	}
 
-	photos, err := h.Photos.BatchGetPhotos(ctx, bibRes.photoIDs)
+	allPhotos, err := h.Photos.BatchGetPhotos(ctx, bibRes.photoIDs)
 	if err != nil {
 		slog.ErrorContext(ctx, "BatchGetPhotos failed",
 			slog.String("eventID", eventID),
@@ -157,32 +228,18 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	// Filter: only indexed photos with a valid watermark key (AC4).
-	// WatermarkedS3Key is validated against safeS3KeyRE before URL construction
-	// to prevent a tampered DynamoDB record from injecting an arbitrary URL.
-	allIndexed := make([]photoItem, 0, len(photos))
-	for _, p := range photos {
-		if p.Status != models.PhotoStatusIndexed || p.WatermarkedS3Key == "" {
-			continue
-		}
-		if !safeS3KeyRE.MatchString(p.WatermarkedS3Key) {
-			slog.WarnContext(ctx, "skipping photo with malformed WatermarkedS3Key",
-				slog.String("photoID", p.ID),
-			)
-			continue
-		}
-		item := photoItem{
-			PhotoID: p.ID,
-			// TrimLeft strips all leading slashes — TrimPrefix removes only one,
-			// leaving double-slash URLs if a key begins with "//".
-			WatermarkedURL: "https://" + h.CdnDomain + "/" + strings.TrimLeft(p.WatermarkedS3Key, "/"),
-		}
-		if p.CapturedAt != "" {
-			item.CapturedAt = &p.CapturedAt
-		}
-		allIndexed = append(allIndexed, item)
+	// Sort by photoId for a stable ordering across requests (BatchGetItem
+	// result order is not guaranteed by DynamoDB).
+	allIndexed := buildPageItems(ctx, h.CdnDomain, allPhotos)
+	sort.Slice(allIndexed, func(i, j int) bool { return allIndexed[i].PhotoID < allIndexed[j].PhotoID })
+
+	// Apply offset from fallback cursor (for very large bibs where pre-fetched IDs
+	// were exhausted after bibCursorMaxIDs). For normal first requests, offset is 0.
+	offset := 0
+	if bibCur != nil {
+		offset = bibCur.Offset
 	}
 
-	// Slice the indexed results by offset for pagination.
 	totalCount := len(allIndexed)
 	var page []photoItem
 	if offset >= totalCount {
@@ -195,11 +252,29 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		page = allIndexed[offset:end]
 	}
 
+	// Build cursor: pre-fetch the next bibCursorMaxIDs indexed photo IDs so that
+	// subsequent load-more calls can BatchGet only those IDs (O(page_size)).
 	var nextCursorPtr *string
 	nextOffset := offset + bibPageSize
 	if nextOffset < totalCount {
-		enc := base64.RawURLEncoding.EncodeToString([]byte(strconv.Itoa(nextOffset)))
-		nextCursorPtr = &enc
+		remaining := allIndexed[nextOffset:]
+		take := len(remaining)
+		if take > bibCursorMaxIDs {
+			take = bibCursorMaxIDs
+		}
+		// bibIndexMaxResults cap: if len(bibRes.photoIDs) == bibIndexMaxResults,
+		// the bib-index may have been truncated — there could be more photos.
+		// We set HasMore=true only in that case to trigger a fallback re-fetch.
+		hasMore := (nextOffset+take) < totalCount || len(bibRes.photoIDs) >= bibIndexMaxResults
+		nc := &bibSearchCursor{
+			IDs:        photoItemIDs(remaining[:take]),
+			Offset:     nextOffset,
+			HasMore:    hasMore,
+			TotalCount: totalCount,
+		}
+		if enc, err := encodeBibCursor(nc); err == nil {
+			nextCursorPtr = &enc
+		}
 	}
 
 	return jsonResponse(200, searchResponse{
@@ -210,6 +285,81 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		PricePerPhoto: evRes.event.PricePerPhoto,
 		Currency:      evRes.event.Currency,
 	})
+}
+
+// bibSearchCursor is the cursor payload for bib search pagination.
+// Pre-fetched IDs allow load-more to BatchGet only O(page_size) items rather
+// than re-fetching all bib photos (O(total_bib_photos)) on every page request.
+type bibSearchCursor struct {
+	// IDs holds pre-fetched indexed photo IDs for the next load-more page.
+	// Empty when HasMore is true and IDs were exhausted — triggers a fallback re-fetch.
+	IDs []string `json:"i,omitempty"`
+	// Offset is the number of indexed photos already served (used in fallback re-fetch).
+	Offset int `json:"o"`
+	// HasMore is true when more indexed photos exist beyond IDs.
+	HasMore bool `json:"m,omitempty"`
+	// TotalCount is the total indexed photo count from the initial full fetch.
+	TotalCount int `json:"t"`
+}
+
+func encodeBibCursor(bc *bibSearchCursor) (string, error) {
+	b, err := json.Marshal(bc)
+	if err != nil {
+		return "", fmt.Errorf("encodeBibCursor: %w", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+func decodeBibCursor(s string) (*bibSearchCursor, error) {
+	b, err := base64.RawURLEncoding.DecodeString(s)
+	if err != nil {
+		return nil, fmt.Errorf("decodeBibCursor: base64: %w", err)
+	}
+	var bc bibSearchCursor
+	if err := json.Unmarshal(b, &bc); err != nil {
+		return nil, fmt.Errorf("decodeBibCursor: unmarshal: %w", err)
+	}
+	if bc.Offset < 0 {
+		return nil, fmt.Errorf("decodeBibCursor: negative offset")
+	}
+	return &bc, nil
+}
+
+// buildPageItems filters photos to indexed-only, validates S3 keys, and builds
+// the photoItem slice. Sort order is left to the caller.
+func buildPageItems(ctx context.Context, cdnDomain string, photos []models.Photo) []photoItem {
+	items := make([]photoItem, 0, len(photos))
+	for _, p := range photos {
+		if p.Status != models.PhotoStatusIndexed || p.WatermarkedS3Key == "" {
+			continue
+		}
+		if !safeS3KeyRE.MatchString(p.WatermarkedS3Key) || strings.Contains(p.WatermarkedS3Key, "..") {
+			slog.WarnContext(ctx, "skipping photo with malformed WatermarkedS3Key",
+				slog.String("photoID", p.ID),
+			)
+			continue
+		}
+		item := photoItem{
+			PhotoID: p.ID,
+			// TrimLeft strips all leading slashes — TrimPrefix removes only one,
+			// leaving double-slash URLs if a key begins with "//".
+			WatermarkedURL: "https://" + cdnDomain + "/" + strings.TrimLeft(p.WatermarkedS3Key, "/"),
+		}
+		if p.CapturedAt != "" {
+			item.CapturedAt = &p.CapturedAt
+		}
+		items = append(items, item)
+	}
+	return items
+}
+
+// photoItemIDs extracts the PhotoID from each photoItem in order.
+func photoItemIDs(items []photoItem) []string {
+	ids := make([]string, len(items))
+	for i, item := range items {
+		ids[i] = item.PhotoID
+	}
+	return ids
 }
 
 type errorBody struct {
