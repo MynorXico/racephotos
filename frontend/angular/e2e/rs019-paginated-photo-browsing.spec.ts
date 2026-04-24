@@ -46,9 +46,8 @@ test.describe('RS-019 — Clear bib button (AC4)', () => {
     await page.getByRole('button', { name: /search/i }).click();
 
     // Clear button should appear when mode switches to bib (may take a moment for state update).
-    const clearBtn = page.getByRole('button', { name: /clear/i });
-    // The button may not appear instantly in E2E without a real API response,
-    // but we can verify the form allows the bib to be cleared.
+    // The clear button may not appear without a real API response changing the NgRx mode,
+    // but we verify the form still holds the bib value after submit.
     await expect(input).toHaveValue('101');
   });
 });
