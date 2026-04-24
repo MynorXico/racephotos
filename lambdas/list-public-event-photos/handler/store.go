@@ -111,11 +111,12 @@ func (s *DynamoEventPhotoLister) ListEventPhotos(ctx context.Context, eventID, c
 
 	var nextCursor string
 	if len(photos) > limit {
-		// Use the (limit+1)-th item's raw DynamoDB key as ExclusiveStartKey for the
-		// next page. This avoids reconstructing the key from struct fields and
-		// correctly handles photos with identical uploadedAt values (same-timestamp
-		// tiebreaker is preserved in DynamoDB's own attribute representation).
-		cursorItem := rawItems[limit]
+		// Use the last returned item's raw DynamoDB key as ExclusiveStartKey for the
+		// next page. DynamoDB's ExclusiveStartKey starts evaluation *after* the
+		// provided key, so using rawItems[limit-1] (the last item shown to the user)
+		// means the next page opens with the (limit+1)-th item. The extra item we
+		// collected (rawItems[limit]) is only used to confirm there are more results.
+		cursorItem := rawItems[limit-1]
 		cursorKey := map[string]types.AttributeValue{
 			"id":         cursorItem["id"],
 			"eventId":    cursorItem["eventId"],

@@ -128,19 +128,21 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		}
 
 		page := buildPageItems(ctx, h.CdnDomain, photos)
+		// BatchGetItem returns items in undefined order — sort for consistent paging.
+		sort.Slice(page, func(i, j int) bool { return page[i].PhotoID < page[j].PhotoID })
 
 		remaining := bibCur.IDs[len(thisPage):]
 		var nextCursorPtr *string
 		newOffset := bibCur.Offset + len(thisPage)
 		if len(remaining) > 0 {
-			nc := &bibSearchCursor{IDs: remaining, Offset: newOffset, HasMore: bibCur.HasMore}
+			nc := &bibSearchCursor{IDs: remaining, Offset: newOffset, HasMore: bibCur.HasMore, TotalCount: bibCur.TotalCount}
 			if enc, err := encodeBibCursor(nc); err == nil {
 				nextCursorPtr = &enc
 			}
 		} else if bibCur.HasMore {
 			// IDs exhausted but more exist — encode a fallback cursor so the
 			// next load-more re-fetches from scratch at the correct offset.
-			nc := &bibSearchCursor{IDs: nil, Offset: newOffset, HasMore: true}
+			nc := &bibSearchCursor{IDs: nil, Offset: newOffset, HasMore: true, TotalCount: bibCur.TotalCount}
 			if enc, err := encodeBibCursor(nc); err == nil {
 				nextCursorPtr = &enc
 			}
