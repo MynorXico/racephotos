@@ -253,9 +253,9 @@ they start with a failing test rather than a story document.
 
 | Level       | Meaning                                                        | Target response |
 | ----------- | -------------------------------------------------------------- | --------------- |
-| P1-critical | Data loss, broken core path (upload/search/download/purchase)  | Same day        |
-| P2-high     | Feature broken but workaround exists                           | Next PR         |
-| P3-low      | Polish issue, minor UX gap                                     | Backlog         |
+| P1-critical | Data loss, broken core path (upload/processing/search/purchase/download) | Same day          |
+| P2-high     | Feature broken but workaround exists                                     | 2-3 business days |
+| P3-low      | Polish issue, minor UX gap                                               | Best effort       |
 
 ### Bug doc
 

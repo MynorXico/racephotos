@@ -54,4 +54,4 @@ assignees: ""
 
 ## Additional context
 
-<!-- Anything else that might help — logs, screenshots, related issues. -->
+<!-- Anything else that might help — logs, screenshots, related issues. PLEASE REMOVE any PII (emails, names) or secrets before posting. -->
