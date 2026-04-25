@@ -240,7 +240,7 @@ they start with a failing test rather than a story document.
 1. GitHub Issue opened (reporter — public entry point)
 2. Maintainer triages: assigns severity, creates docs/bugs/BUG-NNN-<slug>.md
 3. Fix branch created from main: fix/BUG-NNN-<slug>
-4. Failing unit test written that reproduces the bug
+4. Failing automated test (unit or integration) written that reproduces the bug
 5. Fix implemented — test passes
 6. make validate (full suite)
 7. PR opened — references bug doc + GitHub Issue (Fixes #<issue>)

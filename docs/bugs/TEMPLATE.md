@@ -29,9 +29,8 @@
 
 ## Definition of Done
 
-- [ ] Failing unit test written that reproduces the bug
+- [ ] Failing test (unit or integration) written that reproduces the bug
 - [ ] Fix implemented — test now passes
-- [ ] `make test-unit` passes
 - [ ] `make validate` passes
 - [ ] Fix branch opened as PR, including this doc and referencing the GitHub Issue (`Fixes #<issue>`)
 - [ ] CI green

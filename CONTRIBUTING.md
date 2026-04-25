@@ -161,7 +161,7 @@ and create an internal bug doc at `docs/bugs/BUG-NNN-<slug>.md`.
    ```bash
    git checkout -b fix/BUG-NNN-<slug>
    ```
-3. Write a **failing unit test** that reproduces the bug first, then fix the implementation
+3. Write a **failing automated test** (unit or integration) that reproduces the bug first, then fix the implementation
 4. Run the full validation suite:
    ```bash
    make validate
