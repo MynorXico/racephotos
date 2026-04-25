@@ -33,7 +33,7 @@
 - [ ] Fix implemented — test now passes
 - [ ] `make test-unit` passes
 - [ ] `make validate` passes
-- [ ] Fix branch opened as PR, referencing this doc and the GitHub Issue (`Fixes #<issue>`)
+- [ ] Fix branch opened as PR, including this doc and referencing the GitHub Issue (`Fixes #<issue>`)
 - [ ] CI green
 - [ ] Pipeline green after merge
 - [ ] GitHub Issue closed

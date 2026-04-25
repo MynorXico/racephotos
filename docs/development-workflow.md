@@ -253,7 +253,7 @@ they start with a failing test rather than a story document.
 
 | Level       | Meaning                                                        | Target response |
 | ----------- | -------------------------------------------------------------- | --------------- |
-| P1-critical | Data loss, broken core path (upload/processing/search/purchase/download) | Same day          |
+| P1-critical | Data loss, broken core path (upload/processing/watermarking/search/purchase/download) | Same day          |
 | P2-high     | Feature broken but workaround exists                                     | 2-3 business days |
 | P3-low      | Polish issue, minor UX gap                                               | Best effort       |
 
@@ -265,7 +265,7 @@ Issue — it holds the root cause analysis, acceptance criteria, and DoD checkli
 
 ```bash
 cp docs/bugs/TEMPLATE.md docs/bugs/BUG-001-<slug>.md
-# fill in: ID, GitHub Issue number, severity, affected story, root cause, ACs
+# fill in: title, ID, GitHub Issue number, severity, status, affected story, root cause, ACs
 ```
 
 ### Fix branch naming
