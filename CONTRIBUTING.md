@@ -142,10 +142,32 @@ See [CLAUDE.md](CLAUDE.md) for the full repository layout and all architectural 
 
 ---
 
-## Reporting issues
+## Reporting bugs
 
-Open an issue on GitHub. Include:
+Open a GitHub Issue using the **Bug report** template. Fill in:
 
 - Steps to reproduce
 - Expected vs actual behaviour
-- Environment (OS, Go version, Node version, AWS region if relevant)
+- Environment (OS, Go version, Node version, browser if UI)
+- Which area of the system is affected (upload, search, payment, etc.)
+
+A maintainer will triage the issue within 24 hours, assign a severity (P1–P3),
+and create an internal bug doc at `docs/bugs/BUG-NNN-<slug>.md`.
+
+### Want to fix it yourself?
+
+1. Comment on the issue — a maintainer will assign it to you
+2. Fork the repo and create a fix branch from `main`:
+   ```bash
+   git checkout -b fix/BUG-NNN-<slug>
+   ```
+3. Write a **failing automated test** (unit or integration) that reproduces the bug first, then fix the implementation
+4. Run the full validation suite:
+   ```bash
+   make validate
+   ```
+5. Open a PR that references the issue (`Fixes #<number>`) and the bug doc
+6. All CI checks must pass before review
+
+See [docs/development-workflow.md](docs/development-workflow.md) for the complete
+bug flow, severity levels, and pipeline monitoring steps.

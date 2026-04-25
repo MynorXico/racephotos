@@ -231,6 +231,53 @@ Resume build once the ADR is accepted.
 
 ---
 
+## Bug flow
+
+Bugs follow the same branch → PR → pipeline path as stories. The difference is
+they start with a failing test rather than a story document.
+
+```
+1. GitHub Issue opened (reporter — public entry point)
+2. Maintainer triages: assigns severity, creates docs/bugs/BUG-NNN-<slug>.md
+3. Fix branch created from main: fix/BUG-NNN-<slug>
+4. Failing automated test (unit or integration) written that reproduces the bug
+5. Fix implemented — test passes
+6. make validate (full suite)
+7. PR opened — updates bug doc + references GitHub Issue (Fixes #<issue>)
+8. CI must be green; same specialist agents fire as for stories
+9. Merge (explicit human approval only) → monitor pipeline
+10. GitHub Issue closed
+```
+
+### Severity levels
+
+| Level       | Meaning                                                        | Target response |
+| ----------- | -------------------------------------------------------------- | --------------- |
+| P1-critical | Data loss, broken core path (upload/processing/watermarking/search/purchase/download) | Same day          |
+| P2-high     | Feature broken but workaround exists                                     | 2-3 business days |
+| P3-low      | Polish issue, minor UX gap                                               | Best effort       |
+
+### Bug doc
+
+Every bug picked up by a maintainer gets a `docs/bugs/BUG-NNN-<slug>.md` created
+from `docs/bugs/TEMPLATE.md`. This doc is the internal counterpart to the GitHub
+Issue — it holds the root cause analysis, fix description, acceptance criteria, and DoD checklist.
+
+```bash
+cp docs/bugs/TEMPLATE.md docs/bugs/BUG-001-<slug>.md
+# fill in: title, ID, GitHub Issue number, severity, status, affected story, root cause, fix, ACs
+```
+
+### Fix branch naming
+
+```bash
+git checkout main && git pull
+git checkout -b fix/BUG-NNN-<slug>
+# example: fix/BUG-001-search-empty-bib-returns-500
+```
+
+---
+
 ## Build order
 
 Stories must be built in this exact order (each depends on all prior):
