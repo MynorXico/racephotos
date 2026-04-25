@@ -32,6 +32,7 @@ assignees: ""
 | Go version    |       |
 | Node version  |       |
 | Browser       |       |
+| AWS Region    |       |
 | Environment   | local / dev / prod |
 
 ## Affected area
@@ -41,8 +42,8 @@ assignees: ""
 - [ ] Photo upload
 - [ ] Photo processing pipeline
 - [ ] Watermarking
-- [ ] Bib search
-- [ ] Purchase / payment
+- [ ] Search
+- [ ] Payment
 - [ ] Download
 - [ ] Photographer dashboard
 - [ ] Infrastructure / CDK
