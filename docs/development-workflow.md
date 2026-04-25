@@ -231,6 +231,53 @@ Resume build once the ADR is accepted.
 
 ---
 
+## Bug flow
+
+Bugs follow the same branch → PR → pipeline path as stories. The difference is
+they start with a failing test rather than a story document.
+
+```
+1. GitHub Issue opened (reporter — public entry point)
+2. Maintainer triages: assigns severity, creates docs/bugs/BUG-NNN-<slug>.md
+3. Fix branch created from main: fix/<slug>
+4. Failing unit test written that reproduces the bug
+5. Fix implemented — test passes
+6. make validate (full suite)
+7. PR opened — references bug doc + GitHub Issue (Fixes #<issue>)
+8. CI must be green; same specialist agents fire as for stories
+9. Merge (explicit human approval only) → monitor pipeline
+10. GitHub Issue closed
+```
+
+### Severity levels
+
+| Level       | Meaning                                                        | Target response |
+| ----------- | -------------------------------------------------------------- | --------------- |
+| P1-critical | Data loss, broken core path (upload/search/download/purchase)  | Same day        |
+| P2-high     | Feature broken but workaround exists                           | Next PR         |
+| P3-low      | Polish issue, minor UX gap                                     | Backlog         |
+
+### Bug doc
+
+Every bug picked up by a maintainer gets a `docs/bugs/BUG-NNN-<slug>.md` created
+from `docs/bugs/TEMPLATE.md`. This doc is the internal counterpart to the GitHub
+Issue — it holds the root cause analysis, acceptance criteria, and DoD checklist.
+
+```bash
+cp docs/bugs/TEMPLATE.md docs/bugs/BUG-001-<slug>.md
+# fill in: GitHub Issue number, severity, affected story, root cause, ACs
+```
+
+### Fix branch naming
+
+```bash
+git checkout main && git pull
+git checkout -b fix/<slug>
+# example: fix/search-empty-bib-returns-500
+```
+
+---
+
 ## Build order
 
 Stories must be built in this exact order (each depends on all prior):
