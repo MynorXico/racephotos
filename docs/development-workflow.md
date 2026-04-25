@@ -243,7 +243,7 @@ they start with a failing test rather than a story document.
 4. Failing automated test (unit or integration) written that reproduces the bug
 5. Fix implemented — test passes
 6. make validate (full suite)
-7. PR opened — references bug doc + GitHub Issue (Fixes #<issue>)
+7. PR opened — updates bug doc + references GitHub Issue (Fixes #<issue>)
 8. CI must be green; same specialist agents fire as for stories
 9. Merge (explicit human approval only) → monitor pipeline
 10. GitHub Issue closed
@@ -261,11 +261,11 @@ they start with a failing test rather than a story document.
 
 Every bug picked up by a maintainer gets a `docs/bugs/BUG-NNN-<slug>.md` created
 from `docs/bugs/TEMPLATE.md`. This doc is the internal counterpart to the GitHub
-Issue — it holds the root cause analysis, acceptance criteria, and DoD checklist.
+Issue — it holds the root cause analysis, fix description, acceptance criteria, and DoD checklist.
 
 ```bash
 cp docs/bugs/TEMPLATE.md docs/bugs/BUG-001-<slug>.md
-# fill in: title, ID, GitHub Issue number, severity, status, affected story, root cause, ACs
+# fill in: title, ID, GitHub Issue number, severity, status, affected story, root cause, fix, ACs
 ```
 
 ### Fix branch naming
