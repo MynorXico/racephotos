@@ -159,7 +159,7 @@ and create an internal bug doc at `docs/bugs/BUG-NNN-<slug>.md`.
 1. Comment on the issue — a maintainer will assign it to you
 2. Fork the repo and create a fix branch from `main`:
    ```bash
-   git checkout -b fix/<short-description>
+   git checkout -b fix/BUG-NNN-<slug>
    ```
 3. Write a **failing unit test** that reproduces the bug first, then fix the implementation
 4. Run the full validation suite:

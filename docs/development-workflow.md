@@ -239,7 +239,7 @@ they start with a failing test rather than a story document.
 ```
 1. GitHub Issue opened (reporter — public entry point)
 2. Maintainer triages: assigns severity, creates docs/bugs/BUG-NNN-<slug>.md
-3. Fix branch created from main: fix/<slug>
+3. Fix branch created from main: fix/BUG-NNN-<slug>
 4. Failing unit test written that reproduces the bug
 5. Fix implemented — test passes
 6. make validate (full suite)
@@ -265,15 +265,15 @@ Issue — it holds the root cause analysis, acceptance criteria, and DoD checkli
 
 ```bash
 cp docs/bugs/TEMPLATE.md docs/bugs/BUG-001-<slug>.md
-# fill in: GitHub Issue number, severity, affected story, root cause, ACs
+# fill in: ID, GitHub Issue number, severity, affected story, root cause, ACs
 ```
 
 ### Fix branch naming
 
 ```bash
 git checkout main && git pull
-git checkout -b fix/<slug>
-# example: fix/search-empty-bib-returns-500
+git checkout -b fix/BUG-NNN-<slug>
+# example: fix/BUG-001-search-empty-bib-returns-500
 ```
 
 ---
