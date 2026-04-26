@@ -9,7 +9,7 @@
 //	RACEPHOTOS_ENV             required — "local"|"dev"|"qa"|"staging"|"prod"
 //	RACEPHOTOS_PURCHASES_TABLE required — DynamoDB purchases table name
 //	RACEPHOTOS_ORDERS_TABLE    required — DynamoDB orders table name
-//	RACEPHOTOS_FROM_EMAIL      required — SES verified sender address
+//	RACEPHOTOS_SES_FROM_ADDRESS required — SES verified sender address
 //
 // SES template variables:
 //
@@ -32,7 +32,7 @@ import (
 func main() {
 	purchasesTable := mustGetenv("RACEPHOTOS_PURCHASES_TABLE")
 	ordersTable := mustGetenv("RACEPHOTOS_ORDERS_TABLE")
-	fromEmail := mustGetenv("RACEPHOTOS_FROM_EMAIL")
+	fromEmail := mustGetenv("RACEPHOTOS_SES_FROM_ADDRESS")
 
 	slog.SetDefault(slog.New(slog.NewJSONHandler(os.Stdout, nil)))
 

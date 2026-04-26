@@ -143,8 +143,8 @@ func validate(req updateRequest) error {
 			req.DefaultCurrency, validCurrencyList)
 	}
 	// preferredLocale is optional (empty = default en). When provided it must be a supported value.
-	if req.PreferredLocale != "" && !locale.SupportedLocales[req.PreferredLocale] {
-		return fmt.Errorf("unsupported locale %q — must be one of: en, es-419", req.PreferredLocale)
+	if req.PreferredLocale != "" && !locale.IsSupported(req.PreferredLocale) {
+		return fmt.Errorf("unsupported locale — must be one of: en, es-419")
 	}
 	if utf8.RuneCountInString(req.BankName) > maxBankNameLength {
 		return fmt.Errorf("bankName must not exceed %d characters", maxBankNameLength)

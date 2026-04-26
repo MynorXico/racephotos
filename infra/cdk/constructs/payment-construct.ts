@@ -320,7 +320,7 @@ export class PaymentConstruct extends Construct {
         RACEPHOTOS_ENV: config.envName,
         RACEPHOTOS_PURCHASES_TABLE: purchasesTable.tableName,
         RACEPHOTOS_ORDERS_TABLE: ordersTable.tableName,
-        RACEPHOTOS_FROM_EMAIL: sesFromAddress,
+        RACEPHOTOS_SES_FROM_ADDRESS: sesFromAddress,
       },
     });
 

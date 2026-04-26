@@ -101,6 +101,7 @@ type downloadEntry struct {
 
 // resolveLocale finds the locale from the most recently approved purchase's parent order.
 // Falls back to "en" if the order cannot be fetched.
+// TODO: denormalize Purchase.Locale at order creation to remove this serial GetItem.
 func (h *Handler) resolveLocale(ctx context.Context, purchases []models.Purchase) string {
 	// Find the purchase with the most recent ApprovedAt timestamp.
 	var newest *models.Purchase
