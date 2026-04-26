@@ -52,4 +52,5 @@ type Order struct {
 	EventName      string  `dynamodbav:"eventName"      json:"eventName"` // denormalized
 	ClaimedAt      string  `dynamodbav:"claimedAt"      json:"claimedAt"`
 	ApprovedAt     string  `dynamodbav:"approvedAt"     json:"approvedAt,omitempty"`
+	Locale         string  `dynamodbav:"locale"         json:"locale"`          // IETF BCP 47 tag, e.g. "en" or "es-419"
 }

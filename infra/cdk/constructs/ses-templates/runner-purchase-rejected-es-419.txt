@@ -1,0 +1,6 @@
+Solicitud de Compra Rechazada — {{eventName}}
+
+Tu solicitud de pago no fue aprobada.
+
+Si crees que es un error, comunícate directamente con el fotógrafo
+o envía una nueva solicitud con la referencia de pago correcta.

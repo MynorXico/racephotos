@@ -11,18 +11,20 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 
+	"github.com/racephotos/shared/locale"
 	"github.com/racephotos/shared/models"
 )
 
 const (
-	rateLimitWindow = 3600 // 1 hour in seconds
-	rateLimitMax    = 3
-	sesTemplateName = "racephotos-runner-redownload-resend"
+	rateLimitWindow    = 3600 // 1 hour in seconds
+	rateLimitMax       = 3
+	sesTemplateBase    = "racephotos-runner-redownload-resend"
 )
 
 // Handler holds dependencies for POST /purchases/redownload-resend.
 type Handler struct {
 	Purchases  PurchaseStore
+	Orders     OrderStore
 	RateLimit  RateLimitStore
 	Email      EmailSender
 	AppBaseURL string // no trailing slash
@@ -82,7 +84,8 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	// Send resend email only when there are approved purchases; always return 200
 	// to avoid revealing whether an email address has purchases (AC3: no enumeration).
 	if len(purchases) > 0 {
-		h.sendResendEmail(ctx, req.Email, purchases)
+		runnerLocale := h.resolveLocale(ctx, purchases)
+		h.sendResendEmail(ctx, req.Email, purchases, runnerLocale)
 	}
 
 	return jsonResponse(200, map[string]string{
@@ -96,9 +99,35 @@ type downloadEntry struct {
 	PhotoReference string `json:"photoReference"`
 }
 
+// resolveLocale finds the locale from the most recently approved purchase's parent order.
+// Falls back to "en" if the order cannot be fetched.
+func (h *Handler) resolveLocale(ctx context.Context, purchases []models.Purchase) string {
+	// Find the purchase with the most recent ApprovedAt timestamp.
+	var newest *models.Purchase
+	for i := range purchases {
+		p := &purchases[i]
+		if newest == nil || p.ApprovedAt > newest.ApprovedAt {
+			newest = p
+		}
+	}
+	if newest == nil || newest.OrderID == "" {
+		return "en"
+	}
+	order, err := h.Orders.GetOrder(ctx, newest.OrderID)
+	if err != nil {
+		slog.ErrorContext(ctx, "GetOrder for locale resolution failed — falling back to en",
+			slog.String("service", "redownload-resend"),
+			slog.String("orderID", newest.OrderID),
+			slog.String("error", err.Error()),
+		)
+		return "en"
+	}
+	return order.Locale
+}
+
 // sendResendEmail sends the redownload-resend SES email.
 // Failures are logged but not surfaced — the 200 is already committed.
-func (h *Handler) sendResendEmail(ctx context.Context, email string, purchases []models.Purchase) {
+func (h *Handler) sendResendEmail(ctx context.Context, email string, purchases []models.Purchase, runnerLocale string) {
 	var downloads []downloadEntry
 	for _, p := range purchases {
 		if p.DownloadToken == nil {
@@ -112,7 +141,8 @@ func (h *Handler) sendResendEmail(ctx context.Context, email string, purchases [
 	if len(downloads) == 0 {
 		return
 	}
-	if err := h.Email.SendTemplatedEmail(ctx, email, sesTemplateName, map[string]any{
+	tmpl := locale.LocaleTemplateName(sesTemplateBase, runnerLocale)
+	if err := h.Email.SendTemplatedEmail(ctx, email, tmpl, map[string]any{
 		"downloads": downloads,
 	}); err != nil {
 		// runnerEmail is PII — never include it in log output.

@@ -320,6 +320,7 @@ export class PaymentConstruct extends Construct {
         RACEPHOTOS_ENV: config.envName,
         RACEPHOTOS_PURCHASES_TABLE: purchasesTable.tableName,
         RACEPHOTOS_ORDERS_TABLE: ordersTable.tableName,
+        RACEPHOTOS_FROM_EMAIL: sesFromAddress,
       },
     });
 
@@ -334,6 +335,9 @@ export class PaymentConstruct extends Construct {
     );
     // GetItem + UpdateItem on the orders base table.
     ordersTable.grant(this.rejectPurchaseFn, 'dynamodb:GetItem', 'dynamodb:UpdateItem');
+
+    // SES grant — SendTemplatedEmail for runner rejection notification (RS-021).
+    ses.grantSendEmail(this.rejectPurchaseFn);
 
     new ObservabilityConstruct(this, 'RejectPurchaseObs', {
       lambda: this.rejectPurchaseFn,

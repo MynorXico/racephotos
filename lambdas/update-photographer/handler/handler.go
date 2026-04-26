@@ -13,6 +13,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 
+	"github.com/racephotos/shared/locale"
 	"github.com/racephotos/shared/models"
 )
 
@@ -57,6 +58,7 @@ type Handler struct {
 type updateRequest struct {
 	DisplayName       string `json:"displayName"`
 	DefaultCurrency   string `json:"defaultCurrency"`
+	PreferredLocale   string `json:"preferredLocale"`
 	BankName          string `json:"bankName"`
 	BankAccountNumber string `json:"bankAccountNumber"`
 	BankAccountHolder string `json:"bankAccountHolder"`
@@ -88,6 +90,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	// Normalise before validation so the canonical values are stored.
 	req.DisplayName = strings.TrimSpace(req.DisplayName)
 	req.DefaultCurrency = strings.ToUpper(strings.TrimSpace(req.DefaultCurrency))
+	req.PreferredLocale = strings.TrimSpace(req.PreferredLocale)
 	req.BankName = strings.TrimSpace(req.BankName)
 	req.BankAccountHolder = strings.TrimSpace(req.BankAccountHolder)
 	req.BankAccountNumber = strings.TrimSpace(req.BankAccountNumber)
@@ -104,6 +107,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		Email:             photographerEmail,
 		DisplayName:       req.DisplayName,
 		DefaultCurrency:   req.DefaultCurrency,
+		PreferredLocale:   req.PreferredLocale,
 		BankName:          req.BankName,
 		BankAccountNumber: req.BankAccountNumber,
 		BankAccountHolder: req.BankAccountHolder,
@@ -137,6 +141,10 @@ func validate(req updateRequest) error {
 	if !validCurrencies[req.DefaultCurrency] {
 		return fmt.Errorf("unsupported currency code %q — must be one of %s",
 			req.DefaultCurrency, validCurrencyList)
+	}
+	// preferredLocale is optional (empty = default en). When provided it must be a supported value.
+	if req.PreferredLocale != "" && !locale.SupportedLocales[req.PreferredLocale] {
+		return fmt.Errorf("unsupported locale %q — must be one of: en, es-419", req.PreferredLocale)
 	}
 	if utf8.RuneCountInString(req.BankName) > maxBankNameLength {
 		return fmt.Errorf("bankName must not exceed %d characters", maxBankNameLength)

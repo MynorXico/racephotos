@@ -1,0 +1,13 @@
+Nueva Solicitud de Compra — {{eventName}}
+
+Un corredor ha enviado una solicitud de pago.
+
+Corredor:           {{runnerEmailMasked}}
+Evento:             {{eventName}}
+Referencia de foto: {{photoReference}}
+Referencia de pago: {{paymentReference}}
+
+Revisa la solicitud en tu panel:
+{{dashboardUrl}}
+
+Aprueba o rechaza la solicitud después de verificar el pago en tu extracto bancario.

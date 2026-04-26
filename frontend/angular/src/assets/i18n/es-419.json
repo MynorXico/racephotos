@@ -1,0 +1,134 @@
+{
+  "language": {
+    "changeAriaLabel": "Cambiar idioma",
+    "en": "English",
+    "es419": "Español (Latino)"
+  },
+  "common": {
+    "tryAgain": "Intentar de nuevo",
+    "cancel": "Cancelar",
+    "saveChanges": "Guardar cambios",
+    "done": "Listo",
+    "retry": "Reintentar",
+    "language": "Idioma",
+    "close": "Cerrar"
+  },
+  "nav": {
+    "skipToMain": "Ir al contenido principal",
+    "photographerNavAria": "Navegación del fotógrafo",
+    "myEvents": "Mis eventos",
+    "dashboard": "Panel",
+    "profile": "Perfil",
+    "openMenuAria": "Abrir menú de navegación",
+    "signOutAria": "Cerrar sesión de RaceShots",
+    "signOut": "Cerrar sesión"
+  },
+  "home": {
+    "photographerLogin": "Inicio de sesión para fotógrafos",
+    "photographerLoginShort": "Ingresar",
+    "heroHeadline": "Encuentra tus fotos de carrera",
+    "heroSub": "Busca cualquier evento para encontrar tus fotos con tu número de dorsal.",
+    "loadingAria": "Cargando eventos, por favor espera",
+    "loadError": "No se pudieron cargar los eventos.",
+    "loadErrorSub": "Algo salió mal. Por favor, intenta de nuevo.",
+    "emptyState": "Aún no hay eventos publicados.",
+    "emptyStateSub": "Vuelve pronto.",
+    "eventsGridAria": "Próximos eventos de carrera",
+    "loadMore": "Cargar más eventos",
+    "loadingMore": "Cargando más eventos",
+    "loadMoreError": "No se pudieron cargar más eventos.",
+    "footer": "RaceShots — plataforma de fotos de carrera de código abierto"
+  },
+  "event": {
+    "heroTitle": "Encuentra tus fotos de carrera",
+    "heroSubtitle": "Ingresa tu número de dorsal para encontrar tus fotos de este evento.",
+    "bibLabel": "Número de dorsal",
+    "bibPlaceholder": "ej. 1234",
+    "clearBibAria": "Borrar número de dorsal",
+    "bibRequired": "El número de dorsal es obligatorio",
+    "bibInvalid": "El dorsal debe tener entre 1 y 6 dígitos",
+    "searchAria": "Buscar fotos",
+    "search": "Buscar",
+    "loadingAria": "Cargando fotos",
+    "findAriaLabel": "Encuentra tus fotos de carrera",
+    "bibFormAria": "Formulario de búsqueda por dorsal",
+    "noPhotos": "No se encontraron fotos para el dorsal",
+    "error": "Algo salió mal. Por favor, intenta de nuevo."
+  },
+  "purchase": {
+    "dialogTitle": "Comprar fotos",
+    "closeAria": "Cerrar diálogo de compra",
+    "step": {
+      "cart": "Carrito",
+      "email": "Tu correo",
+      "bankTransfer": "Transferencia bancaria",
+      "done": "Listo"
+    },
+    "cart": {
+      "heading": "Revisa tu carrito",
+      "empty": "No hay fotos seleccionadas.",
+      "listAria": "Fotos seleccionadas",
+      "total": "Total",
+      "editAria": "Editar carrito — regresar a selección de fotos",
+      "edit": "Editar carrito",
+      "continue": "Continuar al pago"
+    },
+    "email": {
+      "instruction": "Ingresa tu correo para recibir instrucciones de pago y enlaces de descarga.",
+      "label": "Correo electrónico",
+      "placeholder": "tu@correo.com",
+      "required": "El correo electrónico es obligatorio.",
+      "invalid": "Ingresa un correo electrónico válido.",
+      "previewText": "Enviaremos actualizaciones a — ¿es correcto?",
+      "confirm": "Confirmar y continuar",
+      "submitting": "Enviando…",
+      "tryAgain": "Intentar de nuevo"
+    },
+    "bank": {
+      "instruction": "Transfiere el monto indicado a la cuenta bancaria mostrada. Usa exactamente la referencia de pago mostrada para que el fotógrafo pueda identificar tu pago.",
+      "paymentRef": "Referencia de pago",
+      "copyRefAria": "Copiar referencia de pago",
+      "bankAccount": "Cuenta bancaria",
+      "copyAccountAria": "Copiar número de cuenta",
+      "additionalInstructions": "Instrucciones adicionales",
+      "confirm": "Ya realicé la transferencia"
+    },
+    "confirmation": {
+      "headline": "Solicitud de pago enviada",
+      "body": "Tu solicitud de pago ha sido enviada. El fotógrafo la revisará y recibirás un correo una vez aprobada.",
+      "emailReminder": "Se envió una confirmación a",
+      "done": "Listo"
+    }
+  },
+  "profile": {
+    "heading": "Perfil de cuenta",
+    "welcomeBanner": "Bienvenido a RaceShots. Completa tus datos bancarios para que los corredores puedan pagarte directamente.",
+    "loadingAria": "Cargando perfil",
+    "loadError": "No se pudo cargar tu perfil. Por favor, actualiza la página.",
+    "displayName": "Nombre a mostrar",
+    "displayNameHint": "Se muestra a los corredores en las páginas de tus eventos.",
+    "displayNameRequired": "El nombre a mostrar es obligatorio.",
+    "displayNameMaxLength": "El nombre a mostrar debe tener 100 caracteres o menos.",
+    "defaultCurrency": "Moneda predeterminada",
+    "defaultCurrencyRequired": "Por favor selecciona una moneda.",
+    "preferredLocale": {
+      "label": "Idioma preferido para correos",
+      "hint": "Controla el idioma de las notificaciones que te enviamos.",
+      "errorRequired": "Por favor selecciona un idioma."
+    },
+    "bankSection": {
+      "title": "Datos de transferencia bancaria",
+      "subtitle": "Estos datos se muestran a los corredores cuando compran tus fotos."
+    },
+    "bankName": "Nombre del banco",
+    "bankNameMaxLength": "El nombre del banco debe tener 100 caracteres o menos.",
+    "bankAccountHolder": "Nombre del titular de la cuenta",
+    "bankAccountHolderMaxLength": "El nombre del titular debe tener 100 caracteres o menos.",
+    "bankAccountNumber": "Número de cuenta",
+    "bankAccountNumberHint": "Tu número de cuenta o IBAN.",
+    "bankAccountNumberMaxLength": "El número de cuenta debe tener 50 caracteres o menos.",
+    "bankInstructions": "Instrucciones de pago",
+    "bankInstructionsHint": "Instrucciones adicionales para los corredores, p. ej. formato de referencia o datos de la sucursal.",
+    "bankInstructionsMaxLength": "Las instrucciones de pago deben tener 500 caracteres o menos."
+  }
+}

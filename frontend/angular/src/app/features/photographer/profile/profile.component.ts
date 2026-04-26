@@ -88,6 +88,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
   readonly form = this.fb.group({
     displayName: ['', [Validators.required, noWhitespaceOnly, Validators.maxLength(100)]],
     defaultCurrency: ['USD', [Validators.required]],
+    preferredLocale: ['en', [Validators.required]],
     bankName: ['', [Validators.maxLength(100)]],
     bankAccountHolder: ['', [Validators.maxLength(100)]],
     bankAccountNumber: ['', [Validators.maxLength(50)]],
@@ -119,6 +120,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
         const patch = {
           displayName: profile.displayName,
           defaultCurrency: profile.defaultCurrency,
+          preferredLocale: profile.preferredLocale || 'en',
           bankName: profile.bankName,
           bankAccountHolder: profile.bankAccountHolder,
           bankAccountNumber: profile.bankAccountNumber,
@@ -175,6 +177,7 @@ export class ProfileComponent implements OnInit, OnDestroy {
         profile: {
           displayName: value.displayName ?? '',
           defaultCurrency: value.defaultCurrency ?? 'USD',
+          preferredLocale: value.preferredLocale ?? 'en',
           bankName: value.bankName ?? '',
           bankAccountHolder: value.bankAccountHolder ?? '',
           bankAccountNumber: value.bankAccountNumber ?? '',

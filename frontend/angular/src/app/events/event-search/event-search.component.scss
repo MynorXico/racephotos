@@ -9,6 +9,7 @@
 // ── Hero ─────────────────────────────────────────────────────────────────────
 
 .hero {
+  position: relative;
   background: linear-gradient(
     135deg,
     var(--mat-sys-primary) 0%,
@@ -18,6 +19,13 @@
   padding: 48px 24px 56px;
   display: flex;
   justify-content: center;
+}
+
+.hero-lang-switcher {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  color: var(--mat-sys-on-primary);
 }
 
 .hero-content {

@@ -4,6 +4,7 @@ import { RouterTestingModule } from '@angular/router/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { TranslateModule } from '@ngx-translate/core';
 
 import { ProfileComponent } from './profile.component';
 import { initialPhotographerState } from '../../../store/photographer/photographer.state';
@@ -20,6 +21,7 @@ describe('ProfileComponent', () => {
         RouterTestingModule,
         NoopAnimationsModule,
         MatSnackBarModule,
+        TranslateModule.forRoot(),
       ],
       providers: [provideMockStore({ initialState: { photographer: initialPhotographerState } })],
     }).compileComponents();
@@ -48,6 +50,7 @@ describe('ProfileComponent', () => {
     comp.form.setValue({
       displayName: 'John Doe',
       defaultCurrency: 'USD',
+      preferredLocale: 'en',
       bankName: 'Test Bank',
       bankAccountHolder: 'John Doe',
       bankAccountNumber: '12345678',
@@ -62,6 +65,7 @@ describe('ProfileComponent', () => {
         profile: {
           displayName: 'John Doe',
           defaultCurrency: 'USD',
+          preferredLocale: 'en',
           bankName: 'Test Bank',
           bankAccountHolder: 'John Doe',
           bankAccountNumber: '12345678',
@@ -79,6 +83,7 @@ describe('ProfileComponent', () => {
     comp.form.setValue({
       displayName: '',
       defaultCurrency: 'USD',
+      preferredLocale: 'en',
       bankName: '',
       bankAccountHolder: '',
       bankAccountNumber: '',

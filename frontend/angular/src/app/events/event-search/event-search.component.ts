@@ -53,6 +53,7 @@ import {
   PurchaseStepperComponent,
   PurchaseStepperDialogData,
 } from './purchase-stepper/purchase-stepper.component';
+import { LanguageSwitcherComponent } from '../../shared/language-switcher/language-switcher.component';
 import { take } from 'rxjs';
 
 @Component({
@@ -68,6 +69,7 @@ import { take } from 'rxjs';
     MatProgressSpinnerModule,
     MatSnackBarModule,
     RunnerPhotoGridComponent,
+    LanguageSwitcherComponent,
   ],
   templateUrl: './event-search.component.html',
   styleUrl: './event-search.component.scss',
