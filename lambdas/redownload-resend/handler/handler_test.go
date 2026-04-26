@@ -42,10 +42,19 @@ func makeEmptyEvent() events.APIGatewayV2HTTPRequest {
 func purchaseWithToken(token string) models.Purchase {
 	return models.Purchase{
 		ID:            "purchase-1",
+		OrderID:       "order-1",
 		PhotoID:       "photo-1",
 		RunnerEmail:   testEmail,
 		DownloadToken: &token,
 		Status:        models.OrderStatusApproved,
+		ApprovedAt:    "2026-04-17T10:00:00Z",
+	}
+}
+
+func orderWithLocale(locale string) *models.Order {
+	return &models.Order{
+		ID:     "order-1",
+		Locale: locale,
 	}
 }
 
@@ -53,19 +62,20 @@ func TestHandle(t *testing.T) {
 	tests := []struct {
 		name       string
 		event      events.APIGatewayV2HTTPRequest
-		setup      func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender)
+		setup      func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender)
 		wantStatus int
 		check      func(t *testing.T, body string)
 	}{
 		{
 			name:  "AC3: happy path — within rate limit, purchases found, sends email, returns 200",
 			event: makeEvent(testEmail),
-			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
 				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
 				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(
 					[]models.Purchase{purchaseWithToken("tok-abc")}, nil,
 				)
-				e.EXPECT().SendTemplatedEmail(gomock.Any(), testEmail, "racephotos-runner-redownload-resend", gomock.Any()).Return(nil)
+				o.EXPECT().GetOrder(gomock.Any(), "order-1").Return(orderWithLocale("en"), nil)
+				e.EXPECT().SendTemplatedEmail(gomock.Any(), testEmail, "racephotos-runner-redownload-resend-en", gomock.Any()).Return(nil)
 			},
 			wantStatus: 200,
 			check: func(t *testing.T, body string) {
@@ -77,7 +87,7 @@ func TestHandle(t *testing.T) {
 		{
 			name:  "AC3: no purchases for email still returns 200 (no enumeration)",
 			event: makeEvent(testEmail),
-			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
 				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
 				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(nil, nil)
 				// No email sent when no purchases exist.
@@ -87,7 +97,7 @@ func TestHandle(t *testing.T) {
 		{
 			name:  "AC4: rate limit exceeded returns 429",
 			event: makeEvent(testEmail),
-			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
 				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(false, nil)
 			},
 			wantStatus: 429,
@@ -100,19 +110,19 @@ func TestHandle(t *testing.T) {
 		{
 			name:       "missing email returns 400",
 			event:      makeEmptyEvent(),
-			setup:      func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {},
+			setup:      func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {},
 			wantStatus: 400,
 		},
 		{
 			name:       "invalid email format returns 400 without hitting rate-limit store",
 			event:      makeEvent("notanemail"),
-			setup:      func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {},
+			setup:      func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {},
 			wantStatus: 400,
 		},
 		{
 			name:  "display-name email is normalized to bare address for rate-limit key",
 			event: makeEvent("Runner Name <" + testEmail + ">"),
-			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
 				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
 				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(nil, nil)
 			},
@@ -121,7 +131,7 @@ func TestHandle(t *testing.T) {
 		{
 			name:  "rate limit store error returns 500",
 			event: makeEvent(testEmail),
-			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
 				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(false, assert.AnError)
 			},
 			wantStatus: 500,
@@ -129,7 +139,7 @@ func TestHandle(t *testing.T) {
 		{
 			name:  "purchase store error returns 500",
 			event: makeEvent(testEmail),
-			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
 				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
 				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(nil, assert.AnError)
 			},
@@ -138,12 +148,39 @@ func TestHandle(t *testing.T) {
 		{
 			name:  "SES error is logged but response is still 200",
 			event: makeEvent(testEmail),
-			setup: func(p *mocks.MockPurchaseStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
 				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
 				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(
 					[]models.Purchase{purchaseWithToken("tok-abc")}, nil,
 				)
+				o.EXPECT().GetOrder(gomock.Any(), "order-1").Return(orderWithLocale("en"), nil)
 				e.EXPECT().SendTemplatedEmail(gomock.Any(), testEmail, gomock.Any(), gomock.Any()).Return(assert.AnError)
+			},
+			wantStatus: 200,
+		},
+		{
+			name:  "order fetch failure falls back to en template",
+			event: makeEvent(testEmail),
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
+				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
+				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(
+					[]models.Purchase{purchaseWithToken("tok-abc")}, nil,
+				)
+				o.EXPECT().GetOrder(gomock.Any(), "order-1").Return(nil, assert.AnError)
+				e.EXPECT().SendTemplatedEmail(gomock.Any(), testEmail, "racephotos-runner-redownload-resend-en", gomock.Any()).Return(nil)
+			},
+			wantStatus: 200,
+		},
+		{
+			name:  "spanish locale uses es-419 template",
+			event: makeEvent(testEmail),
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, r *mocks.MockRateLimitStore, e *mocks.MockEmailSender) {
+				r.EXPECT().IncrementAndCheck(gomock.Any(), rateLimitKey(testEmail), 3600, 3).Return(true, nil)
+				p.EXPECT().GetApprovedPurchasesByEmail(gomock.Any(), testEmail).Return(
+					[]models.Purchase{purchaseWithToken("tok-abc")}, nil,
+				)
+				o.EXPECT().GetOrder(gomock.Any(), "order-1").Return(orderWithLocale("es-419"), nil)
+				e.EXPECT().SendTemplatedEmail(gomock.Any(), testEmail, "racephotos-runner-redownload-resend-es-419", gomock.Any()).Return(nil)
 			},
 			wantStatus: 200,
 		},
@@ -155,13 +192,15 @@ func TestHandle(t *testing.T) {
 			defer ctrl.Finish()
 
 			mockPurchases := mocks.NewMockPurchaseStore(ctrl)
+			mockOrders := mocks.NewMockOrderStore(ctrl)
 			mockRateLimit := mocks.NewMockRateLimitStore(ctrl)
 			mockEmail := mocks.NewMockEmailSender(ctrl)
 
-			tc.setup(mockPurchases, mockRateLimit, mockEmail)
+			tc.setup(mockPurchases, mockOrders, mockRateLimit, mockEmail)
 
 			h := &handler.Handler{
 				Purchases:  mockPurchases,
+				Orders:     mockOrders,
 				RateLimit:  mockRateLimit,
 				Email:      mockEmail,
 				AppBaseURL: testAppBaseURL,

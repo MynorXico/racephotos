@@ -132,7 +132,7 @@ func TestHandle(t *testing.T) {
 					{ID: testPurchaseID, Status: models.OrderStatusApproved},
 				}, nil)
 				o.EXPECT().UpdateOrderStatus(gomock.Any(), testOrderID, models.OrderStatusApproved, gomock.Any()).Return(nil)
-				e.EXPECT().SendTemplatedEmail(gomock.Any(), "runner@example.com", "racephotos-runner-purchase-approved", gomock.Any()).Return(nil)
+				e.EXPECT().SendTemplatedEmail(gomock.Any(), "runner@example.com", "racephotos-runner-purchase-approved-en", gomock.Any()).Return(nil)
 			},
 			wantStatus: 200,
 			check: func(t *testing.T, body string) {

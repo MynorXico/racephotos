@@ -60,9 +60,15 @@ var (
 
 func makeReq(t *testing.T, photoIDs []string, email string) events.APIGatewayV2HTTPRequest {
 	t.Helper()
+	return makeReqWithLocale(t, photoIDs, email, "en")
+}
+
+func makeReqWithLocale(t *testing.T, photoIDs []string, email string, locale string) events.APIGatewayV2HTTPRequest {
+	t.Helper()
 	body, err := json.Marshal(map[string]interface{}{
 		"photoIds":    photoIDs,
 		"runnerEmail": email,
+		"locale":      locale,
 	})
 	require.NoError(t, err)
 	return events.APIGatewayV2HTTPRequest{Body: string(body)}
@@ -107,8 +113,8 @@ func TestHandle_HappyPath(t *testing.T) {
 	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
 	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
 	writer.EXPECT().CreateOrderWithPurchases(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
-	email.EXPECT().SendTemplatedEmail(gomock.Any(), testPhotographer.Email, "racephotos-photographer-claim", gomock.Any()).Return(nil)
-	email.EXPECT().SendTemplatedEmail(gomock.Any(), testRunnerEmail, "racephotos-runner-claim-confirmation", gomock.Any()).Return(nil)
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), testPhotographer.Email, "racephotos-photographer-claim-en", gomock.Any()).Return(nil)
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), testRunnerEmail, "racephotos-runner-claim-confirmation-en", gomock.Any()).Return(nil)
 
 	resp, err := h.Handle(context.Background(), makeReq(t, []string{testPhotoID}, testRunnerEmail))
 	require.NoError(t, err)
@@ -427,4 +433,75 @@ func TestHandle_PaymentRefFormat(t *testing.T) {
 
 	// Verify paymentRef format: RS- followed by 8 uppercase alphanumeric chars.
 	assert.Regexp(t, `^RS-[A-Z0-9]{8}$`, capturedOrder.PaymentRef)
+}
+
+func TestHandle_LocaleStored(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, purchases, writer, photos, evStore, phStore, email := newHandler(ctrl)
+
+	var capturedOrder models.Order
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
+	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+	writer.EXPECT().CreateOrderWithPurchases(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, o models.Order, _ []models.Purchase) error {
+			capturedOrder = o
+			return nil
+		})
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
+
+	resp, err := h.Handle(context.Background(), makeReqWithLocale(t, []string{testPhotoID}, testRunnerEmail, "es-419"))
+	require.NoError(t, err)
+	assert.Equal(t, 201, resp.StatusCode)
+	assert.Equal(t, "es-419", capturedOrder.Locale)
+}
+
+func TestHandle_SpanishLocale_UsesLocalizedTemplates(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, purchases, writer, photos, evStore, phStore, email := newHandler(ctrl)
+
+	spanishPhotographer := &models.Photographer{
+		ID:              testPhotographerID,
+		Email:           "photographer@example.com",
+		PreferredLocale: "es-419",
+	}
+
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
+	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(spanishPhotographer, nil)
+	writer.EXPECT().CreateOrderWithPurchases(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil)
+	// Photographer gets es-419 template (photographer's preference); runner gets es-419 (runner's locale).
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), spanishPhotographer.Email, "racephotos-photographer-claim-es-419", gomock.Any()).Return(nil)
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), testRunnerEmail, "racephotos-runner-claim-confirmation-es-419", gomock.Any()).Return(nil)
+
+	resp, err := h.Handle(context.Background(), makeReqWithLocale(t, []string{testPhotoID}, testRunnerEmail, "es-419"))
+	require.NoError(t, err)
+	assert.Equal(t, 201, resp.StatusCode)
+}
+
+func TestHandle_MissingLocale_Returns400(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, _, _, _, _, _, _ := newHandler(ctrl)
+
+	body, _ := json.Marshal(map[string]interface{}{
+		"photoIds":    []string{testPhotoID},
+		"runnerEmail": testRunnerEmail,
+		// locale omitted
+	})
+	resp, err := h.Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: string(body)})
+	require.NoError(t, err)
+	assert.Equal(t, 400, resp.StatusCode)
+	assert.Contains(t, resp.Body, "locale")
+}
+
+func TestHandle_LocaleTooLong_Returns400(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	h, _, _, _, _, _, _, _ := newHandler(ctrl)
+
+	resp, err := h.Handle(context.Background(), makeReqWithLocale(t, []string{testPhotoID}, testRunnerEmail, "this-locale-tag-is-way-too-long-for-any-bcp47"))
+	require.NoError(t, err)
+	assert.Equal(t, 400, resp.StatusCode)
+	assert.Contains(t, resp.Body, "locale")
 }

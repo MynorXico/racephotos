@@ -24,6 +24,11 @@ type PurchaseStore interface {
 	GetApprovedPurchasesByEmail(ctx context.Context, email string) ([]models.Purchase, error)
 }
 
+// OrderStore fetches order records by ID.
+type OrderStore interface {
+	GetOrder(ctx context.Context, id string) (*models.Order, error)
+}
+
 // RateLimitStore atomically increments a counter and reports whether the limit
 // has been exceeded. Returns (true, nil) when the request is allowed; (false, nil)
 // when the rate limit is exceeded.
@@ -48,6 +53,11 @@ type DynamoQueryClient interface {
 // DynamoUpdateClient wraps UpdateItem for DynamoRateLimitStore.
 type DynamoUpdateClient interface {
 	UpdateItem(ctx context.Context, params *dynamodb.UpdateItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.UpdateItemOutput, error)
+}
+
+// DynamoGetClient wraps GetItem for DynamoOrderStore.
+type DynamoGetClient interface {
+	GetItem(ctx context.Context, params *dynamodb.GetItemInput, optFns ...func(*dynamodb.Options)) (*dynamodb.GetItemOutput, error)
 }
 
 // SESAPIClient wraps SendTemplatedEmail.
@@ -83,13 +93,15 @@ func (s *DynamoPurchaseStore) GetApprovedPurchasesByEmail(ctx context.Context, e
 			IndexName:              aws.String("runnerEmail-claimedAt-index"),
 			KeyConditionExpression: aws.String("#email = :email"),
 			FilterExpression:       aws.String("#status = :approved"),
-			// Fetch downloadToken and photoId — enough to build link + photo reference.
-			ProjectionExpression: aws.String("#dt, #pid"),
+			// Fetch fields needed to build links, photo references, and locale lookup.
+			ProjectionExpression: aws.String("#dt, #pid, #oid, #aat"),
 			ExpressionAttributeNames: map[string]string{
 				"#email":  "runnerEmail",
 				"#status": "status",
 				"#dt":     "downloadToken",
 				"#pid":    "photoId",
+				"#oid":    "orderId",
+				"#aat":    "approvedAt",
 			},
 			ExpressionAttributeValues: map[string]types.AttributeValue{
 				":email":    &types.AttributeValueMemberS{Value: email},
@@ -169,6 +181,34 @@ func (s *DynamoRateLimitStore) IncrementAndCheck(ctx context.Context, key string
 
 // nowUnix returns the current Unix timestamp. Isolated for testability.
 var nowUnix = func() int64 { return time.Now().Unix() }
+
+// ── DynamoOrderStore ──────────────────────────────────────────────────────────
+
+// DynamoOrderStore implements OrderStore by fetching orders by PK.
+type DynamoOrderStore struct {
+	Client    DynamoGetClient
+	TableName string
+}
+
+func (s *DynamoOrderStore) GetOrder(ctx context.Context, id string) (*models.Order, error) {
+	out, err := s.Client.GetItem(ctx, &dynamodb.GetItemInput{
+		TableName: aws.String(s.TableName),
+		Key: map[string]types.AttributeValue{
+			"id": &types.AttributeValueMemberS{Value: id},
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("GetOrder: GetItem: %w", err)
+	}
+	if len(out.Item) == 0 {
+		return nil, fmt.Errorf("GetOrder: order %s not found", id)
+	}
+	var o models.Order
+	if err := attributevalue.UnmarshalMap(out.Item, &o); err != nil {
+		return nil, fmt.Errorf("GetOrder: unmarshal: %w", err)
+	}
+	return &o, nil
+}
 
 // ── SESEmailSender ────────────────────────────────────────────────────────────
 

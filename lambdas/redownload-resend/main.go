@@ -2,11 +2,13 @@
 // HTTP method + route: POST /purchases/redownload-resend
 // Auth: none (public — runner recovery flow)
 // Story: RS-012 — Runner downloads a photo via download token
+//       RS-021 — Locale-aware SES template selection
 //
 // Environment variables:
 //
 //	RACEPHOTOS_ENV              required — "local"|"dev"|"qa"|"staging"|"prod"
 //	RACEPHOTOS_PURCHASES_TABLE  required — DynamoDB purchases table name
+//	RACEPHOTOS_ORDERS_TABLE     required — DynamoDB orders table name
 //	RACEPHOTOS_SES_FROM_ADDRESS required — verified SES sender address
 //	RACEPHOTOS_RATE_LIMITS_TABLE required — DynamoDB rate-limits table name
 //	RACEPHOTOS_APP_BASE_URL     required — base URL for download links in email (no trailing slash)
@@ -28,6 +30,7 @@ import (
 
 func main() {
 	purchasesTable := mustGetenv("RACEPHOTOS_PURCHASES_TABLE")
+	ordersTable := mustGetenv("RACEPHOTOS_ORDERS_TABLE")
 	sesFromAddress := mustGetenv("RACEPHOTOS_SES_FROM_ADDRESS")
 	rateLimitsTable := mustGetenv("RACEPHOTOS_RATE_LIMITS_TABLE")
 	appBaseURL := strings.TrimSuffix(mustGetenv("RACEPHOTOS_APP_BASE_URL"), "/")
@@ -47,6 +50,10 @@ func main() {
 		Purchases: &handler.DynamoPurchaseStore{
 			Client:    ddbClient,
 			TableName: purchasesTable,
+		},
+		Orders: &handler.DynamoOrderStore{
+			Client:    ddbClient,
+			TableName: ordersTable,
 		},
 		RateLimit: &handler.DynamoRateLimitStore{
 			Client:    ddbClient,

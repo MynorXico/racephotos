@@ -1,0 +1,16 @@
+<html>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+  <h2>Tus Enlaces de Descarga</h2>
+  <p>Aquí están tus enlaces de descarga activos para compras aprobadas:</p>
+  <!-- TemplateData: { "downloads": [ { "url": "...", "photoReference": "..." } ] }
+       Use Handlebars #each iteration — never pass pre-built HTML as a variable. -->
+  <ul>
+    {{#each downloads}}
+    <li><a href="{{url}}">Foto {{photoReference}}</a></li>
+    {{/each}}
+  </ul>
+  <p style="color:#666;font-size:13px;margin-top:24px">
+    Cada enlace funciona indefinidamente. Márcalos como favoritos o guarda este correo.
+  </p>
+</body>
+</html>

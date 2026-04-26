@@ -4,6 +4,7 @@ import { provideAnimationsAsync } from '@angular/platform-browser/animations/asy
 import { provideRouter } from '@angular/router';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
 import { Title } from '@angular/platform-browser';
+import { TranslateModule } from '@ngx-translate/core';
 
 import { EventsListPageComponent } from './events-list-page.component';
 import { PublicEventsActions } from '../../store/events/events.actions';
@@ -29,7 +30,7 @@ describe('EventsListPageComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [EventsListPageComponent],
+      imports: [EventsListPageComponent, TranslateModule.forRoot()],
       providers: [
         provideAnimationsAsync(),
         provideRouter([]),

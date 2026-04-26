@@ -40,6 +40,18 @@
       }
     </mat-form-field>
 
+    <mat-form-field appearance="outline" class="full-width">
+      <mat-label>Preferred language for emails</mat-label>
+      <mat-select formControlName="preferredLocale" aria-label="Preferred language for emails" [disabled]="loading() || saving()">
+        <mat-option value="en">English</mat-option>
+        <mat-option value="es-419">Español (Latino)</mat-option>
+      </mat-select>
+      <mat-hint>Controls the language of notifications sent to you.</mat-hint>
+      @if (form.get('preferredLocale')?.hasError('required') && form.get('preferredLocale')?.touched) {
+      <mat-error>Please select a language.</mat-error>
+      }
+    </mat-form-field>
+
     <mat-divider class="section-divider" />
 
     <!-- Section B: Bank Transfer Details -->

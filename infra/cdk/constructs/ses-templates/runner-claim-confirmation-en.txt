@@ -1,0 +1,10 @@
+Payment Claim Received — {{eventName}}
+
+We received your payment claim. The photographer will verify and approve it.
+
+Event:                  {{eventName}}
+Photo reference:        {{photoReference}}
+Your payment reference: {{paymentReference}}
+
+Keep your payment reference for your records.
+You will receive another email once the photographer approves your claim.

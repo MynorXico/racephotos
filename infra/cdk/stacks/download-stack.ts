@@ -60,6 +60,7 @@ export class DownloadStack extends cdk.Stack {
     this.download = new DownloadConstruct(this, 'Download', {
       config,
       purchasesTable: db.purchasesTable,
+      ordersTable: db.ordersTable,
       photosTable: db.photosTable,
       rateLimitsTable: db.rateLimitsTable,
       rawBucket: photoStorage.rawBucket,

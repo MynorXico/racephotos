@@ -2,6 +2,7 @@ export interface Photographer {
   id: string;
   displayName: string;
   defaultCurrency: string;
+  preferredLocale: string;
   bankName: string;
   bankAccountNumber: string;
   bankAccountHolder: string;
@@ -37,6 +38,7 @@ export const initialPhotographerState: PhotographerState = {
 export const emptyPhotographerDefaults: Omit<Photographer, 'id' | 'createdAt' | 'updatedAt'> = {
   displayName: '',
   defaultCurrency: 'USD',
+  preferredLocale: 'en',
   bankName: '',
   bankAccountNumber: '',
   bankAccountHolder: '',

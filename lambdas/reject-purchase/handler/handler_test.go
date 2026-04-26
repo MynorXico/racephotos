@@ -60,7 +60,7 @@ func TestHandle(t *testing.T) {
 		name           string
 		purchaseID     string
 		photographerID string
-		setup          func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore)
+		setup          func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, e *mocks.MockEmailSender)
 		wantStatus     int
 		check          func(t *testing.T, body string)
 	}{
@@ -68,7 +68,7 @@ func TestHandle(t *testing.T) {
 			name:           "AC7: purchase not found returns 404",
 			purchaseID:     testPurchaseID,
 			photographerID: testPhotographerID,
-			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, e *mocks.MockEmailSender) {
 				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(nil, apperrors.ErrNotFound)
 			},
 			wantStatus: 404,
@@ -77,7 +77,7 @@ func TestHandle(t *testing.T) {
 			name:           "AC6: wrong photographer returns 403",
 			purchaseID:     testPurchaseID,
 			photographerID: testOtherPhotogID,
-			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, e *mocks.MockEmailSender) {
 				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(pendingPurchase(), nil)
 				o.EXPECT().GetOrder(gomock.Any(), testOrderID).Return(ownerOrder(), nil)
 			},
@@ -87,7 +87,7 @@ func TestHandle(t *testing.T) {
 			name:           "AC8: rejecting approved purchase returns 409",
 			purchaseID:     testPurchaseID,
 			photographerID: testPhotographerID,
-			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, e *mocks.MockEmailSender) {
 				pur := pendingPurchase()
 				pur.Status = models.OrderStatusApproved
 				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(pur, nil)
@@ -99,7 +99,7 @@ func TestHandle(t *testing.T) {
 			name:           "AC5: already rejected is idempotent — returns 200 and repairs order status",
 			purchaseID:     testPurchaseID,
 			photographerID: testPhotographerID,
-			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, e *mocks.MockEmailSender) {
 				pur := pendingPurchase()
 				pur.Status = models.OrderStatusRejected
 				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(pur, nil)
@@ -121,7 +121,7 @@ func TestHandle(t *testing.T) {
 			name:           "concurrent reject race returns 409",
 			purchaseID:     testPurchaseID,
 			photographerID: testPhotographerID,
-			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, e *mocks.MockEmailSender) {
 				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(pendingPurchase(), nil)
 				o.EXPECT().GetOrder(gomock.Any(), testOrderID).Return(ownerOrder(), nil)
 				// ConditionalCheckFailedException mapped to ErrConflict by the store.
@@ -130,10 +130,10 @@ func TestHandle(t *testing.T) {
 			wantStatus: 409,
 		},
 		{
-			name:           "AC4: happy path — rejects purchase, no email, returns 200",
+			name:           "AC4: happy path — rejects purchase, sends rejection email, returns 200",
 			purchaseID:     testPurchaseID,
 			photographerID: testPhotographerID,
-			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore) {
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, e *mocks.MockEmailSender) {
 				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(pendingPurchase(), nil)
 				o.EXPECT().GetOrder(gomock.Any(), testOrderID).Return(ownerOrder(), nil)
 				p.EXPECT().UpdatePurchaseRejected(gomock.Any(), testPurchaseID).Return(nil)
@@ -141,6 +141,7 @@ func TestHandle(t *testing.T) {
 					{ID: testPurchaseID, Status: models.OrderStatusRejected},
 				}, nil)
 				o.EXPECT().UpdateOrderStatus(gomock.Any(), testOrderID, models.OrderStatusRejected, gomock.Any()).Return(nil)
+				e.EXPECT().SendTemplatedEmail(gomock.Any(), "runner@example.com", "racephotos-runner-purchase-rejected-en", gomock.Any()).Return(nil)
 			},
 			wantStatus: 200,
 			check: func(t *testing.T, body string) {
@@ -148,6 +149,40 @@ func TestHandle(t *testing.T) {
 				require.NoError(t, json.Unmarshal([]byte(body), &resp))
 				assert.Equal(t, models.OrderStatusRejected, resp["status"])
 			},
+		},
+		{
+			name:           "rejection email failure does not fail the request",
+			purchaseID:     testPurchaseID,
+			photographerID: testPhotographerID,
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, e *mocks.MockEmailSender) {
+				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(pendingPurchase(), nil)
+				o.EXPECT().GetOrder(gomock.Any(), testOrderID).Return(ownerOrder(), nil)
+				p.EXPECT().UpdatePurchaseRejected(gomock.Any(), testPurchaseID).Return(nil)
+				p.EXPECT().QueryPurchasesByOrder(gomock.Any(), testOrderID).Return([]*models.Purchase{
+					{ID: testPurchaseID, Status: models.OrderStatusRejected},
+				}, nil)
+				o.EXPECT().UpdateOrderStatus(gomock.Any(), testOrderID, models.OrderStatusRejected, gomock.Any()).Return(nil)
+				e.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(assert.AnError)
+			},
+			wantStatus: 200,
+		},
+		{
+			name:           "spanish locale rejection uses es-419 template",
+			purchaseID:     testPurchaseID,
+			photographerID: testPhotographerID,
+			setup: func(p *mocks.MockPurchaseStore, o *mocks.MockOrderStore, e *mocks.MockEmailSender) {
+				spanishOrder := ownerOrder()
+				spanishOrder.Locale = "es-419"
+				p.EXPECT().GetPurchase(gomock.Any(), testPurchaseID).Return(pendingPurchase(), nil)
+				o.EXPECT().GetOrder(gomock.Any(), testOrderID).Return(spanishOrder, nil)
+				p.EXPECT().UpdatePurchaseRejected(gomock.Any(), testPurchaseID).Return(nil)
+				p.EXPECT().QueryPurchasesByOrder(gomock.Any(), testOrderID).Return([]*models.Purchase{
+					{ID: testPurchaseID, Status: models.OrderStatusRejected},
+				}, nil)
+				o.EXPECT().UpdateOrderStatus(gomock.Any(), testOrderID, models.OrderStatusRejected, gomock.Any()).Return(nil)
+				e.EXPECT().SendTemplatedEmail(gomock.Any(), "runner@example.com", "racephotos-runner-purchase-rejected-es-419", gomock.Any()).Return(nil)
+			},
+			wantStatus: 200,
 		},
 	}
 
@@ -158,12 +193,14 @@ func TestHandle(t *testing.T) {
 
 			mockPurchases := mocks.NewMockPurchaseStore(ctrl)
 			mockOrders := mocks.NewMockOrderStore(ctrl)
+			mockEmail := mocks.NewMockEmailSender(ctrl)
 
-			tc.setup(mockPurchases, mockOrders)
+			tc.setup(mockPurchases, mockOrders, mockEmail)
 
 			h := &handler.Handler{
 				Purchases: mockPurchases,
 				Orders:    mockOrders,
+				Email:     mockEmail,
 			}
 
 			resp, err := h.Handle(context.Background(), makeEvent(tc.purchaseID, tc.photographerID))

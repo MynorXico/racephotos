@@ -1,0 +1,6 @@
+Purchase Claim Rejected — {{eventName}}
+
+Your payment claim was not approved.
+
+If you believe this is an error, please contact the photographer directly
+or submit a new claim with the correct payment reference.

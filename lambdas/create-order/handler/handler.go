@@ -15,6 +15,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/racephotos/shared/apperrors"
+	"github.com/racephotos/shared/locale"
 	"github.com/racephotos/shared/models"
 )
 
@@ -46,9 +47,13 @@ type Handler struct {
 	ApprovalsURL  string
 }
 
+// maxLocaleLen caps the IETF BCP 47 locale tag length per RS-021 spec.
+const maxLocaleLen = 35
+
 type createOrderRequest struct {
 	PhotoIDs    []string `json:"photoIds"`
 	RunnerEmail string   `json:"runnerEmail"`
+	Locale      string   `json:"locale"`
 }
 
 type bankDetails struct {
@@ -86,6 +91,12 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	// AC7: validate email format.
 	if !emailRE.MatchString(req.RunnerEmail) {
 		return errResponse(400, "invalid email address"), nil
+	}
+
+	// Validate locale: must be non-empty and within length cap; unknown codes are allowed
+	// (LocaleTemplateName falls back to "en" for unsupported values).
+	if req.Locale == "" || len(req.Locale) > maxLocaleLen {
+		return errResponse(400, "locale must be a non-empty IETF BCP 47 tag (max 35 chars)"), nil
 	}
 
 	// Deduplicate photoIds preserving order (guards against accidental double-sends).
@@ -163,6 +174,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		EventID:        eventID,
 		EventName:      ev.Name,
 		ClaimedAt:      now,
+		Locale:         req.Locale,
 	}
 	purchases := make([]models.Purchase, 0, len(photos))
 	for _, p := range photos {
@@ -185,10 +197,10 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	// AC8: notify photographer with masked runner email.
-	h.sendPhotographerEmail(ctx, photographer.Email, ev, orderID, paymentRef, req.RunnerEmail)
+	h.sendPhotographerEmail(ctx, photographer.Email, ev, orderID, paymentRef, req.RunnerEmail, photographer.PreferredLocale)
 
 	// AC9: confirm to runner.
-	h.sendRunnerEmail(ctx, req.RunnerEmail, ev, orderID, paymentRef)
+	h.sendRunnerEmail(ctx, req.RunnerEmail, ev, orderID, paymentRef, req.Locale)
 
 	// paymentRef is a financial identifier — never log it in plain text (CLAUDE.md).
 	slog.InfoContext(ctx, "order created",
@@ -301,11 +313,10 @@ func (h *Handler) checkIdempotency(ctx context.Context, photoIDs []string, runne
 
 // sendPhotographerEmail sends the photographer claim notification (AC8).
 // Email failures are logged but not returned to the caller — the Order is already persisted.
-// Template variables match racephotos-photographer-claim: runnerEmailMasked, eventName, photoReference, paymentReference, dashboardUrl.
-// photoReference is the orderID (consistent with runner email); paymentReference is the RS-XXXXX
-// bank transfer reference so the photographer can match the incoming transfer to this claim.
-func (h *Handler) sendPhotographerEmail(ctx context.Context, to string, ev *models.Event, orderID string, paymentRef string, runnerEmail string) {
-	if err := h.Email.SendTemplatedEmail(ctx, to, "racephotos-photographer-claim", map[string]string{
+// Template variables match racephotos-photographer-claim-{locale}: runnerEmailMasked, eventName, photoReference, paymentReference, dashboardUrl.
+func (h *Handler) sendPhotographerEmail(ctx context.Context, to string, ev *models.Event, orderID string, paymentRef string, runnerEmail string, photographerLocale string) {
+	tmpl := locale.LocaleTemplateName("racephotos-photographer-claim", photographerLocale)
+	if err := h.Email.SendTemplatedEmail(ctx, to, tmpl, map[string]string{
 		"runnerEmailMasked": maskEmail(runnerEmail),
 		"eventName":         ev.Name,
 		"photoReference":    orderID,
@@ -318,10 +329,10 @@ func (h *Handler) sendPhotographerEmail(ctx context.Context, to string, ev *mode
 
 // sendRunnerEmail sends the runner claim confirmation (AC9).
 // Email failures are logged but not returned to the caller.
-// Template variables match racephotos-runner-claim-confirmation: eventName, photoReference, paymentReference.
-// photoReference is the orderID; paymentReference is the RS-XXXXX bank transfer reference.
-func (h *Handler) sendRunnerEmail(ctx context.Context, to string, ev *models.Event, orderID string, paymentRef string) {
-	if err := h.Email.SendTemplatedEmail(ctx, to, "racephotos-runner-claim-confirmation", map[string]string{
+// Template variables match racephotos-runner-claim-confirmation-{locale}: eventName, photoReference, paymentReference.
+func (h *Handler) sendRunnerEmail(ctx context.Context, to string, ev *models.Event, orderID string, paymentRef string, runnerLocale string) {
+	tmpl := locale.LocaleTemplateName("racephotos-runner-claim-confirmation", runnerLocale)
+	if err := h.Email.SendTemplatedEmail(ctx, to, tmpl, map[string]string{
 		"eventName":        ev.Name,
 		"photoReference":   orderID,
 		"paymentReference": paymentRef,

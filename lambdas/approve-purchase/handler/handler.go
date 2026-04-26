@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/racephotos/shared/apperrors"
+	"github.com/racephotos/shared/locale"
 	"github.com/racephotos/shared/models"
 )
 
@@ -148,7 +149,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	// AC2: send approval email to runner — fire and forget (Purchase already persisted).
 	// runnerEmail is PII — never log it.
 	downloadLink := fmt.Sprintf("%s/download/%s", h.AppBaseURL, downloadToken)
-	h.sendApprovalEmail(ctx, purchase.RunnerEmail, order.EventName, downloadLink)
+	h.sendApprovalEmail(ctx, purchase.RunnerEmail, order.EventName, downloadLink, order.Locale)
 
 	slog.InfoContext(ctx, "purchase approved",
 		slog.String("service", "approve-purchase"),
@@ -178,8 +179,9 @@ func (h *Handler) updateOrderStatus(ctx context.Context, orderID, now string) er
 
 // sendApprovalEmail sends the runner approval email (ADR-0002).
 // Failures are logged but not surfaced — the Purchase is already persisted.
-func (h *Handler) sendApprovalEmail(ctx context.Context, runnerEmail, eventName, downloadLink string) {
-	if err := h.Email.SendTemplatedEmail(ctx, runnerEmail, "racephotos-runner-purchase-approved", map[string]string{
+func (h *Handler) sendApprovalEmail(ctx context.Context, runnerEmail, eventName, downloadLink string, runnerLocale string) {
+	tmpl := locale.LocaleTemplateName("racephotos-runner-purchase-approved", runnerLocale)
+	if err := h.Email.SendTemplatedEmail(ctx, runnerEmail, tmpl, map[string]string{
 		"eventName":   eventName,
 		"downloadUrl": downloadLink,
 	}); err != nil {
