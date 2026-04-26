@@ -54,34 +54,8 @@ test.describe('RS-021 — Language switcher — homepage (AC2, AC8)', () => {
 
 test.describe('RS-021 — Language switcher — event search hero (AC6)', () => {
   test('language switcher is visible on the event search page', async ({ page }) => {
-    // Intercept the event API so the page renders without a real backend
-    await page.route('**/events/evt-test', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          eventId: 'evt-test',
-          name: 'Test Race',
-          date: '2026-05-01',
-          location: 'City',
-          status: 'active',
-          pricePerPhoto: 10,
-          currency: 'USD',
-          photographerId: 'ph-1',
-        }),
-      }),
-    );
-
-    await page.route('**/runner/photos**', (route) =>
-      route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({ photos: [], nextCursor: null, totalCount: 0 }),
-      }),
-    );
-
-    await page.goto('/events/evt-test');
-    await page.waitForLoadState('networkidle');
+    // Navigate to any event slug — the hero section renders regardless of API response
+    await page.goto('/events/evt-test-001');
 
     // Language switcher should be present on this page (floating in hero section)
     const switcher = page.locator('[data-testid="language-switcher-btn"]').first();
