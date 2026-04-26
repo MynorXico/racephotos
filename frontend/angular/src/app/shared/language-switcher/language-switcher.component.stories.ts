@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/angular';
-import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { TranslateModule, TranslateLoader } from '@ngx-translate/core';
 import { of } from 'rxjs';
 
@@ -35,14 +35,12 @@ export const EnglishActive: Story = {
     props: args,
     moduleMetadata: {
       imports: [
+        NoopAnimationsModule,
         TranslateModule.forRoot({
           loader: { provide: TranslateLoader, useValue: staticLoader(en) },
         }),
       ],
-      providers: [
-        provideAnimationsAsync(),
-        { provide: LocaleService, useValue: makeLocaleService('en') },
-      ],
+      providers: [{ provide: LocaleService, useValue: makeLocaleService('en') }],
     },
   }),
 };
@@ -52,15 +50,13 @@ export const SpanishActive: Story = {
     props: args,
     moduleMetadata: {
       imports: [
+        NoopAnimationsModule,
         TranslateModule.forRoot({
           defaultLanguage: 'es-419',
           loader: { provide: TranslateLoader, useValue: staticLoader(es419) },
         }),
       ],
-      providers: [
-        provideAnimationsAsync(),
-        { provide: LocaleService, useValue: makeLocaleService('es-419') },
-      ],
+      providers: [{ provide: LocaleService, useValue: makeLocaleService('es-419') }],
     },
   }),
 };
