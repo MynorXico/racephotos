@@ -85,16 +85,22 @@ describe('SesConstruct — email identity (AC1)', () => {
 // ── AC2 — Four SES email templates ────────────────────────────────────────────
 
 describe('SesConstruct — email templates (AC2)', () => {
-  test('creates exactly four email templates', () => {
+  test('creates exactly ten email templates (five types × two locales: en and es-419)', () => {
     const t = makeTemplate(devConfig);
-    t.resourceCountIs('AWS::SES::Template', 4);
+    t.resourceCountIs('AWS::SES::Template', 10);
   });
 
   test.each([
-    'racephotos-photographer-claim',
-    'racephotos-runner-claim-confirmation',
-    'racephotos-runner-purchase-approved',
-    'racephotos-runner-redownload-resend',
+    'racephotos-photographer-claim-en',
+    'racephotos-photographer-claim-es-419',
+    'racephotos-runner-claim-confirmation-en',
+    'racephotos-runner-claim-confirmation-es-419',
+    'racephotos-runner-purchase-approved-en',
+    'racephotos-runner-purchase-approved-es-419',
+    'racephotos-runner-purchase-rejected-en',
+    'racephotos-runner-purchase-rejected-es-419',
+    'racephotos-runner-redownload-resend-en',
+    'racephotos-runner-redownload-resend-es-419',
   ])('creates template named %s', (templateName) => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::SES::Template', {
@@ -125,57 +131,57 @@ describe('SesConstruct — email templates (AC2)', () => {
     }
   });
 
-  test('photographer-claim template references runner email mask variable', () => {
+  test('photographer-claim-en template references runner email mask variable', () => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::SES::Template', {
       Template: Match.objectLike({
-        TemplateName: 'racephotos-photographer-claim',
+        TemplateName: 'racephotos-photographer-claim-en',
         HtmlPart: Match.stringLikeRegexp('runnerEmailMasked'),
       }),
     });
   });
 
-  test('runner-purchase-approved template includes downloadUrl variable', () => {
+  test('runner-purchase-approved-en template includes downloadUrl variable', () => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::SES::Template', {
       Template: Match.objectLike({
-        TemplateName: 'racephotos-runner-purchase-approved',
+        TemplateName: 'racephotos-runner-purchase-approved-en',
         HtmlPart: Match.stringLikeRegexp('downloadUrl'),
       }),
     });
   });
 
-  test('runner-claim-confirmation template includes paymentReference variable', () => {
+  test('runner-claim-confirmation-en template includes paymentReference variable', () => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::SES::Template', {
       Template: Match.objectLike({
-        TemplateName: 'racephotos-runner-claim-confirmation',
+        TemplateName: 'racephotos-runner-claim-confirmation-en',
         HtmlPart: Match.stringLikeRegexp('paymentReference'),
       }),
     });
   });
 
-  test('runner-redownload-resend template uses Handlebars each iteration over downloads array', () => {
+  test('runner-redownload-resend-en template uses Handlebars each iteration over downloads array', () => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::SES::Template', {
       Template: Match.objectLike({
-        TemplateName: 'racephotos-runner-redownload-resend',
+        TemplateName: 'racephotos-runner-redownload-resend-en',
         HtmlPart: Match.stringLikeRegexp('#each downloads'),
       }),
     });
   });
 
-  test('runner-redownload-resend template includes url and photoReference variables inside each block', () => {
+  test('runner-redownload-resend-en template includes url and photoReference variables inside each block', () => {
     const t = makeTemplate(devConfig);
     t.hasResourceProperties('AWS::SES::Template', {
       Template: Match.objectLike({
-        TemplateName: 'racephotos-runner-redownload-resend',
+        TemplateName: 'racephotos-runner-redownload-resend-en',
         HtmlPart: Match.stringLikeRegexp('\\{\\{url\\}\\}'),
       }),
     });
     t.hasResourceProperties('AWS::SES::Template', {
       Template: Match.objectLike({
-        TemplateName: 'racephotos-runner-redownload-resend',
+        TemplateName: 'racephotos-runner-redownload-resend-en',
         HtmlPart: Match.stringLikeRegexp('\\{\\{photoReference\\}\\}'),
       }),
     });
