@@ -14,6 +14,7 @@ import { map } from 'rxjs/operators';
 import { AuthActions } from '../../../store/auth/auth.actions';
 import { selectAuthEmail, selectAuthStatus } from '../../../store/auth/auth.selectors';
 import { NavigationTitleService } from '../../../core/services/navigation-title.service';
+import { LanguageSwitcherComponent } from '../../../shared/language-switcher/language-switcher.component';
 
 @Component({
   selector: 'app-photographer-layout',
@@ -29,6 +30,7 @@ import { NavigationTitleService } from '../../../core/services/navigation-title.
     MatButtonModule,
     MatProgressSpinnerModule,
     MatToolbarModule,
+    LanguageSwitcherComponent,
   ],
   templateUrl: './photographer-layout.component.html',
   styleUrl: './photographer-layout.component.scss',

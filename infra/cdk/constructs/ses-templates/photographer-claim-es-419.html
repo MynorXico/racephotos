@@ -1,0 +1,33 @@
+<html>
+<body style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;padding:20px">
+  <h2>Nueva Solicitud de Compra</h2>
+  <p>Un corredor ha enviado una solicitud de pago por una de tus fotos.</p>
+  <table style="border-collapse:collapse;width:100%">
+    <tr>
+      <td style="padding:8px;font-weight:bold">Corredor</td>
+      <td style="padding:8px">{{runnerEmailMasked}}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;font-weight:bold">Evento</td>
+      <td style="padding:8px">{{eventName}}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;font-weight:bold">Referencia de foto</td>
+      <td style="padding:8px">{{photoReference}}</td>
+    </tr>
+    <tr>
+      <td style="padding:8px;font-weight:bold">Referencia de pago</td>
+      <td style="padding:8px">{{paymentReference}}</td>
+    </tr>
+  </table>
+  <p style="margin-top:24px">
+    <a href="{{dashboardUrl}}"
+       style="background:#1a73e8;color:#fff;padding:12px 24px;text-decoration:none;border-radius:4px;display:inline-block">
+      Revisar solicitud en el panel
+    </a>
+  </p>
+  <p style="color:#666;font-size:12px;margin-top:32px">
+    Aprueba o rechaza la solicitud después de verificar el pago en tu extracto bancario.
+  </p>
+</body>
+</html>

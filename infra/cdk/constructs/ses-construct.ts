@@ -22,11 +22,12 @@ interface SesConstructProps {
  *
  * Creates:
  *   - SES email identity for the verified sender (one per environment)
- *   - Four SES email templates used by payment and download Lambda stories:
- *       racephotos-photographer-claim         (ADR-0001)
- *       racephotos-runner-claim-confirmation  (ADR-0002)
- *       racephotos-runner-purchase-approved   (ADR-0002)
- *       racephotos-runner-redownload-resend   (ADR-0002)
+ *   - Ten SES email templates (five types × two locales) used by payment and download Lambda stories:
+ *       racephotos-photographer-claim-{en|es-419}         (ADR-0001)
+ *       racephotos-runner-claim-confirmation-{en|es-419}  (ADR-0002)
+ *       racephotos-runner-purchase-approved-{en|es-419}   (ADR-0002)
+ *       racephotos-runner-purchase-rejected-{en|es-419}   (RS-021)
+ *       racephotos-runner-redownload-resend-{en|es-419}   (ADR-0002)
  *
  * Template names have NO {envName} suffix — SES templates are account-scoped
  * and each environment is deployed to an isolated AWS account.
@@ -35,10 +36,11 @@ interface SesConstructProps {
  * ses:SendEmail + ses:SendTemplatedEmail on the verified identity ARN.
  *
  * SES template variable conventions (Handlebars {{variableName}}):
- *   photographer-claim:        runnerEmailMasked, eventName, photoReference, paymentReference, dashboardUrl
- *   runner-claim-confirmation: eventName, photoReference, paymentReference
- *   runner-purchase-approved:  eventName, downloadUrl
- *   runner-redownload-resend:  downloads (array) — each item: { url, photoReference }
+ *   photographer-claim-{locale}:        runnerEmailMasked, eventName, photoReference, paymentReference, dashboardUrl
+ *   runner-claim-confirmation-{locale}: eventName, photoReference, paymentReference
+ *   runner-purchase-approved-{locale}:  eventName, downloadUrl
+ *   runner-purchase-rejected-{locale}:  eventName
+ *   runner-redownload-resend-{locale}:  downloads (array) — each item: { url, photoReference }
  *                             url = {appBaseUrl}/download/{token}; photoReference = photoId.
  *                             Passed as JSON array to SendTemplatedEmail TemplateData.
  *                             Use Handlebars {{#each downloads}} iteration; never pass raw HTML.
@@ -67,29 +69,65 @@ export class SesConstruct extends Construct {
    * and each environment is deployed to an isolated AWS account.
    */
   static readonly TEMPLATES = {
-    PhotographerClaim: {
-      name: 'racephotos-photographer-claim',
+    PhotographerClaimEn: {
+      name: 'racephotos-photographer-claim-en',
       subject: 'New purchase claim — {{eventName}}',
-      htmlFile: 'photographer-claim.html',
-      textFile: 'photographer-claim.txt',
+      htmlFile: 'photographer-claim-en.html',
+      textFile: 'photographer-claim-en.txt',
     },
-    RunnerClaimConfirmation: {
-      name: 'racephotos-runner-claim-confirmation',
+    PhotographerClaimEs419: {
+      name: 'racephotos-photographer-claim-es-419',
+      subject: 'Nueva solicitud de compra — {{eventName}}',
+      htmlFile: 'photographer-claim-es-419.html',
+      textFile: 'photographer-claim-es-419.txt',
+    },
+    RunnerClaimConfirmationEn: {
+      name: 'racephotos-runner-claim-confirmation-en',
       subject: 'Payment claim received — {{eventName}}',
-      htmlFile: 'runner-claim-confirmation.html',
-      textFile: 'runner-claim-confirmation.txt',
+      htmlFile: 'runner-claim-confirmation-en.html',
+      textFile: 'runner-claim-confirmation-en.txt',
     },
-    RunnerPurchaseApproved: {
-      name: 'racephotos-runner-purchase-approved',
+    RunnerClaimConfirmationEs419: {
+      name: 'racephotos-runner-claim-confirmation-es-419',
+      subject: 'Solicitud de pago recibida — {{eventName}}',
+      htmlFile: 'runner-claim-confirmation-es-419.html',
+      textFile: 'runner-claim-confirmation-es-419.txt',
+    },
+    RunnerPurchaseApprovedEn: {
+      name: 'racephotos-runner-purchase-approved-en',
       subject: 'Your photo is ready to download — {{eventName}}',
-      htmlFile: 'runner-purchase-approved.html',
-      textFile: 'runner-purchase-approved.txt',
+      htmlFile: 'runner-purchase-approved-en.html',
+      textFile: 'runner-purchase-approved-en.txt',
     },
-    RunnerRedownloadResend: {
-      name: 'racephotos-runner-redownload-resend',
+    RunnerPurchaseApprovedEs419: {
+      name: 'racephotos-runner-purchase-approved-es-419',
+      subject: 'Tu foto está lista para descargar — {{eventName}}',
+      htmlFile: 'runner-purchase-approved-es-419.html',
+      textFile: 'runner-purchase-approved-es-419.txt',
+    },
+    RunnerPurchaseRejectedEn: {
+      name: 'racephotos-runner-purchase-rejected-en',
+      subject: 'Purchase claim rejected — {{eventName}}',
+      htmlFile: 'runner-purchase-rejected-en.html',
+      textFile: 'runner-purchase-rejected-en.txt',
+    },
+    RunnerPurchaseRejectedEs419: {
+      name: 'racephotos-runner-purchase-rejected-es-419',
+      subject: 'Solicitud de compra rechazada — {{eventName}}',
+      htmlFile: 'runner-purchase-rejected-es-419.html',
+      textFile: 'runner-purchase-rejected-es-419.txt',
+    },
+    RunnerRedownloadResendEn: {
+      name: 'racephotos-runner-redownload-resend-en',
       subject: 'Your RaceShots download links',
-      htmlFile: 'runner-redownload-resend.html',
-      textFile: 'runner-redownload-resend.txt',
+      htmlFile: 'runner-redownload-resend-en.html',
+      textFile: 'runner-redownload-resend-en.txt',
+    },
+    RunnerRedownloadResendEs419: {
+      name: 'racephotos-runner-redownload-resend-es-419',
+      subject: 'Tus enlaces de descarga de RaceShots',
+      htmlFile: 'runner-redownload-resend-es-419.html',
+      textFile: 'runner-redownload-resend-es-419.txt',
     },
   } as const;
 

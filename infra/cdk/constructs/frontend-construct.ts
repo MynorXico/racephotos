@@ -157,9 +157,24 @@ export class FrontendConstruct extends Construct {
     }
 
     if (hasRealEnv) {
+      // Static Angular assets (hashed filenames) — cache indefinitely; CloudFront
+      // invalidation on deploy handles staleness for the entry point index.html.
       new s3deploy.BucketDeployment(this, 'DeployFrontend', {
+        sources: [s3deploy.Source.asset(angularDistPath)],
+        destinationBucket: websiteBucket,
+        distribution,
+        distributionPaths: ['/*'],
+        cacheControl: [
+          s3deploy.CacheControl.maxAge(cdk.Duration.days(365)),
+          s3deploy.CacheControl.fromString('immutable'),
+        ],
+      });
+
+      // Short-lived assets: runtime config and i18n translation files change on
+      // every deploy. 5-minute TTL lets CloudFront serve warm cache within a
+      // release window while ensuring runners see updated translations quickly.
+      new s3deploy.BucketDeployment(this, 'DeployRuntimeAssets', {
         sources: [
-          s3deploy.Source.asset(angularDistPath),
           s3deploy.Source.jsonData('assets/config.json', {
             apiBaseUrl,
             cognitoUserPoolId,
@@ -169,7 +184,8 @@ export class FrontendConstruct extends Construct {
         ],
         destinationBucket: websiteBucket,
         distribution,
-        distributionPaths: ['/*'],
+        distributionPaths: ['/assets/config.json', '/assets/i18n/*'],
+        cacheControl: [s3deploy.CacheControl.maxAge(cdk.Duration.minutes(5))],
       });
     }
 

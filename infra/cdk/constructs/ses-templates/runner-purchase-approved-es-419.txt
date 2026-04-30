@@ -1,0 +1,11 @@
+Tu Foto Está Lista — {{eventName}}
+
+Tu pago fue aprobado. Ya puedes descargar tu foto.
+
+Evento: {{eventName}}
+
+Descarga tu foto:
+{{downloadUrl}}
+
+Este enlace funciona indefinidamente. Márcalo como favorito o guarda este correo.
+Si lo pierdes, visita la plataforma y usa la opción de re-descarga.

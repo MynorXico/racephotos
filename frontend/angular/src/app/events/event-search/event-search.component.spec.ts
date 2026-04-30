@@ -8,6 +8,7 @@ import { provideMockActions } from '@ngrx/effects/testing';
 import { Subject } from 'rxjs';
 import { Action } from '@ngrx/store';
 import { of } from 'rxjs';
+import { TranslateModule } from '@ngx-translate/core';
 
 import { EventSearchComponent } from './event-search.component';
 import { RunnerPhoto } from '../../store/runner-photos/runner-photos.actions';
@@ -98,7 +99,7 @@ describe('EventSearchComponent', () => {
     dialogSpy.open.and.returnValue(dialogRefSpy);
 
     await TestBed.configureTestingModule({
-      imports: [NoopAnimationsModule, EventSearchComponent],
+      imports: [NoopAnimationsModule, EventSearchComponent, TranslateModule.forRoot()],
       providers: [
         provideMockStore(),
         provideMockActions(() => actions$),

@@ -1,0 +1,11 @@
+Your Photo is Ready — {{eventName}}
+
+Your payment has been approved. You can now download your photo.
+
+Event: {{eventName}}
+
+Download your photo:
+{{downloadUrl}}
+
+This link works indefinitely. Bookmark it or keep this email.
+If you lose it, visit the platform and use the re-download option.

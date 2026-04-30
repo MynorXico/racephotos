@@ -1,0 +1,13 @@
+New Purchase Claim — {{eventName}}
+
+A runner has submitted a payment claim.
+
+Runner:            {{runnerEmailMasked}}
+Event:             {{eventName}}
+Photo reference:   {{photoReference}}
+Payment reference: {{paymentReference}}
+
+Review the claim in your dashboard:
+{{dashboardUrl}}
+
+Approve or reject the claim after verifying the payment on your bank statement.

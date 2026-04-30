@@ -16,6 +16,7 @@ type Photographer struct {
 	BankAccountNumber string `dynamodbav:"bankAccountNumber" json:"bankAccountNumber"`
 	BankAccountHolder string `dynamodbav:"bankAccountHolder" json:"bankAccountHolder"`
 	BankInstructions  string `dynamodbav:"bankInstructions"  json:"bankInstructions"`
+	PreferredLocale   string `dynamodbav:"preferredLocale"   json:"preferredLocale"` // IETF BCP 47, e.g. "en" or "es-419"; empty = "en"
 	CreatedAt         string `dynamodbav:"createdAt"         json:"createdAt"`
 	UpdatedAt         string `dynamodbav:"updatedAt"         json:"updatedAt"`
 }

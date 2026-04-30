@@ -3,6 +3,7 @@ package handler
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -10,6 +11,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/ses"
+	sestypes "github.com/aws/aws-sdk-go-v2/service/ses/types"
 
 	"github.com/racephotos/shared/apperrors"
 	"github.com/racephotos/shared/models"
@@ -28,6 +31,11 @@ type PurchaseStore interface {
 type OrderStore interface {
 	GetOrder(ctx context.Context, id string) (*models.Order, error)
 	UpdateOrderStatus(ctx context.Context, id, status, updatedAt string) error
+}
+
+// EmailSender sends SES templated emails.
+type EmailSender interface {
+	SendTemplatedEmail(ctx context.Context, to, template string, data map[string]string) error
 }
 
 // ── DynamoDB client interfaces ────────────────────────────────────────────────
@@ -164,6 +172,38 @@ func (s *DynamoOrderStore) GetOrder(ctx context.Context, id string) (*models.Ord
 		return nil, fmt.Errorf("GetOrder: unmarshal: %w", err)
 	}
 	return &o, nil
+}
+
+// ── SES implementation ────────────────────────────────────────────────────────
+
+// SESAPIClient wraps the SES SendTemplatedEmail method.
+type SESAPIClient interface {
+	SendTemplatedEmail(ctx context.Context, params *ses.SendTemplatedEmailInput, optFns ...func(*ses.Options)) (*ses.SendTemplatedEmailOutput, error)
+}
+
+// SESEmailSender implements EmailSender using Amazon SES v1 templated emails.
+type SESEmailSender struct {
+	Client      SESAPIClient
+	FromAddress string
+}
+
+func (s *SESEmailSender) SendTemplatedEmail(ctx context.Context, to, template string, data map[string]string) error {
+	templateDataJSON, err := json.Marshal(data)
+	if err != nil {
+		return fmt.Errorf("SendTemplatedEmail: marshal template data: %w", err)
+	}
+	_, err = s.Client.SendTemplatedEmail(ctx, &ses.SendTemplatedEmailInput{
+		Source: aws.String(s.FromAddress),
+		Destination: &sestypes.Destination{
+			ToAddresses: []string{to},
+		},
+		Template:     aws.String(template),
+		TemplateData: aws.String(string(templateDataJSON)),
+	})
+	if err != nil {
+		return fmt.Errorf("SendTemplatedEmail: SES: %w", err)
+	}
+	return nil
 }
 
 func (s *DynamoOrderStore) UpdateOrderStatus(ctx context.Context, id, status, updatedAt string) error {

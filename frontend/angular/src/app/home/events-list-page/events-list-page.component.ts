@@ -21,6 +21,7 @@ import {
   selectPublicNextCursor,
 } from '../../store/events/events.selectors';
 import { EventCardComponent } from './event-card/event-card.component';
+import { LanguageSwitcherComponent } from '../../shared/language-switcher/language-switcher.component';
 
 @Component({
   selector: 'app-events-list-page',
@@ -32,6 +33,7 @@ import { EventCardComponent } from './event-card/event-card.component';
     MatIconModule,
     MatProgressSpinnerModule,
     EventCardComponent,
+    LanguageSwitcherComponent,
   ],
   templateUrl: './events-list-page.component.html',
   styleUrl: './events-list-page.component.scss',

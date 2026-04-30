@@ -1,0 +1,10 @@
+Solicitud de Pago Recibida — {{eventName}}
+
+Recibimos tu solicitud de pago. El fotógrafo la verificará y aprobará.
+
+Evento:              {{eventName}}
+Referencia de foto:  {{photoReference}}
+Tu referencia de pago: {{paymentReference}}
+
+Guarda tu referencia de pago.
+Recibirás otro correo cuando el fotógrafo apruebe tu solicitud.

@@ -296,3 +296,43 @@ func TestHandler_Handle_PreservesCreatedAt(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(resp.Body), &p))
 	assert.Equal(t, originalCreatedAt, p.CreatedAt)
 }
+
+func bodyWithLocale(locale string) string {
+	b, _ := json.Marshal(map[string]string{
+		"displayName":     "Test Photographer",
+		"defaultCurrency": "USD",
+		"preferredLocale": locale,
+	})
+	return string(b)
+}
+
+func TestHandler_PreferredLocale(t *testing.T) {
+	tests := []struct {
+		name     string
+		body     string
+		wantCode int
+	}{
+		{"valid en", bodyWithLocale("en"), 200},
+		{"valid es-419", bodyWithLocale("es-419"), 200},
+		{"empty locale is allowed (defaults to en)", validBody("USD"), 200},
+		{"unsupported locale returns 400", bodyWithLocale("fr"), 400},
+		{"unsupported variant returns 400", bodyWithLocale("es-ES"), 400},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			defer ctrl.Finish()
+
+			mockStore := mocks.NewMockPhotographerUpserter(ctrl)
+			if tt.wantCode == 200 {
+				mockStore.EXPECT().UpsertPhotographer(gomock.Any(), gomock.Any()).Return(&models.Photographer{}, nil)
+			}
+
+			h := &handler.Handler{Store: mockStore}
+			resp, err := h.Handle(context.Background(), makeEvent("user-locale", tt.body))
+			require.NoError(t, err)
+			assert.Equal(t, tt.wantCode, resp.StatusCode)
+		})
+	}
+}

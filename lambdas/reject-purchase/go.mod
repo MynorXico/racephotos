@@ -8,9 +8,10 @@ require (
 	github.com/aws/aws-sdk-go-v2/config v1.27.0
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.15.0
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.37.0
+	github.com/aws/aws-sdk-go-v2/service/ses v1.27.0
 	github.com/golang/mock v1.6.0
 	github.com/racephotos/shared v0.0.0
-	github.com/stretchr/testify v1.9.0
+	github.com/stretchr/testify v1.11.1
 )
 
 require (

@@ -1,0 +1,9 @@
+Tus Enlaces de Descarga de RaceShots
+
+Aquí están tus enlaces de descarga activos para compras aprobadas:
+
+{{#each downloads}}
+- Foto {{photoReference}}: {{url}}
+{{/each}}
+
+Cada enlace funciona indefinidamente. Márcalos como favoritos o guarda este correo.

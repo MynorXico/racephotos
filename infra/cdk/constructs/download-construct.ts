@@ -16,6 +16,8 @@ interface DownloadConstructProps {
   config: EnvConfig;
   /** The racephotos-purchases DynamoDB table. */
   purchasesTable: dynamodb.Table;
+  /** The racephotos-orders DynamoDB table (for locale lookup in redownload-resend). */
+  ordersTable: dynamodb.Table;
   /** The racephotos-photos DynamoDB table. */
   photosTable: dynamodb.Table;
   /** The racephotos-rate-limits DynamoDB table. */
@@ -74,6 +76,7 @@ export class DownloadConstruct extends Construct {
     const {
       config,
       purchasesTable,
+      ordersTable,
       photosTable,
       rateLimitsTable,
       rawBucket,
@@ -149,6 +152,7 @@ export class DownloadConstruct extends Construct {
       environment: {
         RACEPHOTOS_ENV: config.envName,
         RACEPHOTOS_PURCHASES_TABLE: purchasesTable.tableName,
+        RACEPHOTOS_ORDERS_TABLE: ordersTable.tableName,
         RACEPHOTOS_SES_FROM_ADDRESS: sesFromAddress,
         RACEPHOTOS_RATE_LIMITS_TABLE: rateLimitsTable.tableName,
         RACEPHOTOS_APP_BASE_URL: appBaseUrl,
@@ -162,6 +166,9 @@ export class DownloadConstruct extends Construct {
         resources: [`${purchasesTable.tableArn}/index/runnerEmail-claimedAt-index`],
       }),
     );
+
+    // dynamodb:GetItem on the orders table (locale lookup for redownload email).
+    ordersTable.grant(this.redownloadResendFn, 'dynamodb:GetItem');
 
     // dynamodb:UpdateItem + GetItem on the rate-limits base table.
     rateLimitsTable.grant(this.redownloadResendFn, 'dynamodb:UpdateItem', 'dynamodb:GetItem');

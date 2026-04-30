@@ -1,0 +1,134 @@
+{
+  "language": {
+    "changeAriaLabel": "Change language",
+    "en": "English",
+    "es419": "Español (Latino)"
+  },
+  "common": {
+    "tryAgain": "Try again",
+    "cancel": "Cancel",
+    "saveChanges": "Save changes",
+    "done": "Done",
+    "retry": "Retry",
+    "language": "Language",
+    "close": "Close"
+  },
+  "nav": {
+    "skipToMain": "Skip to main content",
+    "photographerNavAria": "Photographer navigation",
+    "myEvents": "My Events",
+    "dashboard": "Dashboard",
+    "profile": "Profile",
+    "openMenuAria": "Open navigation menu",
+    "signOutAria": "Sign out of RaceShots",
+    "signOut": "Sign out"
+  },
+  "home": {
+    "photographerLogin": "Photographer login",
+    "photographerLoginShort": "Login",
+    "heroHeadline": "Find your race photos",
+    "heroSub": "Search any event below to find photos by your bib number.",
+    "loadingAria": "Loading events, please wait",
+    "loadError": "Unable to load events.",
+    "loadErrorSub": "Something went wrong. Please try again.",
+    "emptyState": "No events listed yet.",
+    "emptyStateSub": "Check back soon.",
+    "eventsGridAria": "Upcoming race events",
+    "loadMore": "Load more events",
+    "loadingMore": "Loading more events",
+    "loadMoreError": "Could not load more events.",
+    "footer": "RaceShots — open-source race photo platform"
+  },
+  "event": {
+    "heroTitle": "Find your race photos",
+    "heroSubtitle": "Enter your bib number to find your photos from this event.",
+    "bibLabel": "Bib number",
+    "bibPlaceholder": "e.g. 1234",
+    "clearBibAria": "Clear bib number",
+    "bibRequired": "Bib number is required",
+    "bibInvalid": "Bib must be 1–6 digits",
+    "searchAria": "Search photos",
+    "search": "Search",
+    "loadingAria": "Loading photos",
+    "findAriaLabel": "Find your race photos",
+    "bibFormAria": "Bib search form",
+    "noPhotos": "No photos found for bib",
+    "error": "Something went wrong. Please try again."
+  },
+  "purchase": {
+    "dialogTitle": "Purchase photos",
+    "closeAria": "Close purchase dialog",
+    "step": {
+      "cart": "Cart",
+      "email": "Your email",
+      "bankTransfer": "Bank transfer",
+      "done": "Done"
+    },
+    "cart": {
+      "heading": "Review your cart",
+      "empty": "No photos selected.",
+      "listAria": "Selected photos",
+      "total": "Total",
+      "editAria": "Edit cart — return to photo selection",
+      "edit": "Edit cart",
+      "continue": "Continue to checkout"
+    },
+    "email": {
+      "instruction": "Enter your email to receive payment instructions and download links.",
+      "label": "Email address",
+      "placeholder": "you@example.com",
+      "required": "Email address is required.",
+      "invalid": "Enter a valid email address.",
+      "previewText": "We'll send updates to — is this correct?",
+      "confirm": "Confirm and continue",
+      "submitting": "Submitting…",
+      "tryAgain": "Try again"
+    },
+    "bank": {
+      "instruction": "Transfer the amount below to the bank account shown. Use the payment reference exactly as shown so the photographer can identify your payment.",
+      "paymentRef": "Payment reference",
+      "copyRefAria": "Copy payment reference",
+      "bankAccount": "Bank account",
+      "copyAccountAria": "Copy account number",
+      "additionalInstructions": "Additional instructions",
+      "confirm": "I've made the transfer"
+    },
+    "confirmation": {
+      "headline": "Payment claim submitted",
+      "body": "Your payment claim has been submitted. The photographer will review it and you'll receive an email once approved.",
+      "emailReminder": "A confirmation has been sent to",
+      "done": "Done"
+    }
+  },
+  "profile": {
+    "heading": "Account Profile",
+    "welcomeBanner": "Welcome to RaceShots. Fill in your bank details so runners can pay you directly.",
+    "loadingAria": "Loading profile",
+    "loadError": "Could not load your profile. Please refresh the page.",
+    "displayName": "Display name",
+    "displayNameHint": "Shown to runners on your event pages.",
+    "displayNameRequired": "Display name is required.",
+    "displayNameMaxLength": "Display name must be 100 characters or fewer.",
+    "defaultCurrency": "Default currency",
+    "defaultCurrencyRequired": "Please select a currency.",
+    "preferredLocale": {
+      "label": "Preferred language for emails",
+      "hint": "Controls the language of notifications sent to you.",
+      "errorRequired": "Please select a language."
+    },
+    "bankSection": {
+      "title": "Bank Transfer Details",
+      "subtitle": "These details are shown to runners when they purchase your photos."
+    },
+    "bankName": "Bank name",
+    "bankNameMaxLength": "Bank name must be 100 characters or fewer.",
+    "bankAccountHolder": "Account holder name",
+    "bankAccountHolderMaxLength": "Account holder name must be 100 characters or fewer.",
+    "bankAccountNumber": "Account number",
+    "bankAccountNumberHint": "Your account or IBAN number.",
+    "bankAccountNumberMaxLength": "Account number must be 50 characters or fewer.",
+    "bankInstructions": "Payment instructions",
+    "bankInstructionsHint": "Additional instructions shown to runners, e.g. reference format or bank branch details.",
+    "bankInstructionsMaxLength": "Payment instructions must be 500 characters or fewer."
+  }
+}

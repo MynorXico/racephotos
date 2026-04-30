@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { RouterTestingModule } from '@angular/router/testing';
 import { NoopAnimationsModule } from '@angular/platform-browser/animations';
 import { MockStore, provideMockStore } from '@ngrx/store/testing';
+import { TranslateModule } from '@ngx-translate/core';
 
 import { PhotographerLayoutComponent } from './photographer-layout.component';
 import { initialAuthState } from '../../../store/auth/auth.state';
@@ -12,7 +13,7 @@ describe('PhotographerLayoutComponent', () => {
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({
-      imports: [PhotographerLayoutComponent, RouterTestingModule, NoopAnimationsModule],
+      imports: [PhotographerLayoutComponent, RouterTestingModule, NoopAnimationsModule, TranslateModule.forRoot()],
       providers: [
         provideMockStore({
           initialState: {

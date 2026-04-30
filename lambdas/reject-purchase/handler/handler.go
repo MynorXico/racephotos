@@ -11,6 +11,7 @@ import (
 	"github.com/aws/aws-lambda-go/events"
 
 	"github.com/racephotos/shared/apperrors"
+	"github.com/racephotos/shared/locale"
 	"github.com/racephotos/shared/models"
 )
 
@@ -18,6 +19,7 @@ import (
 type Handler struct {
 	Purchases PurchaseStore
 	Orders    OrderStore
+	Email     EmailSender
 }
 
 type purchaseResponse struct {
@@ -98,7 +100,6 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 	}
 
 	// Update the purchase to rejected (conditional — fails if concurrent write landed).
-	// No email is sent to the runner in v1 (Out of scope).
 	if err := h.Purchases.UpdatePurchaseRejected(ctx, purchaseID); err != nil {
 		if errors.Is(err, apperrors.ErrConflict) {
 			// A concurrent approve or reject landed between our status read and this write.
@@ -123,6 +124,9 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		)
 	}
 
+	// Notify runner of rejection (RS-021 — scoped out in RS-011; added here).
+	h.sendRejectionEmail(ctx, purchase.RunnerEmail, order.EventName, order.Locale)
+
 	slog.InfoContext(ctx, "purchase rejected",
 		slog.String("service", "reject-purchase"),
 		slog.String("purchaseID", purchaseID),
@@ -131,6 +135,24 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 
 	purchase.Status = models.OrderStatusRejected
 	return jsonResponse(200, toResponse(purchase))
+}
+
+// sendRejectionEmail notifies the runner that their purchase was rejected.
+// Failures are logged but not surfaced — the Purchase is already persisted.
+// SES template variables: eventName.
+func (h *Handler) sendRejectionEmail(ctx context.Context, runnerEmail, eventName, runnerLocale string) {
+	if h.Email == nil {
+		return
+	}
+	tmpl := locale.LocaleTemplateName("racephotos-runner-purchase-rejected", runnerLocale)
+	if err := h.Email.SendTemplatedEmail(ctx, runnerEmail, tmpl, map[string]string{
+		"eventName": eventName,
+	}); err != nil {
+		slog.ErrorContext(ctx, "SendTemplatedEmail to runner (rejection) failed",
+			slog.String("service", "reject-purchase"),
+			slog.String("error", err.Error()),
+		)
+	}
 }
 
 func (h *Handler) updateOrderStatus(ctx context.Context, orderID, now string) error {
