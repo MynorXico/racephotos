@@ -1,7 +1,7 @@
 # Story: Internationalization — English and Latin Spanish (extensible)
 **ID**: RS-021
 **Epic**: Frontend
-**Status**: ready
+**Status**: done
 **Has UI**: yes
 
 ## Context
