@@ -99,9 +99,9 @@ type downloadEntry struct {
 	PhotoReference string `json:"photoReference"`
 }
 
-// resolveLocale finds the locale from the most recently approved purchase's parent order.
-// Falls back to "en" if the order cannot be fetched.
-// TODO: denormalize Purchase.Locale at order creation to remove this serial GetItem.
+// resolveLocale returns the locale from the most recently approved purchase.
+// Purchase.Locale is denormalized at order creation (RS-021). For legacy
+// purchases created before RS-021 the field is empty — fall back to GetOrder.
 func (h *Handler) resolveLocale(ctx context.Context, purchases []models.Purchase) string {
 	// Find the purchase with the most recent ApprovedAt timestamp.
 	var newest *models.Purchase
@@ -111,7 +111,15 @@ func (h *Handler) resolveLocale(ctx context.Context, purchases []models.Purchase
 			newest = p
 		}
 	}
-	if newest == nil || newest.OrderID == "" {
+	if newest == nil {
+		return "en"
+	}
+	// Fast path: locale already on the purchase (post-RS-021 data).
+	if newest.Locale != "" {
+		return newest.Locale
+	}
+	// Slow path: legacy purchase — fetch locale from the parent order.
+	if newest.OrderID == "" {
 		return "en"
 	}
 	order, err := h.Orders.GetOrder(ctx, newest.OrderID)

@@ -93,10 +93,13 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 		return errResponse(400, "invalid email address"), nil
 	}
 
-	// Validate locale: must be non-empty and within length cap; unknown codes are allowed
-	// (LocaleTemplateName falls back to "en" for unsupported values).
-	if req.Locale == "" || len(req.Locale) > maxLocaleLen {
-		return errResponse(400, "locale must be a non-empty IETF BCP 47 tag (max 35 chars)"), nil
+	// Locale is optional; omitted or empty defaults to "en".
+	// Unknown codes are accepted — LocaleTemplateName falls back to "en".
+	if len(req.Locale) > maxLocaleLen {
+		return errResponse(400, "locale must be a valid IETF BCP 47 tag (max 35 chars)"), nil
+	}
+	if req.Locale == "" {
+		req.Locale = "en"
 	}
 
 	// Deduplicate photoIds preserving order (guards against accidental double-sends).
@@ -183,6 +186,7 @@ func (h *Handler) Handle(ctx context.Context, event events.APIGatewayV2HTTPReque
 			OrderID:     orderID,
 			PhotoID:     p.ID,
 			RunnerEmail: req.RunnerEmail,
+			Locale:      req.Locale,
 			Status:      models.OrderStatusPending,
 			ClaimedAt:   now,
 		})

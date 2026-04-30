@@ -481,19 +481,31 @@ func TestHandle_SpanishLocale_UsesLocalizedTemplates(t *testing.T) {
 	assert.Equal(t, 201, resp.StatusCode)
 }
 
-func TestHandle_MissingLocale_Returns400(t *testing.T) {
+func TestHandle_MissingLocale_DefaultsToEn(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	h, _, _, _, _, _, _, _ := newHandler(ctrl)
+	h, _, purchases, writer, photos, evStore, phStore, email := newHandler(ctrl)
+
+	var capturedOrder models.Order
+	purchases.EXPECT().GetPurchaseByPhotoAndEmail(gomock.Any(), testPhotoID, testRunnerEmail).Return(nil, nil)
+	photos.EXPECT().GetPhoto(gomock.Any(), testPhotoID).Return(testPhoto, nil)
+	evStore.EXPECT().GetEvent(gomock.Any(), testEventID).Return(testEvent, nil)
+	phStore.EXPECT().GetPhotographer(gomock.Any(), testPhotographerID).Return(testPhotographer, nil)
+	writer.EXPECT().CreateOrderWithPurchases(gomock.Any(), gomock.Any(), gomock.Any()).DoAndReturn(
+		func(_ context.Context, o models.Order, _ []models.Purchase) error {
+			capturedOrder = o
+			return nil
+		})
+	email.EXPECT().SendTemplatedEmail(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(nil).Times(2)
 
 	body, _ := json.Marshal(map[string]interface{}{
 		"photoIds":    []string{testPhotoID},
 		"runnerEmail": testRunnerEmail,
-		// locale omitted
+		// locale omitted — should default to "en"
 	})
 	resp, err := h.Handle(context.Background(), events.APIGatewayV2HTTPRequest{Body: string(body)})
 	require.NoError(t, err)
-	assert.Equal(t, 400, resp.StatusCode)
-	assert.Contains(t, resp.Body, "locale")
+	assert.Equal(t, 201, resp.StatusCode)
+	assert.Equal(t, "en", capturedOrder.Locale)
 }
 
 func TestHandle_LocaleTooLong_Returns400(t *testing.T) {
