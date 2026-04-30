@@ -13,6 +13,7 @@ import { provideEffects } from '@ngrx/effects';
 import { provideRouterStore } from '@ngrx/router-store';
 import { provideStoreDevtools } from '@ngrx/store-devtools';
 import { Amplify } from 'aws-amplify';
+import { firstValueFrom } from 'rxjs';
 import { TranslateModule, TranslateService } from '@ngx-translate/core';
 import { provideTranslateHttpLoader } from '@ngx-translate/http-loader';
 import { importProvidersFrom } from '@angular/core';
@@ -60,7 +61,7 @@ function initializeApp(
 
     const locale = localeService.getCurrentLocale();
     translate.setDefaultLang('en');
-    await translate.use(locale).toPromise();
+    await firstValueFrom(translate.use(locale));
   };
 }
 
