@@ -71,7 +71,10 @@ test.describe('RS-021 — Responsive layout', () => {
     await expect(switcher).toBeVisible();
   });
 
-  test('language switcher is visible at 1280px (desktop)', async ({ page }) => {
+  test('language switcher is visible at 1280px (desktop)', async ({ page }, testInfo) => {
+    // Skip on mobile device emulation — Pixel 5 isMobile flag interferes with
+    // viewport override at widths outside the device's native range.
+    test.skip(testInfo.project.name === 'mobile-chrome', 'desktop-width test — chromium only');
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto('/');
     const switcher = page.locator('[data-testid="language-switcher-btn"]').first();
